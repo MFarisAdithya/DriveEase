@@ -22,7 +22,8 @@ class DriveEaseProgress1Test extends TestCase
 
     protected function getCustomerUser(): User
     {
-        return User::whereHas('role', fn ($q) => $q->where('name', 'customer'))->first();
+        return User::where('email', 'customer@driveease.test')->first() 
+            ?? User::whereHas('role', fn ($q) => $q->where('name', 'customer'))->first();
     }
 
     /**

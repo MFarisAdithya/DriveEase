@@ -5,34 +5,69 @@
     <!-- Top Navbar -->
     <header class="bg-slate-900 border-b border-slate-800 text-white sticky top-0 z-30">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-            <!-- Brand -->
-            <div class="flex items-center gap-3">
-                <div class="w-9 h-9 rounded-lg bg-teal-600 flex items-center justify-center font-bold text-white shadow-sm">
-                    DE
-                </div>
-                <div>
-                    <span class="font-bold text-lg text-white tracking-tight">DriveEase</span>
-                    <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-slate-800 text-teal-300 border border-slate-700">
-                        {{ auth()->user()->role?->display_name ?? 'User' }}
-                    </span>
-                </div>
+            <!-- Brand & Navigation -->
+            <div class="flex items-center gap-6">
+                <a href="{{ route('cars.index') }}" class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-lg bg-teal-600 flex items-center justify-center font-bold text-white shadow-sm">
+                        DE
+                    </div>
+                    <div>
+                        <span class="font-bold text-lg text-white tracking-tight">DriveEase</span>
+                        @auth
+                            <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-slate-800 text-teal-300 border border-slate-700">
+                                {{ auth()->user()->role?->display_name ?? 'User' }}
+                            </span>
+                        @endauth
+                    </div>
+                </a>
+
+                <!-- Navigation Links -->
+                <nav class="hidden md:flex items-center gap-4 text-xs font-semibold">
+                    <a href="{{ route('cars.index') }}" class="px-3 py-1.5 rounded-lg {{ request()->routeIs('cars.*') ? 'bg-slate-800 text-teal-300' : 'text-slate-300 hover:text-white' }} transition-colors">
+                        Katalog Armada
+                    </a>
+                    @auth
+                        @if(auth()->user()->isAdmin())
+                            <a href="{{ route('admin.dashboard') }}" class="px-3 py-1.5 rounded-lg text-slate-300 hover:text-white transition-colors">
+                                Admin Dashboard
+                            </a>
+                        @elseif(auth()->user()->isStaff())
+                            <a href="{{ route('staff.dashboard') }}" class="px-3 py-1.5 rounded-lg {{ request()->routeIs('staff.dashboard') ? 'bg-slate-800 text-teal-300' : 'text-slate-300 hover:text-white' }} transition-colors">
+                                Dashboard Staf
+                            </a>
+                        @elseif(auth()->user()->isCustomer())
+                            <a href="{{ route('customer.dashboard') }}" class="px-3 py-1.5 rounded-lg {{ request()->routeIs('customer.dashboard') ? 'bg-slate-800 text-teal-300' : 'text-slate-300 hover:text-white' }} transition-colors">
+                                Dashboard Saya
+                            </a>
+                        @endif
+                    @endauth
+                </nav>
             </div>
 
-            <!-- User Menu -->
-            <div class="flex items-center gap-4">
-                <div class="text-right hidden sm:block">
-                    <p class="text-sm font-semibold text-white">{{ auth()->user()->name }}</p>
-                    <p class="text-xs text-slate-400">{{ auth()->user()->email }}</p>
-                </div>
-                <form action="{{ route('logout') }}" method="POST">
-                    @csrf
-                    <button type="submit" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-200 bg-slate-800 hover:bg-rose-900/60 hover:text-white rounded-lg transition-colors border border-slate-700">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
-                        </svg>
-                        Keluar
-                    </button>
-                </form>
+            <!-- User Menu / Auth Buttons -->
+            <div class="flex items-center gap-3">
+                @auth
+                    <div class="text-right hidden sm:block">
+                        <p class="text-xs font-semibold text-white">{{ auth()->user()->name }}</p>
+                        <p class="text-[11px] text-slate-400">{{ auth()->user()->email }}</p>
+                    </div>
+                    <form action="{{ route('logout') }}" method="POST">
+                        @csrf
+                        <button type="submit" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-200 bg-slate-800 hover:bg-rose-900/60 hover:text-white rounded-lg transition-colors border border-slate-700">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                            </svg>
+                            Keluar
+                        </button>
+                    </form>
+                @else
+                    <a href="{{ route('login') }}" class="px-3.5 py-1.5 text-xs font-semibold text-slate-300 hover:text-white transition-colors">
+                        Masuk
+                    </a>
+                    <a href="{{ route('register') }}" class="px-3.5 py-1.5 text-xs font-semibold bg-teal-600 hover:bg-teal-700 text-white rounded-lg transition-colors shadow-sm">
+                        Daftar Akun
+                    </a>
+                @endauth
             </div>
         </div>
     </header>
@@ -62,8 +97,11 @@
     </main>
 
     <!-- Footer -->
-    <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500">
-        &copy; {{ date('Y') }} DriveEase — Sistem Informasi Manajemen Rental Kendaraan.
+    <footer class="bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-500">
+        <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+            <span>&copy; {{ date('Y') }} DriveEase — Sistem Informasi Manajemen Rental Kendaraan.</span>
+            <span class="text-slate-400">Armada Prima, Perjalanan Nyaman.</span>
+        </div>
     </footer>
 </div>
 @endsection

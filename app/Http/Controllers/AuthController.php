@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Role;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\View\View;
 
 class AuthController extends Controller
@@ -43,6 +46,54 @@ class AuthController extends Controller
             ->withErrors([
                 'email' => 'Email atau password yang Anda masukkan salah.',
             ]);
+    }
+
+    public function showRegister(): View|RedirectResponse
+    {
+        if (Auth::check()) {
+            return $this->redirectBasedOnRole(Auth::user());
+        }
+
+        return view('auth.register');
+    }
+
+    public function register(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
+            'phone' => ['required', 'string', 'max:25'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ], [
+            'name.required' => 'Nama lengkap wajib diisi.',
+            'email.required' => 'Alamat email wajib diisi.',
+            'email.email' => 'Format email tidak valid.',
+            'email.unique' => 'Alamat email sudah terdaftar. Silakan gunakan email lain atau masuk ke akun Anda.',
+            'phone.required' => 'Nomor telepon/WhatsApp wajib diisi.',
+            'password.required' => 'Kata sandi wajib diisi.',
+            'password.min' => 'Kata sandi minimal 8 karakter.',
+            'password.confirmed' => 'Konfirmasi kata sandi tidak cocok.',
+        ]);
+
+        $customerRole = Role::firstOrCreate(
+            ['name' => 'customer'],
+            ['display_name' => 'Pelanggan']
+        );
+
+        $user = User::create([
+            'role_id' => $customerRole->id,
+            'name' => $validated['name'],
+            'email' => strtolower($validated['email']),
+            'phone' => $validated['phone'],
+            'password' => Hash::make($validated['password']),
+            'verification_status' => 'pending',
+        ]);
+
+        Auth::login($user);
+        $request->session()->regenerate();
+
+        return redirect()->route('customer.dashboard')
+            ->with('success', 'Pendaftaran berhasil! Selamat datang di DriveEase, ' . $user->name . '.');
     }
 
     public function logout(Request $request): RedirectResponse

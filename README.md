@@ -1,16 +1,18 @@
 # DriveEase — Sistem Informasi Manajemen Rental Kendaraan
 
-DriveEase adalah aplikasi berbasis web yang dirancang untuk mengelola proses operasional persewaan kendaraan secara terpadu, mulai dari manajemen armada mobil, autentikasi multi-peran, pencatatan transaksi, hingga pengawasan ketersediaan unit. Proyek ini dikembangkan untuk memenuhi tugas mata kuliah Pemrograman Web Lanjut (PWL).
+DriveEase adalah aplikasi berbasis web yang dirancang untuk mengelola proses operasional persewaan kendaraan secara terpadu, mulai dari manajemen armada mobil, kategori kendaraan, autentikasi multi-peran, pendaftaran pelanggan mandiri, katalog publik dinamis, hingga pengawasan ketersediaan unit. Proyek ini dikembangkan untuk memenuhi tugas mata kuliah Pemrograman Web Lanjut (PWL).
 
 ---
 
 ## 1. Deskripsi Proyek
 
-Aplikasi **DriveEase** Progress 1 mengimplementasikan pondasi utama sistem sewa mobil mencakup:
+Aplikasi **DriveEase** Progress 1 mengimplementasikan modul inti mencakup:
 - Arsitektur berbasis **Laravel MVC** terintegrasi dengan basis data **PostgreSQL**.
-- Autentikasi sesi mandiri (login & logout) yang aman.
+- Autentikasi sesi mandiri (login, logout, register pelanggan baru) yang aman.
 - Sistem otorisasi 3 peran (*Admin*, *Staff*, *Customer*) dengan pembatasan akses di tingkat middleware backend.
 - Modul CRUD (Create, Read, Update, Delete) armada kendaraan lengkap dengan validasi form dan pesan notifikasi (flash message).
+- Modul CRUD kategori kendaraan (*Car Types*) untuk Administrator dengan proteksi integritas relasi armada.
+- Katalog kendaraan publik dinamis berbasis PostgreSQL dengan filter kategori, transmisi, pencarian instan, dan halaman rincian spesifikasi.
 - Dashboard informatif yang disesuaikan untuk masing-masing peran pengguna dengan statistik riil dari basis data.
 
 ---
@@ -22,7 +24,7 @@ Aplikasi **DriveEase** Progress 1 mengimplementasikan pondasi utama sistem sewa 
 - **Template Engine**: Laravel Blade
 - **Styling**: Tailwind CSS & Vite
 - **ORM**: Eloquent ORM
-- **Testing**: PHPUnit / Laravel Feature Testing Suite
+- **Testing**: PHPUnit / Laravel Feature Testing Suite (29 Automated Tests Passed)
 - **Version Control**: Git
 
 ---
@@ -103,47 +105,49 @@ Password untuk semua akun demo adalah: **`password123`**
 
 | Peran (Role) | Email Login | Wewenang & Batasan Akses |
 |:---|:---|:---|
-| **Admin** | `admin@driveease.test` | Akses penuh ke Admin Console (`/admin/dashboard`), manajemen CRUD armada mobil (`/admin/cars`), melihat ringkasan statistik operasional dari basis data. |
-| **Staff (Staf Lapangan)** | `staff@driveease.test` | Mengakses Staff Portal (`/staff/dashboard`), melihat statistik ringkas dan daftar seluruh armada dalam mode *read-only*. Dilarang keras mengakses fitur tambah/edit/hapus kendaraan (otomatis diblokir 403 Forbidden). |
+| **Admin** | `admin@driveease.test` | Akses penuh ke Admin Console (`/admin/dashboard`), manajemen CRUD armada mobil (`/admin/cars`), manajemen CRUD kategori kendaraan (`/admin/car-types`), melihat ringkasan statistik operasional dari basis data. |
+| **Staff (Staf Lapangan)** | `staff@driveease.test` | Mengakses Staff Portal (`/staff/dashboard`), melihat statistik ringkas dan daftar seluruh armada dalam mode *read-only*. Dilarang keras mengakses fitur tambah/edit/hapus kendaraan atau kategori (otomatis diblokir 403 Forbidden). |
 | **Customer (Pelanggan)** | `customer@driveease.test` | Mengakses Customer Portal (`/customer/dashboard`), menjelajahi katalog unit kendaraan yang berstatus *Tersedia* lengkap dengan rincian spesifikasi teknis dan tarif harian. Dilarang mengakses rute manajemen admin. |
 
 ---
 
-## 7. Fitur yang Telah Selesai (Progress 1)
+## 7. Rute & Modul yang Tersedia
 
-1. **Setup & Integrasi PostgreSQL**: Basis data PostgreSQL `driveease_db` terhubung stabil via PDO pgsql.
-2. **Database Migrations & Models**:
-   - `roles`: Menyimpan peran (`admin`, `staff`, `customer`).
-   - `users`: Ekstensi model user dengan `role_id`, `phone`, `address`.
-   - `car_types`: Kategori armada (*SUV*, *MPV*, *Sedan*, *City Car*).
-   - `cars`: Tabel armada dengan atribut lengkap (nama, nomor plat unik, merek, tahun, transmisi, kapasitas, tarif, status, deskripsi).
-3. **Autentikasi Sesi & Proteksi Middleware**:
-   - Login & Logout dengan validasi ketat dan regenerasi token sesi CSRF.
-   - Redirect cerdas ke dashboard sesuai peran pengguna.
-   - Middleware `role:...` di tingkat backend yang mengamankan rute terproteksi.
-4. **CRUD Kendaraan untuk Admin**:
-   - Daftar kendaraan dengan filter kategori, filter status, dan pencarian instan.
-   - Tambah kendaraan baru dengan validasi data (plat nomor unik, harga sewa > 0, kapasitas > 0).
-   - Detail spesifikasi kendaraan.
-   - Ubah/edit data kendaraan.
-   - Hapus kendaraan dengan konfirmasi keamanan.
-   - Tampilan pesan sukses (flash alert) dan pesan error validasi per kolom.
-5. **Role-Specific Dashboards**:
-   - **Admin Dashboard**: Statistik riil dari basis data (Total Armada, Tersedia, Disewa, Masa Perawatan) serta 5 unit terbaru.
-   - **Staff Dashboard**: Ringkasan armada dan tabel pantau status kendaraan *read-only*.
-   - **Customer Dashboard**: Katalog kartu kendaraan yang berstatus siap sewa dengan rincian tarif per hari.
-6. **Desain Antarmuka Modern & Responsif**:
-   - Menggunakan palet warna *Navy Blue* (`#0b1d3a`) dan aksen *Muted Teal* (`#0d9488`).
-   - Halaman error ramah pengguna (HTTP 403 & 404).
-7. **Pengujian Otomatis (Automated Feature Testing)**:
-   - 14 pengujian fitur (14 passed, 53 assertions) berjalan sukses di PHPUnit.
+### Modul Publik & Autentikasi
+- `GET /` — Beranda (redirect cerdas ke dashboard bila login, atau ke katalog `/cars` bagi guest)
+- `GET /cars` — Katalog armada dinamis publik dengan fitur pencarian teks, filter kategori, dan pagination
+- `GET /cars/{car}` — Detail spesifikasi lengkap armada kendaraan
+- `GET /login` & `POST /login` — Masuk ke akun sistem
+- `GET /register` & `POST /register` — Pendaftaran akun pelanggan mandiri (auto-assigned role `customer`)
+- `POST /logout` — Keluar dari sistem
+
+### Modul Khusus Administrator (`auth, role:admin`)
+- `GET /admin/dashboard` — Dashboard ringkasan metrik basis data
+- Resource `/admin/cars` — CRUD armada mobil (Index, Create, Store, Show, Edit, Update, Destroy)
+- Resource `/admin/car-types` — CRUD kategori kendaraan (Index, Create, Store, Edit, Update, Destroy) dengan pencegahan penghapusan kategori yang masih digunakan armada
+
+### Modul Khusus Staf (`auth, role:staff`)
+- `GET /staff/dashboard` — Dashboard operasional lapangan (*read-only* list)
+
+### Modul Khusus Pelanggan (`auth, role:customer`)
+- `GET /customer/dashboard` — Dashboard katalog armada siap sewa
 
 ---
 
-## 8. Rencana Pengembangan Selanjutnya (Progress 2)
+## 8. Pengujian Otomatis (Automated Feature Testing)
+
+Proyek ini dilengkapi dengan 29 skenario pengujian fitur komprehensif (`tests/Feature`) yang dijalankan langsung terhadap PostgreSQL:
+```bash
+php artisan test --without-tty
+```
+Hasil: **29 Passed, 104 Assertions, 0 Failed**.
+
+---
+
+## 9. Rencana Pengembangan Selanjutnya (Progress 2)
 
 Fitur yang dijadwalkan untuk tahap berikutnya:
-- Registrasi publik untuk calon penyewa dengan unggah berkas KTP & SIM.
+- Unggah dan verifikasi berkas identitas resmi (KTP & SIM) oleh Admin.
 - Modul pemesanan/reservasi sewa kendaraan (*Rentals*) dengan pemilihan tanggal sewa.
 - Algoritma pencegahan bentrok jadwal (*double-booking prevention*).
 - Validasi bukti pembayaran sewa oleh Admin.

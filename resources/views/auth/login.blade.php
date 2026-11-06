@@ -82,6 +82,13 @@
                     </button>
                 </div>
             </form>
+
+            <div class="mt-6 pt-4 border-t border-slate-100 text-center text-xs text-slate-500">
+                Belum memiliki akun?
+                <a href="{{ route('register') }}" class="font-semibold text-teal-700 hover:text-teal-800 ml-1">
+                    Daftar Akun Baru
+                </a>
+            </div>
         </div>
 
         <!-- Demo Accounts Helper -->

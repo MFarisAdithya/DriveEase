@@ -64,7 +64,7 @@
                     @endif
                 </div>
 
-                <!-- Card Footer (Pricing & Note) -->
+                <!-- Card Footer (Pricing & Link) -->
                 <div class="p-5 bg-slate-50/70 border-t border-slate-100 flex items-center justify-between">
                     <div>
                         <span class="text-[10px] text-slate-400 uppercase font-semibold block">Tarif Sewa</span>
@@ -75,9 +75,12 @@
                             <span class="text-[11px] text-slate-500">/ hari</span>
                         </div>
                     </div>
-                    <span class="text-[11px] font-medium text-slate-500 bg-white px-2.5 py-1 rounded border border-slate-200">
-                        Plat: {{ $car->plate_number }}
-                    </span>
+                    <a href="{{ route('cars.show', $car) }}" class="inline-flex items-center gap-1 text-xs font-semibold text-teal-700 hover:text-teal-900 bg-white px-3 py-1.5 rounded-lg border border-slate-200 hover:border-teal-500 transition-colors shadow-xs">
+                        Lihat Detail
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                        </svg>
+                    </a>
                 </div>
             </div>
         @empty
