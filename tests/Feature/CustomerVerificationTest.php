@@ -83,7 +83,7 @@ class CustomerVerificationTest extends TestCase
 
         $response = $this->actingAs($this->customer)->post(route('customer.verification.store'), [
             'ktp_number' => '3578012304950001',
-            'sim_number' => '1234-5678-901234',
+            'sim_number' => '12345678901234',
             'ktp_image' => $ktpFile,
             'sim_image' => $simFile,
         ]);
@@ -95,7 +95,7 @@ class CustomerVerificationTest extends TestCase
 
         $this->assertEquals('3578012304950001', $this->customer->ktp_number);
         $this->assertEquals('3578012304950001', $this->customer->nik_ktp);
-        $this->assertEquals('1234-5678-901234', $this->customer->sim_number);
+        $this->assertEquals('12345678901234', $this->customer->sim_number);
         $this->assertEquals('pending', $this->customer->verification_status);
         $this->assertNull($this->customer->rejection_reason);
 
@@ -113,7 +113,7 @@ class CustomerVerificationTest extends TestCase
         // 15 digits
         $response = $this->actingAs($this->customer)->post(route('customer.verification.store'), [
             'ktp_number' => '123456789012345',
-            'sim_number' => 'SIM-12345',
+            'sim_number' => '12345678901234',
             'ktp_image' => UploadedFile::fake()->image('ktp.jpg'),
             'sim_image' => UploadedFile::fake()->image('sim.jpg'),
         ]);
@@ -122,7 +122,7 @@ class CustomerVerificationTest extends TestCase
         // 17 digits
         $response2 = $this->actingAs($this->customer)->post(route('customer.verification.store'), [
             'ktp_number' => '12345678901234567',
-            'sim_number' => 'SIM-12345',
+            'sim_number' => '12345678901234',
             'ktp_image' => UploadedFile::fake()->image('ktp.jpg'),
             'sim_image' => UploadedFile::fake()->image('sim.jpg'),
         ]);
@@ -131,22 +131,83 @@ class CustomerVerificationTest extends TestCase
         // Contains letters
         $response3 = $this->actingAs($this->customer)->post(route('customer.verification.store'), [
             'ktp_number' => '123456789012345A',
-            'sim_number' => 'SIM-12345',
+            'sim_number' => '12345678901234',
             'ktp_image' => UploadedFile::fake()->image('ktp.jpg'),
             'sim_image' => UploadedFile::fake()->image('sim.jpg'),
         ]);
         $response3->assertSessionHasErrors(['ktp_number']);
     }
 
-    public function test_sim_number_is_required(): void
+    public function test_sim_number_must_be_exactly_14_numeric_digits(): void
     {
-        $response = $this->actingAs($this->customer)->post(route('customer.verification.store'), [
+        // Empty
+        $response1 = $this->actingAs($this->customer)->post(route('customer.verification.store'), [
             'ktp_number' => '3578012304950001',
             'sim_number' => '',
             'ktp_image' => UploadedFile::fake()->image('ktp.jpg'),
             'sim_image' => UploadedFile::fake()->image('sim.jpg'),
         ]);
-        $response->assertSessionHasErrors(['sim_number']);
+        $response1->assertSessionHasErrors(['sim_number']);
+
+        // 13 digits
+        $response2 = $this->actingAs($this->customer)->post(route('customer.verification.store'), [
+            'ktp_number' => '3578012304950001',
+            'sim_number' => '1234567890123',
+            'ktp_image' => UploadedFile::fake()->image('ktp.jpg'),
+            'sim_image' => UploadedFile::fake()->image('sim.jpg'),
+        ]);
+        $response2->assertSessionHasErrors(['sim_number']);
+
+        // 15 digits
+        $response3 = $this->actingAs($this->customer)->post(route('customer.verification.store'), [
+            'ktp_number' => '3578012304950001',
+            'sim_number' => '123456789012345',
+            'ktp_image' => UploadedFile::fake()->image('ktp.jpg'),
+            'sim_image' => UploadedFile::fake()->image('sim.jpg'),
+        ]);
+        $response3->assertSessionHasErrors(['sim_number']);
+
+        // Non numeric
+        $response4 = $this->actingAs($this->customer)->post(route('customer.verification.store'), [
+            'ktp_number' => '3578012304950001',
+            'sim_number' => '1234-5678-9012',
+            'ktp_image' => UploadedFile::fake()->image('ktp.jpg'),
+            'sim_image' => UploadedFile::fake()->image('sim.jpg'),
+        ]);
+        $response4->assertSessionHasErrors(['sim_number']);
+    }
+
+    public function test_temporary_uploaded_files_are_preserved_when_other_fields_fail(): void
+    {
+        $ktpFile = UploadedFile::fake()->image('my_ktp.jpg');
+        $simFile = UploadedFile::fake()->image('my_sim.jpg');
+
+        // Submit with invalid 1-digit KTP and invalid 5-digit SIM
+        $response = $this->actingAs($this->customer)->post(route('customer.verification.store'), [
+            'ktp_number' => '1',
+            'sim_number' => '12345',
+            'ktp_image' => $ktpFile,
+            'sim_image' => $simFile,
+        ]);
+
+        $response->assertSessionHasErrors(['ktp_number', 'sim_number']);
+        $this->assertTrue(session()->has('temp_ktp_image'));
+        $this->assertTrue(session()->has('temp_sim_image'));
+
+        // Next submission fixes KTP and SIM without re-uploading files
+        $response2 = $this->actingAs($this->customer)->post(route('customer.verification.store'), [
+            'ktp_number' => '3578012304950001',
+            'sim_number' => '12345678901234',
+        ]);
+
+        $response2->assertRedirect(route('customer.dashboard'));
+        $response2->assertSessionHas('success');
+
+        $this->customer->refresh();
+        $this->assertNotNull($this->customer->ktp_image);
+        $this->assertNotNull($this->customer->sim_image);
+        Storage::disk('local')->assertExists($this->customer->ktp_image);
+        Storage::disk('local')->assertExists($this->customer->sim_image);
     }
 
     public function test_uploaded_files_must_be_valid_images_under_2mb(): void
@@ -156,7 +217,7 @@ class CustomerVerificationTest extends TestCase
 
         $response = $this->actingAs($this->customer)->post(route('customer.verification.store'), [
             'ktp_number' => '3578012304950001',
-            'sim_number' => 'SIM-12345',
+            'sim_number' => '12345678901234',
             'ktp_image' => $fakeTxt,
             'sim_image' => UploadedFile::fake()->image('sim.jpg'),
         ]);
@@ -167,7 +228,7 @@ class CustomerVerificationTest extends TestCase
 
         $response2 = $this->actingAs($this->customer)->post(route('customer.verification.store'), [
             'ktp_number' => '3578012304950001',
-            'sim_number' => 'SIM-12345',
+            'sim_number' => '12345678901234',
             'ktp_image' => UploadedFile::fake()->image('ktp.jpg'),
             'sim_image' => $largeFile,
         ]);
@@ -182,7 +243,7 @@ class CustomerVerificationTest extends TestCase
         $this->customer->update([
             'ktp_image' => $ktpPath,
             'ktp_number' => '3578012304950001',
-            'sim_number' => 'SIM-9999',
+            'sim_number' => '12345678901234',
         ]);
 
         $response = $this->actingAs($this->admin)->get(route('documents.identity.show', [
@@ -203,7 +264,7 @@ class CustomerVerificationTest extends TestCase
         $this->customer->update([
             'ktp_image' => $ktpPath,
             'ktp_number' => '3578012304950001',
-            'sim_number' => 'SIM-9999',
+            'sim_number' => '12345678901234',
         ]);
 
         $response = $this->actingAs($this->customer)->get(route('documents.identity.show', [
@@ -265,7 +326,7 @@ class CustomerVerificationTest extends TestCase
 
         $this->customer->update([
             'ktp_number' => '3578012304950001',
-            'sim_number' => 'SIM-12345678',
+            'sim_number' => '12345678901234',
             'ktp_image' => $ktpPath,
             'sim_image' => $simPath,
             'verification_status' => 'pending',
@@ -306,7 +367,7 @@ class CustomerVerificationTest extends TestCase
     {
         $this->customer->update([
             'ktp_number' => '3578012304950001',
-            'sim_number' => 'SIM-12345678',
+            'sim_number' => '12345678901234',
             'verification_status' => 'pending',
         ]);
 
@@ -355,7 +416,7 @@ class CustomerVerificationTest extends TestCase
 
         $this->customer->update([
             'ktp_number' => '3578012304950001',
-            'sim_number' => 'SIM-12345678',
+            'sim_number' => '12345678901234',
             'ktp_image' => $ktpPath,
             'sim_image' => $simPath,
             'verification_status' => 'rejected',
@@ -366,7 +427,7 @@ class CustomerVerificationTest extends TestCase
 
         $response = $this->actingAs($this->customer)->post(route('customer.verification.store'), [
             'ktp_number' => '3578012304950001',
-            'sim_number' => 'SIM-12345678',
+            'sim_number' => '12345678901234',
             'ktp_image' => $newKtpFile,
         ]);
 
@@ -388,7 +449,7 @@ class CustomerVerificationTest extends TestCase
 
         $response = $this->actingAs($this->customer)->post(route('customer.verification.store'), [
             'ktp_number' => '3578012304950001',
-            'sim_number' => 'SIM-12345678',
+            'sim_number' => '12345678901234',
             'ktp_image' => UploadedFile::fake()->image('ktp.jpg'),
             'sim_image' => UploadedFile::fake()->image('sim.jpg'),
         ]);

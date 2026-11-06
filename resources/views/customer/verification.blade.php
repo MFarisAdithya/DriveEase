@@ -104,7 +104,7 @@
             <div>
                 <h4 class="text-base font-bold text-blue-900">Lengkapi Identitas untuk Menyewa Mobil</h4>
                 <p class="text-sm text-blue-800 mt-1">
-                    Sesuai kebijakan keamanan rental DriveEase, customer wajib memiliki KTP (16 digit angka) dan SIM A/Umum yang valid dan terverifikasi sebelum dapat melakukan reservasi.
+                    Sesuai kebijakan keamanan rental DriveEase, customer wajib memiliki KTP (16 digit angka) dan SIM (14 digit angka) yang valid dan terverifikasi sebelum dapat melakukan reservasi.
                 </p>
             </div>
         </div>
@@ -135,6 +135,11 @@
 
     <!-- Identity Submission Form -->
     @unless ($user->isVerified())
+        @php
+            $hasKtpStored = !empty($user->ktp_image) || session()->has('temp_ktp_image');
+            $hasSimStored = !empty($user->sim_image) || session()->has('temp_sim_image');
+        @endphp
+
         <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
             <h3 class="text-base font-bold text-slate-900 mb-1">
                 {{ $user->isRejectedVerification() ? 'Formulir Perbaikan & Pengiriman Ulang' : ($user->hasSubmittedDocuments() ? 'Perbarui Dokumen Identitas' : 'Unggah Dokumen Identitas') }}
@@ -154,25 +159,31 @@
                     </h4>
 
                     <div>
-                        <label for="ktp_number" class="block text-xs font-semibold text-slate-700 mb-1">
-                            Nomor Induk Kependudukan (16 Digit) <span class="text-rose-500">*</span>
-                        </label>
+                        <div class="flex items-center justify-between mb-1">
+                            <label for="ktp_number" class="block text-xs font-semibold text-slate-700">
+                                Nomor Induk Kependudukan (16 Digit) <span class="text-rose-500">*</span>
+                            </label>
+                            <span id="ktp_counter" class="text-[11px] font-mono text-slate-400">0 / 16 digit</span>
+                        </div>
                         <input type="text" 
                                name="ktp_number" 
                                id="ktp_number" 
                                maxlength="16"
+                               inputmode="numeric"
                                placeholder="Contoh: 3578012304950001"
                                value="{{ old('ktp_number', $user->ktp_number ?? $user->nik_ktp) }}" 
                                class="w-full px-3.5 py-2.5 rounded-lg border {{ $errors->has('ktp_number') ? 'border-rose-400 bg-rose-50/30' : 'border-slate-300' }} text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent tracking-widest font-mono"
                                required>
                         @error('ktp_number')
                             <p class="text-xs text-rose-600 mt-1 font-medium">{{ $message }}</p>
+                        @else
+                            <p class="text-[11px] text-slate-400 mt-1">Masukkan tepat 16 digit angka sesuai KTP Anda.</p>
                         @enderror
                     </div>
 
                     <div>
                         <label for="ktp_image" class="block text-xs font-semibold text-slate-700 mb-1">
-                            Unggah Foto KTP Asli {{ $user->ktp_image ? '(Opsional jika tidak diganti)' : '*' }}
+                            Unggah Foto KTP Asli {{ $hasKtpStored ? '(Opsional jika tidak diganti)' : '*' }}
                         </label>
                         <input type="file" 
                                name="ktp_image" 
@@ -184,20 +195,24 @@
                             <p class="text-xs text-rose-600 mt-1 font-medium">{{ $message }}</p>
                         @enderror
 
-                        @if ($user->ktp_image)
-                            <div class="mt-3 p-3 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-between">
+                        @if ($hasKtpStored)
+                            <div class="mt-3 p-3 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-between">
                                 <div class="flex items-center gap-3">
-                                    <svg class="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                                    </svg>
+                                    <div class="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                        </svg>
+                                    </div>
                                     <div>
-                                        <p class="text-xs font-semibold text-slate-700">Foto KTP telah tersimpan aman</p>
-                                        <p class="text-[11px] text-slate-400">Tersimpan di sistem private storage</p>
+                                        <p class="text-xs font-semibold text-emerald-900">Foto KTP telah tersimpan aman</p>
+                                        <p class="text-[11px] text-emerald-700 font-mono">{{ session('temp_ktp_image_name', basename($user->ktp_image ?? 'Foto KTP Tersimpan')) }}</p>
                                     </div>
                                 </div>
-                                <a href="{{ route('documents.identity.show', [$user, 'ktp']) }}" target="_blank" class="px-2.5 py-1 text-xs font-medium text-teal-700 bg-white border border-teal-200 rounded hover:bg-teal-50">
-                                    Lihat Pratinjau
-                                </a>
+                                @if ($user->ktp_image || session('temp_ktp_image'))
+                                    <a href="{{ route('documents.identity.show', [$user, 'ktp']) }}" target="_blank" class="px-2.5 py-1 text-xs font-medium text-emerald-800 bg-white border border-emerald-300 rounded hover:bg-emerald-100/50">
+                                        Lihat Pratinjau
+                                    </a>
+                                @endif
                             </div>
                         @endif
                     </div>
@@ -211,24 +226,31 @@
                     </h4>
 
                     <div>
-                        <label for="sim_number" class="block text-xs font-semibold text-slate-700 mb-1">
-                            Nomor SIM <span class="text-rose-500">*</span>
-                        </label>
+                        <div class="flex items-center justify-between mb-1">
+                            <label for="sim_number" class="block text-xs font-semibold text-slate-700">
+                                Nomor SIM (14 Digit) <span class="text-rose-500">*</span>
+                            </label>
+                            <span id="sim_counter" class="text-[11px] font-mono text-slate-400">0 / 14 digit</span>
+                        </div>
                         <input type="text" 
                                name="sim_number" 
                                id="sim_number" 
-                               placeholder="Contoh: 1234-5678-901234"
+                               maxlength="14"
+                               inputmode="numeric"
+                               placeholder="Contoh: 12345678901234"
                                value="{{ old('sim_number', $user->sim_number) }}" 
-                               class="w-full px-3.5 py-2.5 rounded-lg border {{ $errors->has('sim_number') ? 'border-rose-400 bg-rose-50/30' : 'border-slate-300' }} text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent font-mono"
+                               class="w-full px-3.5 py-2.5 rounded-lg border {{ $errors->has('sim_number') ? 'border-rose-400 bg-rose-50/30' : 'border-slate-300' }} text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent tracking-widest font-mono"
                                required>
                         @error('sim_number')
                             <p class="text-xs text-rose-600 mt-1 font-medium">{{ $message }}</p>
+                        @else
+                            <p class="text-[11px] text-slate-400 mt-1">Nomor SIM harus tepat 14 digit angka.</p>
                         @enderror
                     </div>
 
                     <div>
                         <label for="sim_image" class="block text-xs font-semibold text-slate-700 mb-1">
-                            Unggah Foto SIM Asli {{ $user->sim_image ? '(Opsional jika tidak diganti)' : '*' }}
+                            Unggah Foto SIM Asli {{ $hasSimStored ? '(Opsional jika tidak diganti)' : '*' }}
                         </label>
                         <input type="file" 
                                name="sim_image" 
@@ -240,20 +262,24 @@
                             <p class="text-xs text-rose-600 mt-1 font-medium">{{ $message }}</p>
                         @enderror
 
-                        @if ($user->sim_image)
-                            <div class="mt-3 p-3 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-between">
+                        @if ($hasSimStored)
+                            <div class="mt-3 p-3 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-between">
                                 <div class="flex items-center gap-3">
-                                    <svg class="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                                    </svg>
+                                    <div class="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                        </svg>
+                                    </div>
                                     <div>
-                                        <p class="text-xs font-semibold text-slate-700">Foto SIM telah tersimpan aman</p>
-                                        <p class="text-[11px] text-slate-400">Tersimpan di sistem private storage</p>
+                                        <p class="text-xs font-semibold text-emerald-900">Foto SIM telah tersimpan aman</p>
+                                        <p class="text-[11px] text-emerald-700 font-mono">{{ session('temp_sim_image_name', basename($user->sim_image ?? 'Foto SIM Tersimpan')) }}</p>
                                     </div>
                                 </div>
-                                <a href="{{ route('documents.identity.show', [$user, 'sim']) }}" target="_blank" class="px-2.5 py-1 text-xs font-medium text-teal-700 bg-white border border-teal-200 rounded hover:bg-teal-50">
-                                    Lihat Pratinjau
-                                </a>
+                                @if ($user->sim_image || session('temp_sim_image'))
+                                    <a href="{{ route('documents.identity.show', [$user, 'sim']) }}" target="_blank" class="px-2.5 py-1 text-xs font-medium text-emerald-800 bg-white border border-emerald-300 rounded hover:bg-emerald-100/50">
+                                        Lihat Pratinjau
+                                    </a>
+                                @endif
                             </div>
                         @endif
                     </div>
@@ -281,4 +307,34 @@
         </div>
     @endunless
 </div>
+
+<script>
+    function setupNumericInput(id, maxDigits, counterId) {
+        const input = document.getElementById(id);
+        const counter = document.getElementById(counterId);
+        if (!input || !counter) return;
+
+        function update() {
+            // Filter non-numeric characters automatically
+            input.value = input.value.replace(/[^0-9]/g, '').slice(0, maxDigits);
+            const len = input.value.length;
+            counter.textContent = `${len} / ${maxDigits} digit`;
+            if (len === maxDigits) {
+                counter.className = 'text-[11px] font-mono text-emerald-600 font-semibold';
+            } else if (len > 0) {
+                counter.className = 'text-[11px] font-mono text-amber-600 font-medium';
+            } else {
+                counter.className = 'text-[11px] font-mono text-slate-400';
+            }
+        }
+
+        input.addEventListener('input', update);
+        update();
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        setupNumericInput('ktp_number', 16, 'ktp_counter');
+        setupNumericInput('sim_number', 14, 'sim_counter');
+    });
+</script>
 @endsection

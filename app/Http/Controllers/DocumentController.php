@@ -37,6 +37,10 @@ class DocumentController extends Controller
         $imageField = $type === 'ktp' ? 'ktp_image' : 'sim_image';
         $path = $user->{$imageField};
 
+        if ((!$path || !Storage::disk('local')->exists($path)) && $isOwner && session("temp_{$type}_image")) {
+            $path = session("temp_{$type}_image");
+        }
+
         if (!$path || !Storage::disk('local')->exists($path)) {
             abort(404, 'Dokumen identitas tidak ditemukan atau belum diunggah.');
         }
