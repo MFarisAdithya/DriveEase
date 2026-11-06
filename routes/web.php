@@ -2,8 +2,11 @@
 
 use App\Http\Controllers\Admin\CarController as AdminCarController;
 use App\Http\Controllers\Admin\CarTypeController as AdminCarTypeController;
+use App\Http\Controllers\Admin\VerificationController as AdminVerificationController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\Customer\VerificationController as CustomerVerificationController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\PublicCarController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
@@ -40,11 +43,22 @@ Route::post('/logout', [AuthController::class, 'logout'])
     ->middleware('auth')
     ->name('logout');
 
+// Secure Private Document Streaming
+Route::get('/documents/identity/{user}/{type}', [DocumentController::class, 'showIdentity'])
+    ->middleware('auth')
+    ->name('documents.identity.show');
+
 // Admin Routes (Protected by auth and role:admin)
 Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'admin'])->name('dashboard');
     Route::resource('cars', AdminCarController::class);
     Route::resource('car-types', AdminCarTypeController::class)->except(['show']);
+
+    // Customer Identity Verification Management
+    Route::get('/verifications', [AdminVerificationController::class, 'index'])->name('verifications.index');
+    Route::get('/verifications/{user}', [AdminVerificationController::class, 'show'])->name('verifications.show');
+    Route::patch('/verifications/{user}/approve', [AdminVerificationController::class, 'approve'])->name('verifications.approve');
+    Route::patch('/verifications/{user}/reject', [AdminVerificationController::class, 'reject'])->name('verifications.reject');
 });
 
 // Staff Routes (Protected by auth and role:staff)
@@ -55,4 +69,6 @@ Route::middleware(['auth', 'role:staff'])->prefix('staff')->name('staff.')->grou
 // Customer Routes (Protected by auth and role:customer)
 Route::middleware(['auth', 'role:customer'])->prefix('customer')->name('customer.')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'customer'])->name('dashboard');
+    Route::get('/verification', [CustomerVerificationController::class, 'create'])->name('verification.create');
+    Route::post('/verification', [CustomerVerificationController::class, 'store'])->name('verification.store');
 });

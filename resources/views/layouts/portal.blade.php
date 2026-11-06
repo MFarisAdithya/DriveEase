@@ -39,6 +39,9 @@
                             <a href="{{ route('customer.dashboard') }}" class="px-3 py-1.5 rounded-lg {{ request()->routeIs('customer.dashboard') ? 'bg-slate-800 text-teal-300' : 'text-slate-300 hover:text-white' }} transition-colors">
                                 Dashboard Saya
                             </a>
+                            <a href="{{ route('customer.verification.create') }}" class="px-3 py-1.5 rounded-lg {{ request()->routeIs('customer.verification.*') ? 'bg-slate-800 text-teal-300' : 'text-slate-300 hover:text-white' }} transition-colors">
+                                Verifikasi Dokumen
+                            </a>
                         @endif
                     @endauth
                 </nav>

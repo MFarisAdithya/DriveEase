@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Car;
+use App\Models\User;
 use Illuminate\View\View;
 
 class DashboardController extends Controller
@@ -14,6 +15,9 @@ class DashboardController extends Controller
             'available' => Car::where('status', 'available')->count(),
             'rented' => Car::where('status', 'rented')->count(),
             'maintenance' => Car::where('status', 'maintenance')->count(),
+            'pending_verifications' => User::where('verification_status', 'pending')
+                ->whereHas('role', fn($q) => $q->where('name', 'customer'))
+                ->count(),
         ];
 
         $recentCars = Car::with('carType')->latest()->take(5)->get();
@@ -32,11 +36,12 @@ class DashboardController extends Controller
 
     public function customer(): View
     {
+        $user = auth()->user();
         $availableCars = Car::with('carType')
             ->where('status', 'available')
             ->orderBy('price_per_day', 'asc')
             ->get();
 
-        return view('dashboard.customer', compact('availableCars'));
+        return view('dashboard.customer', compact('availableCars', 'user'));
     }
 }

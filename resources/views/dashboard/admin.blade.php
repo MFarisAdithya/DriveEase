@@ -28,7 +28,7 @@
     </div>
 
     <!-- Statistics Grid (All from DB) -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
         <!-- Total Vehicles -->
         <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm">
             <div class="flex items-center justify-between">
@@ -83,6 +83,24 @@
                 </span>
             </div>
             <p class="text-3xl font-bold text-rose-700 mt-3">{{ $stats['maintenance'] }}</p>
+            <p class="text-xs text-slate-500 mt-1">Dalam perbaikan bengkel</p>
+        </div>
+
+        <!-- Pending Verifications (Clickable to filtered list) -->
+        <a href="{{ route('admin.verifications.index', ['status' => 'pending']) }}" class="bg-white rounded-xl p-5 border {{ $stats['pending_verifications'] > 0 ? 'border-amber-300 ring-2 ring-amber-100' : 'border-slate-200' }} shadow-sm hover:border-amber-400 transition-all block group">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-semibold uppercase tracking-wider text-amber-700 group-hover:text-amber-800">Verifikasi Tertunda</span>
+                <span class="p-2 rounded-lg bg-amber-50 text-amber-600 group-hover:bg-amber-100 transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                    </svg>
+                </span>
+            </div>
+            <p class="text-3xl font-bold text-amber-600 mt-3">{{ $stats['pending_verifications'] }}</p>
+            <p class="text-xs text-amber-600/80 mt-1 flex items-center gap-1 font-medium">
+                Customer menunggu persetujuan &rarr;
+            </p>
+        </a>
             <p class="text-xs text-slate-500 mt-1">Dalam masa perbaikan/bengkel</p>
         </div>
     </div>

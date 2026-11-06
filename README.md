@@ -1,19 +1,27 @@
 # DriveEase — Sistem Informasi Manajemen Rental Kendaraan
 
-DriveEase adalah aplikasi berbasis web yang dirancang untuk mengelola proses operasional persewaan kendaraan secara terpadu, mulai dari manajemen armada mobil, kategori kendaraan, autentikasi multi-peran, pendaftaran pelanggan mandiri, katalog publik dinamis, hingga pengawasan ketersediaan unit. Proyek ini dikembangkan untuk memenuhi tugas mata kuliah Pemrograman Web Lanjut (PWL).
+DriveEase adalah aplikasi berbasis web yang dirancang untuk mengelola proses operasional persewaan kendaraan secara terpadu, mulai dari manajemen armada mobil, kategori kendaraan, autentikasi multi-peran, pendaftaran pelanggan mandiri, katalog publik dinamis, verifikasi identitas resmi pelanggan (KTP & SIM), hingga pengawasan ketersediaan unit. Proyek ini dikembangkan untuk memenuhi tugas mata kuliah Pemrograman Web Lanjut (PWL).
 
 ---
 
 ## 1. Deskripsi Proyek
 
-Aplikasi **DriveEase** Progress 1 mengimplementasikan modul inti mencakup:
+Aplikasi **DriveEase** mengimplementasikan modul inti mencakup:
 - Arsitektur berbasis **Laravel MVC** terintegrasi dengan basis data **PostgreSQL**.
 - Autentikasi sesi mandiri (login, logout, register pelanggan baru) yang aman.
 - Sistem otorisasi 3 peran (*Admin*, *Staff*, *Customer*) dengan pembatasan akses di tingkat middleware backend.
 - Modul CRUD (Create, Read, Update, Delete) armada kendaraan lengkap dengan validasi form dan pesan notifikasi (flash message).
 - Modul CRUD kategori kendaraan (*Car Types*) untuk Administrator dengan proteksi integritas relasi armada.
 - Katalog kendaraan publik dinamis berbasis PostgreSQL dengan filter kategori, transmisi, pencarian instan, dan halaman rincian spesifikasi.
-- Dashboard informatif yang disesuaikan untuk masing-masing peran pengguna dengan statistik riil dari basis data.
+- **Modul Verifikasi Identitas Customer**:
+  - Pengunggahan dokumen KTP (validasi tepat 16 digit angka) dan SIM A/Umum dengan pembatasan ukuran berkas maksimal 2 MB (format JPG, JPEG, PNG, WEBP).
+  - Penyimpanan berkas privat terenkripsi pada direktori aman (`storage/app/private/identities`) yang tidak terekspos ke direktori publik web.
+  - Streaming dokumen terlindungi otorisasi (`GET /documents/identity/{user}/{type}`), hanya dapat diakses oleh Admin atau pemilik dokumen itu sendiri dengan header `Cache-Control: private, no-store`.
+  - Panel peninjauan verifikasi Admin (`/admin/verifications`) dengan filter status (*all*, *pending*, *verified*, *rejected*).
+  - Mekanisme persetujuan (*Approve*) dan penolakan (*Reject*) dengan kewajiban mengisi alasan penolakan (*rejection reason*).
+  - Mekanisme pengiriman ulang (*resubmission*) oleh pelanggan yang ditolak hingga status kembali menjadi *pending*.
+  - Helper eligibilitas pemesanan `canMakeReservation()` pada Model `User` sesuai aturan bisnis BR-08.
+- Dashboard informatif yang disesuaikan untuk masing-masing peran pengguna dengan statistik riil dari basis data (termasuk metrik verifikasi tertunda).
 
 ---
 
@@ -24,7 +32,7 @@ Aplikasi **DriveEase** Progress 1 mengimplementasikan modul inti mencakup:
 - **Template Engine**: Laravel Blade
 - **Styling**: Tailwind CSS & Vite
 - **ORM**: Eloquent ORM
-- **Testing**: PHPUnit / Laravel Feature Testing Suite (29 Automated Tests Passed)
+- **Testing**: PHPUnit / Laravel Feature Testing Suite (48 Automated Tests Passed, 178 Assertions)
 - **Version Control**: Git
 
 ---
@@ -87,7 +95,7 @@ php artisan key:generate
 
 ### D. Jalankan Migrasi & Seeder Data Awal
 ```bash
-php artisan migrate:fresh
+php artisan migrate
 php artisan db:seed
 ```
 
@@ -105,9 +113,9 @@ Password untuk semua akun demo adalah: **`password123`**
 
 | Peran (Role) | Email Login | Wewenang & Batasan Akses |
 |:---|:---|:---|
-| **Admin** | `admin@driveease.test` | Akses penuh ke Admin Console (`/admin/dashboard`), manajemen CRUD armada mobil (`/admin/cars`), manajemen CRUD kategori kendaraan (`/admin/car-types`), melihat ringkasan statistik operasional dari basis data. |
-| **Staff (Staf Lapangan)** | `staff@driveease.test` | Mengakses Staff Portal (`/staff/dashboard`), melihat statistik ringkas dan daftar seluruh armada dalam mode *read-only*. Dilarang keras mengakses fitur tambah/edit/hapus kendaraan atau kategori (otomatis diblokir 403 Forbidden). |
-| **Customer (Pelanggan)** | `customer@driveease.test` | Mengakses Customer Portal (`/customer/dashboard`), menjelajahi katalog unit kendaraan yang berstatus *Tersedia* lengkap dengan rincian spesifikasi teknis dan tarif harian. Dilarang mengakses rute manajemen admin. |
+| **Admin** | `admin@driveease.test` | Akses penuh ke Admin Console (`/admin/dashboard`), manajemen CRUD armada mobil (`/admin/cars`), manajemen CRUD kategori kendaraan (`/admin/car-types`), peninjauan dan persetujuan/penolakan verifikasi identitas customer (`/admin/verifications`), serta melihat ringkasan statistik operasional dari basis data. |
+| **Staff (Staf Lapangan)** | `staff@driveease.test` | Mengakses Staff Portal (`/staff/dashboard`), melihat statistik ringkas dan daftar seluruh armada dalam mode *read-only*. Dilarang keras mengakses fitur tambah/edit/hapus kendaraan, kategori, atau menyetujui verifikasi dokumen (otomatis diblokir 403 Forbidden). |
+| **Customer (Pelanggan)** | `customer@driveease.test` | Mengakses Customer Portal (`/customer/dashboard`), formulir verifikasi identitas (`/customer/verification`), menjelajahi katalog unit kendaraan yang berstatus *Tersedia* lengkap dengan rincian spesifikasi teknis dan tarif harian. Dilarang mengakses rute manajemen admin. |
 
 ---
 
@@ -121,33 +129,41 @@ Password untuk semua akun demo adalah: **`password123`**
 - `GET /register` & `POST /register` — Pendaftaran akun pelanggan mandiri (auto-assigned role `customer`)
 - `POST /logout` — Keluar dari sistem
 
+### Modul Akses Dokumen Privat (`auth`)
+- `GET /documents/identity/{user}/{type}` — Streaming foto KTP / SIM dari storage privat (diotorisasi khusus Admin & pemilik dokumen, Staff diblokir 403)
+
 ### Modul Khusus Administrator (`auth, role:admin`)
-- `GET /admin/dashboard` — Dashboard ringkasan metrik basis data
+- `GET /admin/dashboard` — Dashboard ringkasan metrik basis data & notifikasi verifikasi tertunda
 - Resource `/admin/cars` — CRUD armada mobil (Index, Create, Store, Show, Edit, Update, Destroy)
-- Resource `/admin/car-types` — CRUD kategori kendaraan (Index, Create, Store, Edit, Update, Destroy) dengan pencegahan penghapusan kategori yang masih digunakan armada
+- Resource `/admin/car-types` — CRUD kategori kendaraan (Index, Create, Store, Edit, Update, Destroy) dengan proteksi relasi armada
+- `GET /admin/verifications` — Daftar seluruh verifikasi identitas customer dengan tab filter status (*all*, *pending*, *verified*, *rejected*)
+- `GET /admin/verifications/{user}` — Pratinjau detail dokumen KTP & SIM customer
+- `PATCH /admin/verifications/{user}/approve` — Menyetujui verifikasi dokumen customer
+- `PATCH /admin/verifications/{user}/reject` — Menolak verifikasi customer disertai alasan wajib
 
 ### Modul Khusus Staf (`auth, role:staff`)
 - `GET /staff/dashboard` — Dashboard operasional lapangan (*read-only* list)
 
 ### Modul Khusus Pelanggan (`auth, role:customer`)
-- `GET /customer/dashboard` — Dashboard katalog armada siap sewa
+- `GET /customer/dashboard` — Dashboard pelanggan dengan kartu status verifikasi (*pending*, *verified*, *rejected*) dan armada siap sewa
+- `GET /customer/verification` — Formulir pengunggahan & peninjauan identitas KTP & SIM
+- `POST /customer/verification` — Proses validasi dan penyimpanan berkas identitas ke storage privat
 
 ---
 
 ## 8. Pengujian Otomatis (Automated Feature Testing)
 
-Proyek ini dilengkapi dengan 29 skenario pengujian fitur komprehensif (`tests/Feature`) yang dijalankan langsung terhadap PostgreSQL:
+Proyek ini dilengkapi dengan 48 skenario pengujian fitur komprehensif (`tests/Feature`) yang dijalankan langsung terhadap PostgreSQL:
 ```bash
-php artisan test --without-tty
+php artisan test
 ```
-Hasil: **29 Passed, 104 Assertions, 0 Failed**.
+Hasil: **48 Passed, 178 Assertions, 0 Failed**.
 
 ---
 
 ## 9. Rencana Pengembangan Selanjutnya (Progress 2)
 
 Fitur yang dijadwalkan untuk tahap berikutnya:
-- Unggah dan verifikasi berkas identitas resmi (KTP & SIM) oleh Admin.
 - Modul pemesanan/reservasi sewa kendaraan (*Rentals*) dengan pemilihan tanggal sewa.
 - Algoritma pencegahan bentrok jadwal (*double-booking prevention*).
 - Validasi bukti pembayaran sewa oleh Admin.
