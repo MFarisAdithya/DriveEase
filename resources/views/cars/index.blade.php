@@ -70,8 +70,20 @@
         <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
             @forelse ($cars as $car)
                 <article class="flex flex-col overflow-hidden border border-[#49392D] bg-[#1E1712]">
-                    @if ($car->image)
-                        <img src="{{ Storage::disk('public')->url($car->image) }}" alt="{{ $car->name }}" loading="lazy" class="aspect-[16/9] w-full object-cover">
+                    @php
+                        $modelPhoto = collect(config('catalog.photos'))->first(
+                            fn ($file, $model) => str_starts_with(strtolower(trim($car->name)).' ', $model.' ')
+                        );
+                        $hasUnitPhoto = $car->image && Storage::disk('public')->exists($car->image);
+                    @endphp
+                    @if ($hasUnitPhoto || $modelPhoto)
+                        <figure class="relative">
+                            <img src="{{ $hasUnitPhoto ? Storage::disk('public')->url($car->image) : asset('images/models/'.$modelPhoto) }}"
+                                 alt="{{ $car->name }}" loading="lazy" class="aspect-[16/9] w-full object-cover">
+                            @unless ($hasUnitPhoto)
+                                <figcaption class="absolute bottom-2 right-2 bg-black/75 px-2 py-1 text-xs text-white">Foto model</figcaption>
+                            @endunless
+                        </figure>
                     @endif
                     <div class="p-5">
                         <p class="text-xs font-medium text-[#E8AC80]">{{ $car->carType?->name ?? 'Mobil' }} &middot; {{ $car->model_year }}</p>
@@ -100,6 +112,8 @@
                 </div>
             @endforelse
         </div>
+
+        <a class="mt-4 inline-block text-xs underline" href="{{ asset('images/models/kredit.html') }}">Kredit foto model</a>
 
         <!-- Pagination -->
         @if ($cars->hasPages())
