@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
 @section('body')
-<div class="flex h-screen {{ request()->routeIs('admin.verifications.*') ? 'bg-[#191410] text-[#E8DFD1] [color-scheme:dark]' : 'bg-slate-100' }} overflow-hidden">
+<div class="flex h-screen bg-[#191410] text-[#E8DFD1] [color-scheme:dark] overflow-hidden">
     <!-- Sidebar -->
     <aside class="hidden md:flex w-64 bg-[#150F0B] text-slate-200 flex-col shrink-0 border-r border-[#49392D]">
         <!-- Brand -->
@@ -99,7 +99,7 @@
                 <h1 class="text-lg font-bold text-[#E8DFD1]">@yield('page_title', 'Admin Portal')</h1>
             </div>
             <div class="hidden md:flex items-center gap-4 text-xs text-[#CCBDAC]">
-                <span>{{ now()->translatedFormat('l, d F Y') }}</span>
+                <span>{{ now()->locale('id')->translatedFormat('l, d F Y') }}</span>
                 <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
                     Sistem Aktif
                 </span>
