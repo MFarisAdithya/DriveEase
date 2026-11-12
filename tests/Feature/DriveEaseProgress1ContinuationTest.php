@@ -5,11 +5,14 @@ namespace Tests\Feature;
 use App\Models\Car;
 use App\Models\CarType;
 use App\Models\User;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
 class DriveEaseProgress1ContinuationTest extends TestCase
 {
+    use DatabaseTransactions;
+
     protected function getAdminUser(): User
     {
         return User::whereHas('role', fn ($q) => $q->where('name', 'admin'))->first();
@@ -43,7 +46,7 @@ class DriveEaseProgress1ContinuationTest extends TestCase
     public function test_admin_can_create_car_type(): void
     {
         $admin = $this->getAdminUser();
-        $uniqueName = 'Convertible ' . rand(100, 999);
+        $uniqueName = 'Convertible '.rand(100, 999);
 
         $response = $this->actingAs($admin)->post(route('admin.car-types.store'), [
             'name' => $uniqueName,
@@ -75,7 +78,7 @@ class DriveEaseProgress1ContinuationTest extends TestCase
     {
         $admin = $this->getAdminUser();
         $type = CarType::create([
-            'name' => 'Type to Edit ' . rand(100, 999),
+            'name' => 'Type to Edit '.rand(100, 999),
             'description' => 'Deskripsi lama',
         ]);
 
@@ -113,7 +116,7 @@ class DriveEaseProgress1ContinuationTest extends TestCase
     {
         $admin = $this->getAdminUser();
         $unusedCategory = CarType::create([
-            'name' => 'Unused Type ' . rand(100, 999),
+            'name' => 'Unused Type '.rand(100, 999),
             'description' => 'Tidak dipakai mobil manapun',
         ]);
 
@@ -195,7 +198,7 @@ class DriveEaseProgress1ContinuationTest extends TestCase
 
     public function test_guest_can_register_as_customer(): void
     {
-        $uniqueEmail = 'pelanggan' . rand(1000, 9999) . '@test.com';
+        $uniqueEmail = 'pelanggan'.rand(1000, 9999).'@test.com';
 
         $response = $this->post(route('register'), [
             'name' => 'Pelanggan Baru DriveEase',
@@ -239,7 +242,7 @@ class DriveEaseProgress1ContinuationTest extends TestCase
     {
         $response = $this->post(route('register'), [
             'name' => 'Mismatched Password User',
-            'email' => 'mismatch' . rand(100, 999) . '@test.com',
+            'email' => 'mismatch'.rand(100, 999).'@test.com',
             'phone' => '082222222222',
             'password' => 'password888',
             'password_confirmation' => 'different888',

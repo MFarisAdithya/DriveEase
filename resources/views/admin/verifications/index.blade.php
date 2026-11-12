@@ -7,10 +7,10 @@
 <div class="space-y-6">
     <header>
         <h2 class="text-3xl font-semibold tracking-tight">Daftar pemeriksaan</h2>
-        <p class="mt-2 text-sm text-slate-600">{{ $counts['pending'] }} pelanggan berstatus menunggu verifikasi.</p>
+        <p class="mt-2 text-sm text-slate-600">{{ $counts['ready'] }} pengajuan siap ditinjau.</p>
     </header>
     <nav aria-label="Filter status verifikasi" class="flex flex-wrap gap-x-5 border-b border-slate-300">
-        @foreach (['all' => 'Semua pelanggan', 'pending' => 'Menunggu', 'verified' => 'Terverifikasi', 'rejected' => 'Ditolak'] as $key => $label)
+        @foreach (['all' => 'Semua pelanggan', 'ready' => 'Siap ditinjau', 'incomplete' => 'Menunggu kelengkapan', 'verified' => 'Terverifikasi', 'rejected' => 'Ditolak'] as $key => $label)
             <a href="{{ route('admin.verifications.index', $key === 'all' ? [] : ['status' => $key]) }}"
                @if (($status ?: 'all') === $key) aria-current="page" @endif
                class="border-b-2 py-3 text-sm {{ ($status ?: 'all') === $key ? 'border-teal-700 font-semibold text-teal-800' : 'border-transparent text-slate-600 hover:text-slate-900' }}">
@@ -23,7 +23,7 @@
     <div class="bg-white border-y border-slate-200">
         <div class="overflow-x-auto">
             <table class="w-full text-left text-xs text-slate-600">
-                <thead class="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200 uppercase tracking-wider text-[11px]">
+                <thead class="hidden lg:table-header-group bg-slate-50 text-slate-700 font-semibold border-b border-slate-200 uppercase tracking-wider text-[11px]">
                     <tr>
                         <th class="px-3 py-3.5">Pelanggan</th>
                         <th class="px-3 py-3.5">No. Kontak</th>
@@ -35,16 +35,16 @@
                 </thead>
                 <tbody class="divide-y divide-slate-100">
                     @forelse ($customers as $customer)
-                        <tr class="hover:bg-slate-50/70 transition-colors">
+                        <tr class="grid grid-cols-2 items-center lg:table-row hover:bg-slate-50/70 transition-colors">
                             <td class="px-3 py-4">
                                 <div class="font-bold text-slate-900 text-sm">{{ $customer->name }}</div>
-                                <div class="text-slate-400 mt-0.5">{{ $customer->email }}</div>
+                                <div class="hidden lg:block text-slate-600 mt-0.5">{{ $customer->email }}</div>
                             </td>
-                            <td class="px-3 py-4">
+                            <td class="hidden lg:table-cell px-3 py-4">
                                 <span>{{ $customer->phone ?? '-' }}</span>
                             </td>
                             <td class="px-3 py-4">
-                                {{ $customer->hasSubmittedDocuments() ? 'Lengkap' : 'Belum lengkap' }}
+                                {{ $customer->hasSubmittedDocuments() ? 'Berkas lengkap' : 'Berkas belum lengkap' }}
                             </td>
                             <td class="px-3 py-4">
                                 @if ($customer->isVerified())
@@ -64,14 +64,14 @@
                                     </span>
                                 @endif
                             </td>
-                            <td class="px-3 py-4 text-slate-500">
+                            <td class="hidden lg:table-cell px-3 py-4 text-slate-500">
                                 <div>{{ $customer->updated_at ? $customer->updated_at->translatedFormat('d M Y, H:i') : '-' }}</div>
                                 <div class="text-[10px] text-slate-400">Daftar: {{ $customer->created_at->translatedFormat('d M Y') }}</div>
                             </td>
                             <td class="px-3 py-4 text-right">
                                 <a href="{{ route('admin.verifications.show', $customer) }}" 
                                    class="inline-flex items-center gap-1 px-3 py-1.5 text-teal-800 hover:underline font-semibold text-sm">
-                                    <span>Tinjau Dokumen</span>
+                                    <span>Lihat detail</span>
                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
                                     </svg>

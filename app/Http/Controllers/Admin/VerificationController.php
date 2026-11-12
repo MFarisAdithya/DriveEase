@@ -17,25 +17,20 @@ class VerificationController extends Controller
     {
         $status = $request->query('status');
 
-        $query = User::whereHas('role', fn($q) => $q->where('name', 'customer'))
-            ->with(['verifier']);
-
-        if ($status && in_array($status, ['pending', 'verified', 'rejected'], true)) {
-            $query->where('verification_status', $status);
-        }
-
-        // Prioritize pending verifications, then newest
-        $customers = $query->orderByRaw("CASE WHEN verification_status = 'pending' THEN 0 ELSE 1 END")
-            ->latest('updated_at')
-            ->paginate(15)
-            ->withQueryString();
-
-        $counts = [
-            'all' => User::whereHas('role', fn($q) => $q->where('name', 'customer'))->count(),
-            'pending' => User::whereHas('role', fn($q) => $q->where('name', 'customer'))->where('verification_status', 'pending')->count(),
-            'verified' => User::whereHas('role', fn($q) => $q->where('name', 'customer'))->where('verification_status', 'verified')->count(),
-            'rejected' => User::whereHas('role', fn($q) => $q->where('name', 'customer'))->where('verification_status', 'rejected')->count(),
+        $base = User::whereHas('role', fn ($role) => $role->where('name', 'customer'));
+        $pending = (clone $base)->where('verification_status', 'pending');
+        $complete = "COALESCE(NULLIF(ktp_number, ''), nik_ktp, '') <> '' AND COALESCE(sim_number, '') <> '' AND COALESCE(ktp_image, '') <> '' AND COALESCE(sim_image, '') <> ''";
+        $queues = [
+            'all' => $base,
+            'pending' => $pending,
+            'ready' => (clone $pending)->whereRaw($complete),
+            'incomplete' => (clone $pending)->whereRaw("NOT ($complete)"),
+            'verified' => (clone $base)->where('verification_status', 'verified'),
+            'rejected' => (clone $base)->where('verification_status', 'rejected'),
         ];
+        $status = is_string($status) && isset($queues[$status]) ? $status : 'all';
+        $counts = array_map(fn ($query) => $query->count(), $queues);
+        $customers = $queues[$status]->latest('updated_at')->orderByDesc('id')->paginate(15)->withQueryString();
 
         return view('admin.verifications.index', compact('customers', 'counts', 'status'));
     }
@@ -59,7 +54,7 @@ class VerificationController extends Controller
     {
         abort_unless($user->isCustomer(), 404, 'Customer tidak ditemukan.');
 
-        if (!$user->hasSubmittedDocuments()) {
+        if (! $user->hasSubmittedDocuments()) {
             return back()->with('error', 'Dokumen customer belum lengkap untuk dapat disetujui.');
         }
 

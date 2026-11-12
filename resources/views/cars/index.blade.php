@@ -50,9 +50,9 @@
                 <button type="submit" class="w-full py-2.5 px-4 bg-[#935831] hover:bg-[#844F2C] text-white text-xs font-semibold rounded-lg transition-colors shadow-sm text-center">
                     Terapkan
                 </button>
-                @if(request()->hasAny(['search', 'car_type_id', 'transmission']))
+                @if(request()->anyFilled(['search', 'car_type_id', 'transmission']))
                     <a href="{{ route('cars.index') }}" class="p-2.5 text-xs text-[#E8DFD1] hover:bg-[#241C16] rounded-lg border border-[#776553] transition-colors shrink-0" title="Hapus Filter">
-                        Hapus
+                        Hapus filter
                     </a>
                 @endif
             </div>
@@ -63,29 +63,23 @@
     <div>
         <div class="flex items-center justify-between mb-4">
             <p class="text-xs text-[#CCBDAC] font-medium">
-                Menampilkan <strong class="text-[#E8DFD1]">{{ $cars->total() }}</strong> unit armada terdaftar
+                <strong class="text-[#E8DFD1]">{{ $cars->total() }}</strong> {{ request()->anyFilled(['search', 'car_type_id', 'transmission']) ? 'kendaraan ditemukan' : 'kendaraan dalam katalog' }}
             </p>
         </div>
 
         <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
             @forelse ($cars as $car)
                 <article class="flex flex-col overflow-hidden border border-[#49392D] bg-[#1E1712]">
-                    <div class="aspect-[16/9] overflow-hidden bg-[#241C16]">
-                        @if ($car->image)
-                            <img src="{{ Storage::disk('public')->url($car->image) }}" alt="{{ $car->name }}" loading="lazy" class="h-full w-full object-cover">
-                        @else
-                            <div class="flex h-full items-center justify-center text-sm italic text-[#BAAA98]">Foto belum tersedia</div>
-                        @endif
-                    </div>
+                    @if ($car->image)
+                        <img src="{{ Storage::disk('public')->url($car->image) }}" alt="{{ $car->name }}" loading="lazy" class="aspect-[16/9] w-full object-cover">
+                    @endif
                     <div class="p-5">
                         <p class="text-xs font-medium text-[#E8AC80]">{{ $car->carType?->name ?? 'Mobil' }} &middot; {{ $car->model_year }}</p>
                         <h2 class="mt-1 font-serif text-2xl font-normal tracking-tight">
                             <a class="hover:underline" href="{{ route('cars.show', $car) }}">{{ $car->name }}</a>
                         </h2>
                         <p class="mt-1 text-sm text-[#CCBDAC]">{{ $car->brand }} &middot; {{ $car->transmission === 'automatic' ? 'Otomatis' : 'Manual' }} &middot; {{ $car->capacity }} kursi</p>
-                        @if ($car->description)
-                            <p class="mt-2 max-w-xl text-sm text-[#CCBDAC]">{{ $car->description }}</p>
-                        @endif
+
                     </div>
                     <div class="mt-auto border-t border-[#49392D] px-5 py-4">
                         <p class="text-sm text-[#CCBDAC]">{{ ['available' => 'Tersedia', 'rented' => 'Sedang disewa', 'maintenance' => 'Perawatan'][$car->status] ?? 'Belum diketahui' }}</p>
@@ -110,7 +104,15 @@
         <!-- Pagination -->
         @if ($cars->hasPages())
             <div class="mt-8 bg-[#1E1712] rounded-xl p-4 border border-[#49392D] shadow-sm">
-                {{ $cars->links() }}
+                <nav aria-label="Halaman katalog" class="flex items-center justify-between text-sm">
+                    @if ($cars->previousPageUrl())
+                        <a href="{{ $cars->previousPageUrl() }}" class="underline">Sebelumnya</a>
+                    @endif
+                    <span>Halaman {{ $cars->currentPage() }} dari {{ $cars->lastPage() }}</span>
+                    @if ($cars->nextPageUrl())
+                        <a href="{{ $cars->nextPageUrl() }}" class="underline">Berikutnya</a>
+                    @endif
+                </nav>
             </div>
         @endif
     </div>

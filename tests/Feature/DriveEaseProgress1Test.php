@@ -5,11 +5,13 @@ namespace Tests\Feature;
 use App\Models\Car;
 use App\Models\CarType;
 use App\Models\User;
-use Illuminate\Support\Facades\Hash;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Tests\TestCase;
 
 class DriveEaseProgress1Test extends TestCase
 {
+    use DatabaseTransactions;
+
     protected function getAdminUser(): User
     {
         return User::whereHas('role', fn ($q) => $q->where('name', 'admin'))->first();
@@ -22,7 +24,7 @@ class DriveEaseProgress1Test extends TestCase
 
     protected function getCustomerUser(): User
     {
-        return User::where('email', 'customer@driveease.test')->first() 
+        return User::where('email', 'customer@driveease.test')->first()
             ?? User::whereHas('role', fn ($q) => $q->where('name', 'customer'))->first();
     }
 
@@ -148,7 +150,7 @@ class DriveEaseProgress1Test extends TestCase
     {
         $admin = $this->getAdminUser();
         $carType = CarType::first();
-        $testPlate = 'B ' . rand(1000, 9999) . ' TST';
+        $testPlate = 'B '.rand(1000, 9999).' TST';
 
         $response = $this->actingAs($admin)->post('/admin/cars', [
             'name' => 'Mitsubishi Xpander Cross Test',
@@ -252,7 +254,7 @@ class DriveEaseProgress1Test extends TestCase
             'name' => 'Temporary Car for Deletion',
             'car_type_id' => $carType->id,
             'brand' => 'Suzuki',
-            'plate_number' => 'B ' . rand(1000, 9999) . ' DEL',
+            'plate_number' => 'B '.rand(1000, 9999).' DEL',
             'model_year' => 2021,
             'transmission' => 'manual',
             'capacity' => 5,
