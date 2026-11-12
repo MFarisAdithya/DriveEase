@@ -144,8 +144,8 @@ class DriveEaseProgress1ContinuationTest extends TestCase
     {
         $response = $this->get(route('cars.index'));
         $response->assertStatus(200);
-        $response->assertSee('Katalog Resmi DriveEase');
-        $response->assertSee('Temukan Armada Terbaik');
+        $response->assertSee('Katalog kendaraan');
+        $response->assertSee('Bandingkan kapasitas');
     }
 
     public function test_vehicle_catalog_search_filters_correctly(): void
