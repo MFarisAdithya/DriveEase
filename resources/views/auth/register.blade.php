@@ -3,17 +3,24 @@
 @section('title', 'Daftar Akun Baru - DriveEase')
 
 @section('body')
-<div class="min-h-screen flex items-center justify-center p-4 bg-canvas py-12">
-    <div class="w-full max-w-md">
+<div class="relative min-h-screen flex items-center justify-center px-4 pt-12 pb-36 sm:pb-44 bg-canvas overflow-hidden">
+    @include('partials.driveease-backdrop')
+
+    <div class="relative z-10 w-full max-w-md">
         <!-- Logo & Header -->
-        <div class="text-center mb-8">
-            <a href="{{ route('cars.index') }}" class="brand-lockup mx-auto"><img src="{{ asset('images/driveease-logo.png') }}" alt="DriveEase" width="220" height="72"></a>
+        <div class="text-center mb-7">
+            <a href="{{ route('home') }}" class="inline-flex justify-center mb-3 focus:outline-none">
+                @include('partials.driveease-logo', [
+                    'sizeClass' => 'h-16 sm:h-[78px]',
+                    'haloSize' => 'w-16 h-16 sm:w-20 sm:h-20',
+                ])
+            </a>
             <h1 class="text-2xl font-bold text-ink tracking-tight">Daftar Akun Pelanggan</h1>
             <p class="text-sm text-muted mt-1">Bergabung bersama DriveEase untuk kemudahan sewa armada</p>
         </div>
 
         <!-- Register Card -->
-        <div class="bg-surface rounded-2xl shadow-xl border border-line p-8">
+        <div class="bg-white/95 backdrop-blur-md rounded-3xl shadow-[0_24px_60px_rgba(11,40,64,0.09)] border border-[#C6DFEE] p-8">
             <form action="{{ route('register') }}" method="POST" class="space-y-4">
                 @csrf
 

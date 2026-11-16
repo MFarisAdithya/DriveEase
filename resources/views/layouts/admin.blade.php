@@ -4,13 +4,27 @@
 <div class="flex h-screen bg-canvas text-ink [color-scheme:dark] overflow-hidden">
     <!-- Sidebar -->
     <aside class="hidden md:flex w-64 bg-navigation text-subtle flex-col shrink-0 border-r border-line">
-        <!-- Brand -->
-        <div class="h-16 flex items-center px-6 border-b border-line gap-3">
-            <div class="brand-lockup"><img src="{{ asset('images/driveease-logo.png') }}" alt="DriveEase" width="220" height="72"></div>
-            <div>
-
-                <span class="block text-xs text-muted">Area admin</span>
+        <!-- Brand Header (Transparent logo seamlessly integrated into sky-blue coastal backdrop) -->
+        <div class="relative overflow-hidden px-5 pt-4 pb-6 shrink-0"
+             style="background: linear-gradient(135deg, #FFFFFF 0%, #E7F5FC 58%, #C8E7F8 100%);">
+            <div class="relative z-10 flex flex-col gap-1.5">
+                <a href="{{ route('admin.dashboard') }}" class="inline-flex items-center focus:outline-none">
+                    @include('partials.driveease-logo', [
+                        'sizeClass' => 'h-11',
+                        'haloSize' => 'w-11 h-11',
+                    ])
+                </a>
+                <div class="flex items-center gap-1.5 pl-1.5">
+                    <span class="w-1.5 h-1.5 rounded-full bg-[#FF6454]"></span>
+                    <span class="text-[11px] font-bold uppercase tracking-[0.12em] text-[#0B2840]/80">Area Admin</span>
+                </div>
             </div>
+
+            <!-- Smooth Coastal Wave Divider into #002941 Sidebar -->
+            <svg class="pointer-events-none absolute bottom-0 left-0 right-0 w-full h-4 block" viewBox="0 0 256 20" preserveAspectRatio="none" aria-hidden="true">
+                <path d="M0,10 C75,20 175,0 256,12 L256,20 L0,20 Z" fill="#002941"/>
+                <path d="M165,20 C200,14 230,6 256,2 L256,12 C232,15 202,18 165,20 Z" fill="#FF6454" fill-opacity="0.9"/>
+            </svg>
         </div>
 
         <!-- Navigation -->
@@ -80,8 +94,11 @@
 
     <!-- Main Content Area -->
     <div class="flex-1 flex flex-col min-w-0 overflow-y-auto">
-        <!-- Top Navbar -->
-        <header class="h-16 bg-surface text-ink border-b border-line flex items-center gap-3 px-4 md:justify-between md:px-8 shrink-0">
+        <div class="relative min-h-full flex flex-col overflow-x-clip pb-28 sm:pb-36">
+            @include('partials.driveease-backdrop')
+
+            <!-- Top Navbar -->
+            <header class="sticky top-0 z-30 h-16 bg-surface/90 backdrop-blur-md text-ink border-b border-line flex items-center gap-3 px-4 md:justify-between md:px-8 shrink-0">
             <details class="relative md:hidden">
                 <summary class="cursor-pointer py-3 font-semibold">Menu</summary>
                 <nav aria-label="Navigasi admin" class="absolute left-0 top-full z-40 grid w-56 gap-1 border border-line bg-surface-raised p-3 shadow-lg">
@@ -103,7 +120,7 @@
         </header>
 
         <!-- Page Body -->
-        <main class="flex-1 p-4 md:p-8">
+        <main class="relative z-10 flex-1 p-4 md:p-8 pb-24">
             <!-- Flash Messages -->
             @if (session('success'))
                 <div class="mb-6 p-4 rounded-lg bg-success-surface border border-success-line flex items-start gap-3 text-success">
@@ -125,6 +142,7 @@
 
             @yield('content')
         </main>
+        </div>
     </div>
 </div>
 @endsection
