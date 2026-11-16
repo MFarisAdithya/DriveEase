@@ -11,7 +11,7 @@ use App\Http\Controllers\PublicCarController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
-// Redirect root to dashboard if logged in, or cars catalog if guest
+// Redirect root to dashboard if logged in, or landing page if guest
 Route::get('/', function () {
     if (Auth::check()) {
         $user = Auth::user();
@@ -20,11 +20,11 @@ Route::get('/', function () {
             'admin' => redirect()->route('admin.dashboard'),
             'staff' => redirect()->route('staff.dashboard'),
             'customer' => redirect()->route('customer.dashboard'),
-            default => redirect()->route('login'),
+            default => app(PublicCarController::class)->landing(),
         };
     }
 
-    return redirect()->route('cars.index');
+    return app(PublicCarController::class)->landing();
 })->name('home');
 
 // Public Dynamic Vehicle Catalog

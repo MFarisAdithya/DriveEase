@@ -9,10 +9,12 @@ class ExampleTest extends TestCase
     /**
      * A basic test example.
      */
-    public function test_the_application_redirects_guest_to_cars_catalog(): void
+    public function test_the_application_shows_landing_page_for_guests(): void
     {
         $response = $this->get('/');
 
-        $response->assertRedirect(route('cars.index'));
+        $response->assertOk();
+        $response->assertSee('Sewa Kendaraan');
+        $response->assertSee('Lihat Kendaraan');
     }
 }
