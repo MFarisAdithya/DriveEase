@@ -7,34 +7,34 @@
     <!-- Breadcrumb / Header -->
     <div class="flex items-center justify-between">
         <div>
-            <a href="{{ route('customer.dashboard') }}" class="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-teal-600 transition-colors mb-2">
+            <a href="{{ route('customer.dashboard') }}" class="inline-flex items-center gap-1.5 text-xs font-semibold text-muted hover:text-link transition-colors mb-2">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
                 </svg>
                 Kembali ke Dashboard
             </a>
-            <h2 class="text-2xl font-bold text-slate-900">Verifikasi Identitas Pelanggan</h2>
-            <p class="text-sm text-slate-500 mt-1">Lengkapi dokumen KTP dan SIM Anda agar dapat menyewa kendaraan di DriveEase.</p>
+            <h2 class="text-2xl font-bold text-ink">Verifikasi Identitas Pelanggan</h2>
+            <p class="text-sm text-muted mt-1">Lengkapi dokumen KTP dan SIM Anda agar dapat menyewa kendaraan di DriveEase.</p>
         </div>
 
         <div>
             @if ($user->isVerified())
-                <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                    <svg class="w-3.5 h-3.5 text-emerald-600" fill="currentColor" viewBox="0 0 20 20">
+                <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-success-surface text-success border border-success-line">
+                    <svg class="w-3.5 h-3.5 text-success" fill="currentColor" viewBox="0 0 20 20">
                         <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
                     </svg>
                     Terverifikasi
                 </span>
             @elseif ($user->isRejectedVerification())
-                <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-rose-100 text-rose-800 border border-rose-200">
-                    <svg class="w-3.5 h-3.5 text-rose-600" fill="currentColor" viewBox="0 0 20 20">
+                <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-danger-surface text-danger border border-danger-line">
+                    <svg class="w-3.5 h-3.5 text-danger" fill="currentColor" viewBox="0 0 20 20">
                         <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
                     </svg>
                     Verifikasi Ditolak
                 </span>
             @else
-                <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200">
-                    <svg class="w-3.5 h-3.5 text-amber-600 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-warning-surface text-warning border border-warning-line">
+                    <svg class="w-3.5 h-3.5 text-warning animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
                     </svg>
                     Menunggu Verifikasi
@@ -45,65 +45,65 @@
 
     <!-- Status Alerts -->
     @if ($user->isVerified())
-        <div class="p-5 rounded-xl bg-emerald-50 border border-emerald-200 flex items-start gap-4">
-            <div class="p-2 rounded-lg bg-emerald-100 text-emerald-700 shrink-0">
+        <div class="p-5 rounded-xl bg-success-surface border border-success-line flex items-start gap-4">
+            <div class="p-2 rounded-lg bg-success-surface text-success shrink-0">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
                 </svg>
             </div>
             <div>
-                <h4 class="text-base font-bold text-emerald-900">Identitas Anda Telah Diverifikasi</h4>
-                <p class="text-sm text-emerald-800 mt-1">
+                <h4 class="text-base font-bold text-success">Identitas Anda Telah Diverifikasi</h4>
+                <p class="text-sm text-success mt-1">
                     Dokumen identitas Anda telah disetujui pada {{ $user->verified_at ? $user->verified_at->translatedFormat('d F Y H:i') : '-' }}. Akun Anda memiliki akses penuh untuk melakukan pemesanan kendaraan.
                 </p>
                 <div class="mt-3">
-                    <a href="{{ route('customer.dashboard') }}" class="inline-flex items-center gap-2 text-xs font-semibold text-emerald-900 underline hover:text-emerald-700">
+                    <a href="{{ route('customer.dashboard') }}" class="inline-flex items-center gap-2 text-xs font-semibold text-success underline hover:text-success">
                         Kembali pilih armada kendaraan &rarr;
                     </a>
                 </div>
             </div>
         </div>
     @elseif ($user->isRejectedVerification())
-        <div class="p-5 rounded-xl bg-rose-50 border border-rose-200 flex items-start gap-4">
-            <div class="p-2 rounded-lg bg-rose-100 text-rose-700 shrink-0">
+        <div class="p-5 rounded-xl bg-danger-surface border border-danger-line flex items-start gap-4">
+            <div class="p-2 rounded-lg bg-danger-surface text-danger shrink-0">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
                 </svg>
             </div>
             <div>
-                <h4 class="text-base font-bold text-rose-900">Pengajuan Verifikasi Identitas Ditolak</h4>
-                <p class="text-sm text-rose-800 mt-1">
-                    Alasan dari Admin: <span class="font-semibold text-rose-950">"{{ $user->rejection_reason }}"</span>
+                <h4 class="text-base font-bold text-danger">Pengajuan Verifikasi Identitas Ditolak</h4>
+                <p class="text-sm text-danger mt-1">
+                    Alasan dari Admin: <span class="font-semibold text-danger">"{{ $user->rejection_reason }}"</span>
                 </p>
-                <p class="text-xs text-rose-700 mt-2">
+                <p class="text-xs text-danger mt-2">
                     Silakan periksa kembali data nomor identitas atau unggah foto KTP dan SIM baru yang lebih jelas, lalu kirim ulang melalui formulir di bawah.
                 </p>
             </div>
         </div>
     @elseif ($user->hasSubmittedDocuments())
-        <div class="p-5 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-4">
-            <div class="p-2 rounded-lg bg-amber-100 text-amber-700 shrink-0">
+        <div class="p-5 rounded-xl bg-warning-surface border border-warning-line flex items-start gap-4">
+            <div class="p-2 rounded-lg bg-warning-surface text-warning shrink-0">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
                 </svg>
             </div>
             <div>
-                <h4 class="text-base font-bold text-amber-900">Dokumen Sedang Ditinjau Admin</h4>
-                <p class="text-sm text-amber-800 mt-1">
+                <h4 class="text-base font-bold text-warning">Dokumen Sedang Ditinjau Admin</h4>
+                <p class="text-sm text-warning mt-1">
                     Dokumen Anda telah kami terima dan sedang dalam proses verifikasi manual oleh petugas. Anda tetap dapat memperbarui informasi di bawah jika terdapat kesalahan.
                 </p>
             </div>
         </div>
     @else
-        <div class="p-5 rounded-xl bg-blue-50 border border-blue-200 flex items-start gap-4">
-            <div class="p-2 rounded-lg bg-blue-100 text-blue-700 shrink-0">
+        <div class="p-5 rounded-xl bg-info-surface border border-info-line flex items-start gap-4">
+            <div class="p-2 rounded-lg bg-info-surface text-info shrink-0">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                 </svg>
             </div>
             <div>
-                <h4 class="text-base font-bold text-blue-900">Lengkapi Identitas untuk Menyewa Mobil</h4>
-                <p class="text-sm text-blue-800 mt-1">
+                <h4 class="text-base font-bold text-info">Lengkapi Identitas untuk Menyewa Mobil</h4>
+                <p class="text-sm text-info mt-1">
                     Sesuai kebijakan keamanan rental DriveEase, customer wajib memiliki KTP (16 digit angka) dan SIM (14 digit angka) yang valid dan terverifikasi sebelum dapat melakukan reservasi.
                 </p>
             </div>
@@ -111,24 +111,24 @@
     @endif
 
     <!-- Profile Summary Card -->
-    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-        <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4">Informasi Akun</h3>
+    <div class="bg-surface rounded-xl border border-line shadow-sm p-6">
+        <h3 class="text-sm font-bold text-ink uppercase tracking-wider mb-4">Informasi Akun</h3>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
             <div>
-                <span class="text-slate-400 block font-medium">Nama Lengkap</span>
-                <span class="text-sm font-semibold text-slate-800 mt-0.5 block">{{ $user->name }}</span>
+                <span class="text-muted block font-medium">Nama Lengkap</span>
+                <span class="text-sm font-semibold text-ink mt-0.5 block">{{ $user->name }}</span>
             </div>
             <div>
-                <span class="text-slate-400 block font-medium">Alamat Email</span>
-                <span class="text-sm font-semibold text-slate-800 mt-0.5 block">{{ $user->email }}</span>
+                <span class="text-muted block font-medium">Alamat Email</span>
+                <span class="text-sm font-semibold text-ink mt-0.5 block">{{ $user->email }}</span>
             </div>
             <div>
-                <span class="text-slate-400 block font-medium">Nomor Telepon</span>
-                <span class="text-sm font-semibold text-slate-800 mt-0.5 block">{{ $user->phone ?? '-' }}</span>
+                <span class="text-muted block font-medium">Nomor Telepon</span>
+                <span class="text-sm font-semibold text-ink mt-0.5 block">{{ $user->phone ?? '-' }}</span>
             </div>
             <div>
-                <span class="text-slate-400 block font-medium">Status Akun</span>
-                <span class="text-sm font-semibold capitalize text-slate-800 mt-0.5 block">{{ $user->verification_status }}</span>
+                <span class="text-muted block font-medium">Status Akun</span>
+                <span class="text-sm font-semibold capitalize text-ink mt-0.5 block">{{ $user->verification_status }}</span>
             </div>
         </div>
     </div>
@@ -140,11 +140,11 @@
             $hasSimStored = !empty($user->sim_image) || session()->has('temp_sim_image');
         @endphp
 
-        <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-            <h3 class="text-base font-bold text-slate-900 mb-1">
+        <div class="bg-surface rounded-xl border border-line shadow-sm p-6">
+            <h3 class="text-base font-bold text-ink mb-1">
                 {{ $user->isRejectedVerification() ? 'Formulir Perbaikan & Pengiriman Ulang' : ($user->hasSubmittedDocuments() ? 'Perbarui Dokumen Identitas' : 'Unggah Dokumen Identitas') }}
             </h3>
-            <p class="text-xs text-slate-500 mb-6">
+            <p class="text-xs text-muted mb-6">
                 Pastikan foto dokumen tampak jelas, tidak buram, dan teks dapat terbaca dengan baik. Format didukung: JPG, JPEG, PNG, WEBP (Maksimal 2 MB per file).
             </p>
 
@@ -152,18 +152,18 @@
                 @csrf
 
                 <!-- KTP Section -->
-                <div class="border-t border-slate-100 pt-5 space-y-4">
-                    <h4 class="text-sm font-bold text-slate-800 flex items-center gap-2">
-                        <span class="w-6 h-6 rounded-full bg-slate-900 text-white inline-flex items-center justify-center text-xs">1</span>
+                <div class="border-t border-line pt-5 space-y-4">
+                    <h4 class="text-sm font-bold text-ink flex items-center gap-2">
+                        <span class="w-6 h-6 rounded-full bg-navigation text-ink inline-flex items-center justify-center text-xs">1</span>
                         Kartu Tanda Penduduk (KTP / NIK)
                     </h4>
 
                     <div>
                         <div class="flex items-center justify-between mb-1">
-                            <label for="ktp_number" class="block text-xs font-semibold text-slate-700">
-                                Nomor Induk Kependudukan (16 Digit) <span class="text-rose-500">*</span>
+                            <label for="ktp_number" class="block text-xs font-semibold text-ink">
+                                Nomor Induk Kependudukan (16 Digit) <span class="text-danger">*</span>
                             </label>
-                            <span id="ktp_counter" class="text-[11px] font-mono text-slate-400">0 / 16 digit</span>
+                            <span id="ktp_counter" class="text-[11px] font-mono text-muted">0 / 16 digit</span>
                         </div>
                         <input type="text" 
                                name="ktp_number" 
@@ -172,44 +172,44 @@
                                inputmode="numeric"
                                placeholder="Contoh: 3578012304950001"
                                value="{{ old('ktp_number', $user->ktp_number ?? $user->nik_ktp) }}" 
-                               class="w-full px-3.5 py-2.5 rounded-lg border {{ $errors->has('ktp_number') ? 'border-rose-400 bg-rose-50/30' : 'border-slate-300' }} text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent tracking-widest font-mono"
+                               class="w-full px-3.5 py-2.5 rounded-lg border {{ $errors->has('ktp_number') ? 'border-danger-line bg-danger-surface/30' : 'border-field-line' }} text-sm focus:outline-none focus:ring-2 focus:ring-focus focus:border-transparent tracking-widest font-mono"
                                required>
                         @error('ktp_number')
-                            <p class="text-xs text-rose-600 mt-1 font-medium">{{ $message }}</p>
+                            <p class="text-xs text-danger mt-1 font-medium">{{ $message }}</p>
                         @else
-                            <p class="text-[11px] text-slate-400 mt-1">Masukkan tepat 16 digit angka sesuai KTP Anda.</p>
+                            <p class="text-[11px] text-muted mt-1">Masukkan tepat 16 digit angka sesuai KTP Anda.</p>
                         @enderror
                     </div>
 
                     <div>
-                        <label for="ktp_image" class="block text-xs font-semibold text-slate-700 mb-1">
+                        <label for="ktp_image" class="block text-xs font-semibold text-ink mb-1">
                             Unggah Foto KTP Asli {{ $hasKtpStored ? '(Opsional jika tidak diganti)' : '*' }}
                         </label>
                         <input type="file" 
                                name="ktp_image" 
                                id="ktp_image" 
                                accept=".jpg,.jpeg,.png,.webp"
-                               class="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100 border border-slate-200 rounded-lg p-1.5 cursor-pointer">
-                        <p class="text-[11px] text-slate-400 mt-1">Maksimal 2 MB. Format JPG, PNG, atau WEBP.</p>
+                               class="w-full text-xs text-muted file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-surface-hover file:text-link hover:file:bg-surface-hover border border-line rounded-lg p-1.5 cursor-pointer">
+                        <p class="text-[11px] text-muted mt-1">Maksimal 2 MB. Format JPG, PNG, atau WEBP.</p>
                         @error('ktp_image')
-                            <p class="text-xs text-rose-600 mt-1 font-medium">{{ $message }}</p>
+                            <p class="text-xs text-danger mt-1 font-medium">{{ $message }}</p>
                         @enderror
 
                         @if ($hasKtpStored)
-                            <div class="mt-3 p-3 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-between">
+                            <div class="mt-3 p-3 rounded-lg bg-success-surface border border-success-line flex items-center justify-between">
                                 <div class="flex items-center gap-3">
-                                    <div class="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                                    <div class="w-8 h-8 rounded-full bg-success-surface text-success flex items-center justify-center shrink-0">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                                         </svg>
                                     </div>
                                     <div>
-                                        <p class="text-xs font-semibold text-emerald-900">Foto KTP telah tersimpan aman</p>
-                                        <p class="text-[11px] text-emerald-700 font-mono">{{ session('temp_ktp_image_name', basename($user->ktp_image ?? 'Foto KTP Tersimpan')) }}</p>
+                                        <p class="text-xs font-semibold text-success">Foto KTP telah tersimpan aman</p>
+                                        <p class="text-[11px] text-success font-mono">{{ session('temp_ktp_image_name', basename($user->ktp_image ?? 'Foto KTP Tersimpan')) }}</p>
                                     </div>
                                 </div>
                                 @if ($user->ktp_image || session('temp_ktp_image'))
-                                    <a href="{{ route('documents.identity.show', [$user, 'ktp']) }}" target="_blank" class="px-2.5 py-1 text-xs font-medium text-emerald-800 bg-white border border-emerald-300 rounded hover:bg-emerald-100/50">
+                                    <a href="{{ route('documents.identity.show', [$user, 'ktp']) }}" target="_blank" class="px-2.5 py-1 text-xs font-medium text-success bg-surface border border-success-line rounded hover:bg-success-surface/50">
                                         Lihat Pratinjau
                                     </a>
                                 @endif
@@ -219,18 +219,18 @@
                 </div>
 
                 <!-- SIM Section -->
-                <div class="border-t border-slate-100 pt-5 space-y-4">
-                    <h4 class="text-sm font-bold text-slate-800 flex items-center gap-2">
-                        <span class="w-6 h-6 rounded-full bg-slate-900 text-white inline-flex items-center justify-center text-xs">2</span>
+                <div class="border-t border-line pt-5 space-y-4">
+                    <h4 class="text-sm font-bold text-ink flex items-center gap-2">
+                        <span class="w-6 h-6 rounded-full bg-navigation text-ink inline-flex items-center justify-center text-xs">2</span>
                         Surat Izin Mengemudi (SIM)
                     </h4>
 
                     <div>
                         <div class="flex items-center justify-between mb-1">
-                            <label for="sim_number" class="block text-xs font-semibold text-slate-700">
-                                Nomor SIM (14 Digit) <span class="text-rose-500">*</span>
+                            <label for="sim_number" class="block text-xs font-semibold text-ink">
+                                Nomor SIM (14 Digit) <span class="text-danger">*</span>
                             </label>
-                            <span id="sim_counter" class="text-[11px] font-mono text-slate-400">0 / 14 digit</span>
+                            <span id="sim_counter" class="text-[11px] font-mono text-muted">0 / 14 digit</span>
                         </div>
                         <input type="text" 
                                name="sim_number" 
@@ -239,44 +239,44 @@
                                inputmode="numeric"
                                placeholder="Contoh: 12345678901234"
                                value="{{ old('sim_number', $user->sim_number) }}" 
-                               class="w-full px-3.5 py-2.5 rounded-lg border {{ $errors->has('sim_number') ? 'border-rose-400 bg-rose-50/30' : 'border-slate-300' }} text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent tracking-widest font-mono"
+                               class="w-full px-3.5 py-2.5 rounded-lg border {{ $errors->has('sim_number') ? 'border-danger-line bg-danger-surface/30' : 'border-field-line' }} text-sm focus:outline-none focus:ring-2 focus:ring-focus focus:border-transparent tracking-widest font-mono"
                                required>
                         @error('sim_number')
-                            <p class="text-xs text-rose-600 mt-1 font-medium">{{ $message }}</p>
+                            <p class="text-xs text-danger mt-1 font-medium">{{ $message }}</p>
                         @else
-                            <p class="text-[11px] text-slate-400 mt-1">Nomor SIM harus tepat 14 digit angka.</p>
+                            <p class="text-[11px] text-muted mt-1">Nomor SIM harus tepat 14 digit angka.</p>
                         @enderror
                     </div>
 
                     <div>
-                        <label for="sim_image" class="block text-xs font-semibold text-slate-700 mb-1">
+                        <label for="sim_image" class="block text-xs font-semibold text-ink mb-1">
                             Unggah Foto SIM Asli {{ $hasSimStored ? '(Opsional jika tidak diganti)' : '*' }}
                         </label>
                         <input type="file" 
                                name="sim_image" 
                                id="sim_image" 
                                accept=".jpg,.jpeg,.png,.webp"
-                               class="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100 border border-slate-200 rounded-lg p-1.5 cursor-pointer">
-                        <p class="text-[11px] text-slate-400 mt-1">Maksimal 2 MB. Format JPG, PNG, atau WEBP.</p>
+                               class="w-full text-xs text-muted file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-surface-hover file:text-link hover:file:bg-surface-hover border border-line rounded-lg p-1.5 cursor-pointer">
+                        <p class="text-[11px] text-muted mt-1">Maksimal 2 MB. Format JPG, PNG, atau WEBP.</p>
                         @error('sim_image')
-                            <p class="text-xs text-rose-600 mt-1 font-medium">{{ $message }}</p>
+                            <p class="text-xs text-danger mt-1 font-medium">{{ $message }}</p>
                         @enderror
 
                         @if ($hasSimStored)
-                            <div class="mt-3 p-3 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-between">
+                            <div class="mt-3 p-3 rounded-lg bg-success-surface border border-success-line flex items-center justify-between">
                                 <div class="flex items-center gap-3">
-                                    <div class="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                                    <div class="w-8 h-8 rounded-full bg-success-surface text-success flex items-center justify-center shrink-0">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                                         </svg>
                                     </div>
                                     <div>
-                                        <p class="text-xs font-semibold text-emerald-900">Foto SIM telah tersimpan aman</p>
-                                        <p class="text-[11px] text-emerald-700 font-mono">{{ session('temp_sim_image_name', basename($user->sim_image ?? 'Foto SIM Tersimpan')) }}</p>
+                                        <p class="text-xs font-semibold text-success">Foto SIM telah tersimpan aman</p>
+                                        <p class="text-[11px] text-success font-mono">{{ session('temp_sim_image_name', basename($user->sim_image ?? 'Foto SIM Tersimpan')) }}</p>
                                     </div>
                                 </div>
                                 @if ($user->sim_image || session('temp_sim_image'))
-                                    <a href="{{ route('documents.identity.show', [$user, 'sim']) }}" target="_blank" class="px-2.5 py-1 text-xs font-medium text-emerald-800 bg-white border border-emerald-300 rounded hover:bg-emerald-100/50">
+                                    <a href="{{ route('documents.identity.show', [$user, 'sim']) }}" target="_blank" class="px-2.5 py-1 text-xs font-medium text-success bg-surface border border-success-line rounded hover:bg-success-surface/50">
                                         Lihat Pratinjau
                                     </a>
                                 @endif
@@ -286,17 +286,17 @@
                 </div>
 
                 <!-- Privacy & Consent Notice -->
-                <div class="p-4 bg-slate-50 rounded-lg border border-slate-200 text-xs text-slate-500 space-y-1">
-                    <p class="font-semibold text-slate-700">Perlindungan Kerahasiaan Dokumen:</p>
+                <div class="p-4 bg-surface-raised rounded-lg border border-line text-xs text-muted space-y-1">
+                    <p class="font-semibold text-ink">Perlindungan Kerahasiaan Dokumen:</p>
                     <p>File KTP dan SIM Anda disimpan di direktori privat terenkripsi yang tidak dapat diakses secara publik. Hanya Administrator yang berwenang dan Anda sendiri yang dapat melihat dokumen ini untuk keperluan validasi rental.</p>
                 </div>
 
                 <!-- Submit Button -->
                 <div class="flex items-center justify-end gap-3 pt-3">
-                    <a href="{{ route('customer.dashboard') }}" class="px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
+                    <a href="{{ route('customer.dashboard') }}" class="px-4 py-2 text-xs font-semibold text-ink hover:bg-surface-hover rounded-lg transition-colors">
                         Batal
                     </a>
-                    <button type="submit" class="px-6 py-2.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-lg shadow-sm transition-colors flex items-center gap-2">
+                    <button type="submit" class="px-6 py-2.5 bg-action hover:bg-action-hover text-ink text-xs font-bold rounded-lg shadow-sm transition-colors flex items-center gap-2">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
                         </svg>
@@ -320,11 +320,11 @@
             const len = input.value.length;
             counter.textContent = `${len} / ${maxDigits} digit`;
             if (len === maxDigits) {
-                counter.className = 'text-[11px] font-mono text-emerald-600 font-semibold';
+                counter.className = 'text-[11px] font-mono text-success font-semibold';
             } else if (len > 0) {
-                counter.className = 'text-[11px] font-mono text-amber-600 font-medium';
+                counter.className = 'text-[11px] font-mono text-warning font-medium';
             } else {
-                counter.className = 'text-[11px] font-mono text-slate-400';
+                counter.className = 'text-[11px] font-mono text-muted';
             }
         }
 

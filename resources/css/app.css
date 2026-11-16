@@ -4,6 +4,47 @@
 @source '../../storage/framework/views/*.php';
 
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+    --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
+}
+
+@theme {
+    --color-canvas: #191410;
+    --color-surface: #1E1712;
+    --color-surface-raised: #241C16;
+    --color-surface-hover: #34271D;
+    --color-navigation: #150F0B;
+    --color-ink: #E8DFD1;
+    --color-muted: #CCBDAC;
+    --color-subtle: #BAAA98;
+    --color-line: #49392D;
+    --color-field-line: #776553;
+    --color-accent: #A66A3F;
+    --color-action: #935831;
+    --color-action-hover: #844F2C;
+    --color-link: #E8AC80;
+    --color-focus: #C47F4E;
+    --color-success: #86D8B3;
+    --color-success-surface: #102F25;
+    --color-success-line: #316A54;
+    --color-success-action: #246347;
+    --color-danger: #FDA4AF;
+    --color-danger-surface: #371C23;
+    --color-danger-line: #824452;
+    --color-danger-action: #983E52;
+    --color-warning: #F1CF82;
+    --color-warning-surface: #342710;
+    --color-warning-line: #7F632F;
+    --color-warning-action: #795922;
+    --color-info: #E8DFD1;
+    --color-info-surface: #30251D;
+    --color-info-line: #776553;
+}
+
+@layer base {
+    html { color-scheme: dark; }
+    input, select, textarea { background-color: var(--color-surface-raised); color: var(--color-ink); }
+    input::placeholder, textarea::placeholder { color: var(--color-subtle); opacity: 1; }
+    :focus-visible { outline: 2px solid var(--color-focus); outline-offset: 3px; }
+    input:-webkit-autofill { -webkit-text-fill-color: var(--color-ink); -webkit-box-shadow: 0 0 0 1000px var(--color-surface-raised) inset; }
 }

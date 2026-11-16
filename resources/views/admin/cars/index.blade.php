@@ -6,7 +6,7 @@
 @section('content')
 <div class="space-y-6">
     <!-- Action Bar & Filters -->
-    <div class="bg-[#1E1712] rounded-xl p-5 border border-[#49392D] shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+    <div class="bg-surface rounded-xl p-5 border border-line shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <!-- Search & Filter Form -->
         <form action="{{ route('admin.cars.index') }}" method="GET" class="flex flex-wrap items-center gap-3 flex-1">
             <!-- Search input -->
@@ -15,14 +15,14 @@
                        name="search" 
                        value="{{ request('search') }}" 
                        placeholder="Cari nama, merek, atau plat..." 
-                       class="bg-[#241C16] w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-[#776553] focus:outline-none focus:border-[#C47F4E] focus:ring-1 focus:ring-[#C47F4E]">
-                <svg class="w-4 h-4 text-[#CCBDAC] absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                       class="bg-surface-raised w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-field-line focus:outline-none focus:border-focus focus:ring-1 focus:ring-focus">
+                <svg class="w-4 h-4 text-muted absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                 </svg>
             </div>
 
             <!-- Category filter -->
-            <select name="car_type_id" class="bg-[#241C16] text-xs py-2 px-3 rounded-lg border border-[#776553] focus:outline-none focus:border-[#C47F4E]">
+            <select name="car_type_id" class="bg-surface-raised text-xs py-2 px-3 rounded-lg border border-field-line focus:outline-none focus:border-focus">
                 <option value="">Semua Kategori</option>
                 @foreach ($carTypes as $type)
                     <option value="{{ $type->id }}" {{ request('car_type_id') == $type->id ? 'selected' : '' }}>
@@ -32,24 +32,24 @@
             </select>
 
             <!-- Status filter -->
-            <select name="status" class="bg-[#241C16] text-xs py-2 px-3 rounded-lg border border-[#776553] focus:outline-none focus:border-[#C47F4E]">
+            <select name="status" class="bg-surface-raised text-xs py-2 px-3 rounded-lg border border-field-line focus:outline-none focus:border-focus">
                 <option value="">Semua Status</option>
                 <option value="available" {{ request('status') == 'available' ? 'selected' : '' }}>Tersedia</option>
                 <option value="rented" {{ request('status') == 'rented' ? 'selected' : '' }}>Sedang Disewa</option>
                 <option value="maintenance" {{ request('status') == 'maintenance' ? 'selected' : '' }}>Perawatan</option>
             </select>
 
-            <button type="submit" class="px-4 py-2 bg-[#34271D] hover:bg-[#49392D] text-white text-xs font-semibold rounded-lg transition-colors">
+            <button type="submit" class="px-4 py-2 bg-surface-hover hover:bg-line text-ink text-xs font-semibold rounded-lg transition-colors">
                 Terapkan Filter
             </button>
 
             @if(request()->hasAny(['search', 'car_type_id', 'status']))
-                <a href="{{ route('admin.cars.index') }}" class="text-xs text-rose-300 hover:underline">Reset</a>
+                <a href="{{ route('admin.cars.index') }}" class="text-xs text-danger hover:underline">Reset</a>
             @endif
         </form>
 
         <!-- Add Button -->
-        <a href="{{ route('admin.cars.create') }}" class="inline-flex items-center gap-2 px-4 py-2 bg-[#935831] hover:bg-[#844F2C] text-white text-xs font-semibold rounded-lg shadow-sm transition-colors shrink-0">
+        <a href="{{ route('admin.cars.create') }}" class="inline-flex items-center gap-2 px-4 py-2 bg-action hover:bg-action-hover text-ink text-xs font-semibold rounded-lg shadow-sm transition-colors shrink-0">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
             </svg>
@@ -58,11 +58,11 @@
     </div>
 
     <!-- Vehicles Table -->
-    <div class="bg-[#1E1712] rounded-xl border border-[#49392D] shadow-sm overflow-hidden">
+    <div class="bg-surface rounded-xl border border-line shadow-sm overflow-hidden">
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse">
                 <thead>
-                    <tr class="bg-[#241C16] text-[11px] font-semibold text-[#CCBDAC] uppercase tracking-wider border-b border-[#49392D]">
+                    <tr class="bg-surface-raised text-[11px] font-semibold text-muted uppercase tracking-wider border-b border-line">
                         <th class="py-3 px-5">Nama Kendaraan</th>
                         <th class="py-3 px-5">Kategori</th>
                         <th class="py-3 px-5">Plat Nomor</th>
@@ -72,41 +72,41 @@
                         <th class="py-3 px-5 text-right">Aksi</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-[#49392D] text-sm">
+                <tbody class="divide-y divide-line text-sm">
                     @forelse ($cars as $car)
-                        <tr class="hover:bg-[#241C16]/80 transition-colors">
+                        <tr class="hover:bg-surface-raised/80 transition-colors">
                             <td class="py-3.5 px-5">
-                                <span class="font-bold text-[#E8DFD1] block">{{ $car->name }}</span>
-                                <span class="text-xs text-[#CCBDAC]">{{ $car->brand }}</span>
+                                <span class="font-bold text-ink block">{{ $car->name }}</span>
+                                <span class="text-xs text-muted">{{ $car->brand }}</span>
                             </td>
-                            <td class="py-3.5 px-5 text-[#CCBDAC]">
-                                <span class="px-2.5 py-0.5 rounded text-xs font-medium bg-[#34271D] text-[#E8DFD1]">
+                            <td class="py-3.5 px-5 text-muted">
+                                <span class="px-2.5 py-0.5 rounded text-xs font-medium bg-surface-hover text-ink">
                                     {{ $car->carType?->name ?? '-' }}
                                 </span>
                             </td>
                             <td class="py-3.5 px-5">
-                                <span class="font-mono text-xs font-bold px-2 py-1 bg-[#34271D] rounded text-[#E8DFD1] border border-[#49392D]">
+                                <span class="font-mono text-xs font-bold px-2 py-1 bg-surface-hover rounded text-ink border border-line">
                                     {{ $car->plate_number }}
                                 </span>
                             </td>
-                            <td class="py-3.5 px-5 text-xs text-[#CCBDAC]">
+                            <td class="py-3.5 px-5 text-xs text-muted">
                                 <p>{{ $car->model_year }} &bull; {{ ucfirst($car->transmission) }}</p>
-                                <p class="text-[#CCBDAC]">{{ $car->capacity }} Penumpang</p>
+                                <p class="text-muted">{{ $car->capacity }} Penumpang</p>
                             </td>
-                            <td class="py-3.5 px-5 font-bold text-[#E8DFD1]">
+                            <td class="py-3.5 px-5 font-bold text-ink">
                                 Rp {{ number_format($car->price_per_day, 0, ',', '.') }}
                             </td>
                             <td class="py-3.5 px-5">
                                 @if ($car->status === 'available')
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-950 text-emerald-300">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-success-surface text-success">
                                         Tersedia
                                     </span>
                                 @elseif ($car->status === 'rented')
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-950 text-amber-300">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-warning-surface text-warning">
                                         Sedang Disewa
                                     </span>
                                 @else
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-rose-950 text-rose-300">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-danger-surface text-danger">
                                         Perawatan
                                     </span>
                                 @endif
@@ -114,7 +114,7 @@
                             <td class="py-3.5 px-5 text-right">
                                 <div class="inline-flex items-center gap-1.5">
                                     <a href="{{ route('admin.cars.show', $car) }}" 
-                                       class="p-1.5 text-[#CCBDAC] hover:text-[#E8DFD1] hover:bg-[#34271D] rounded transition-colors"
+                                       class="p-1.5 text-muted hover:text-ink hover:bg-surface-hover rounded transition-colors"
                                        title="Lihat Detail">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
@@ -122,7 +122,7 @@
                                         </svg>
                                     </a>
                                     <a href="{{ route('admin.cars.edit', $car) }}" 
-                                       class="p-1.5 text-[#E8AC80] hover:text-[#E8AC80] hover:bg-[#34271D] rounded transition-colors"
+                                       class="p-1.5 text-link hover:text-link hover:bg-surface-hover rounded transition-colors"
                                        title="Ubah Data">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
@@ -135,7 +135,7 @@
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" 
-                                                class="p-1.5 text-rose-300 hover:text-rose-300 hover:bg-rose-950 rounded transition-colors"
+                                                class="p-1.5 text-danger hover:text-danger hover:bg-danger-surface rounded transition-colors"
                                                 title="Hapus Kendaraan">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
@@ -147,9 +147,9 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="py-10 text-center text-[#CCBDAC]">
+                            <td colspan="7" class="py-10 text-center text-muted">
                                 <p class="font-medium">Tidak ada kendaraan yang sesuai dengan kriteria pencarian.</p>
-                                <a href="{{ route('admin.cars.index') }}" class="text-xs text-[#E8AC80] hover:underline mt-1 inline-block">Reset filter</a>
+                                <a href="{{ route('admin.cars.index') }}" class="text-xs text-link hover:underline mt-1 inline-block">Reset filter</a>
                             </td>
                         </tr>
                     @endforelse
@@ -158,8 +158,8 @@
         </div>
 
         @if ($cars->hasPages())
-            <div class="p-4 border-t border-[#49392D]">
-                {{ $cars->links() }}
+            <div class="p-4 border-t border-line">
+                {{ $cars->links('layouts.pagination') }}
             </div>
         @endif
     </div>
