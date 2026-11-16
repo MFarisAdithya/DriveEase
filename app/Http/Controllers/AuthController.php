@@ -8,6 +8,8 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class AuthController extends Controller
@@ -23,6 +25,7 @@ class AuthController extends Controller
 
     public function login(Request $request): RedirectResponse
     {
+        $this->normalizeEmail($request);
         $credentials = $request->validate([
             'email' => ['required', 'email'],
             'password' => ['required', 'string'],
@@ -32,13 +35,22 @@ class AuthController extends Controller
             'password.required' => 'Password wajib diisi.',
         ]);
 
+        $key = 'login:'.hash('sha256', $credentials['email'].'|'.$request->ip());
+        if (RateLimiter::tooManyAttempts($key, 5)) {
+            throw ValidationException::withMessages(['email' => 'Terlalu banyak percobaan masuk. Coba lagi dalam '.RateLimiter::availableIn($key).' detik.']);
+        }
+        RateLimiter::hit($key, 60);
+        if (! app()->environment(['local', 'testing']) && in_array($credentials['email'], ['admin@driveease.test', 'staff@driveease.test', 'customer@driveease.test'], true)) {
+            throw ValidationException::withMessages(['email' => 'Akun demo tidak tersedia pada lingkungan ini.']);
+        }
         $remember = $request->boolean('remember');
 
         if (Auth::attempt($credentials, $remember)) {
+            RateLimiter::clear($key);
             $request->session()->regenerate();
 
             return $this->redirectBasedOnRole(Auth::user())
-                ->with('success', 'Selamat datang kembali, ' . Auth::user()->name . '!');
+                ->with('success', 'Selamat datang kembali, '.Auth::user()->name.'!');
         }
 
         return back()
@@ -59,6 +71,7 @@ class AuthController extends Controller
 
     public function register(Request $request): RedirectResponse
     {
+        $this->normalizeEmail($request);
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
@@ -93,7 +106,7 @@ class AuthController extends Controller
         $request->session()->regenerate();
 
         return redirect()->route('customer.dashboard')
-            ->with('success', 'Pendaftaran berhasil! Selamat datang di DriveEase, ' . $user->name . '.');
+            ->with('success', 'Pendaftaran berhasil! Selamat datang di DriveEase, '.$user->name.'.');
     }
 
     public function logout(Request $request): RedirectResponse
@@ -105,6 +118,13 @@ class AuthController extends Controller
 
         return redirect()->route('login')
             ->with('success', 'Anda telah berhasil keluar dari sistem.');
+    }
+
+    private function normalizeEmail(Request $request): void
+    {
+        if (is_string($request->input('email'))) {
+            $request->merge(['email' => mb_strtolower(trim($request->input('email')))]);
+        }
     }
 
     protected function redirectBasedOnRole($user): RedirectResponse

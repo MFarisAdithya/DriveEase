@@ -31,3 +31,5 @@ LAPORAN_*.md
 PROGRESS_*.md
 ERD_*.png
 generate_erd.py
+
+.env.testing

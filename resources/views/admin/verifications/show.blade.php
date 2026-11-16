@@ -93,7 +93,7 @@
                         <span class="w-6 h-6 rounded-full bg-action text-ink inline-flex items-center justify-center text-xs">1</span>
                         Kartu Tanda Penduduk (KTP)
                     </h3>
-                    @if ($user->ktp_image)
+                    @if (app(\App\Services\IdentityDocuments::class)->exists($user->ktp_image))
                         <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-success-surface text-success border border-success-line">Foto Tersedia</span>
                     @else
                         <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-danger-surface text-danger border border-danger-line">Belum Ada</span>
@@ -110,7 +110,7 @@
 
                     <div class="mt-4">
                         <span class="text-[11px] font-bold text-muted uppercase tracking-wider block mb-2">Pratinjau Foto KTP</span>
-                        @if ($user->ktp_image)
+                        @if (app(\App\Services\IdentityDocuments::class)->exists($user->ktp_image))
                             <div class="rounded-lg border border-line overflow-hidden bg-surface-raised p-2 flex items-center justify-center">
                                 <img src="{{ route('documents.identity.show', [$user, 'ktp']) }}" 
                                      alt="Foto KTP {{ $user->name }}" 
@@ -145,7 +145,7 @@
                         <span class="w-6 h-6 rounded-full bg-action text-ink inline-flex items-center justify-center text-xs">2</span>
                         Surat Izin Mengemudi (SIM)
                     </h3>
-                    @if ($user->sim_image)
+                    @if (app(\App\Services\IdentityDocuments::class)->exists($user->sim_image))
                         <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-success-surface text-success border border-success-line">Foto Tersedia</span>
                     @else
                         <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-danger-surface text-danger border border-danger-line">Belum Ada</span>
@@ -162,7 +162,7 @@
 
                     <div class="mt-4">
                         <span class="text-[11px] font-bold text-muted uppercase tracking-wider block mb-2">Pratinjau Foto SIM</span>
-                        @if ($user->sim_image)
+                        @if (app(\App\Services\IdentityDocuments::class)->exists($user->sim_image))
                             <div class="rounded-lg border border-line overflow-hidden bg-surface-raised p-2 flex items-center justify-center">
                                 <img src="{{ route('documents.identity.show', [$user, 'sim']) }}" 
                                      alt="Foto SIM {{ $user->name }}" 
@@ -212,7 +212,7 @@
                     </p>
                     @if (!$user->hasSubmittedDocuments())
                         <p class="text-xs text-danger font-semibold mt-2">
-                            * Dokumen belum lengkap (KTP atau SIM masih kosong). Persetujuan tidak dapat diproses.
+                            * Dokumen belum lengkap atau berkas tidak ditemukan. Persetujuan tidak dapat diproses.
                         </p>
                     @endif
                 </div>

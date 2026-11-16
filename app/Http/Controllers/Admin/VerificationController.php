@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\VerificationQueue;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class VerificationController extends Controller
@@ -17,17 +19,7 @@ class VerificationController extends Controller
     {
         $status = $request->query('status');
 
-        $base = User::whereHas('role', fn ($role) => $role->where('name', 'customer'));
-        $pending = (clone $base)->where('verification_status', 'pending');
-        $complete = "COALESCE(NULLIF(ktp_number, ''), nik_ktp, '') <> '' AND COALESCE(sim_number, '') <> '' AND COALESCE(ktp_image, '') <> '' AND COALESCE(sim_image, '') <> ''";
-        $queues = [
-            'all' => $base,
-            'pending' => $pending,
-            'ready' => (clone $pending)->whereRaw($complete),
-            'incomplete' => (clone $pending)->whereRaw("NOT ($complete)"),
-            'verified' => (clone $base)->where('verification_status', 'verified'),
-            'rejected' => (clone $base)->where('verification_status', 'rejected'),
-        ];
+        $queues = app(VerificationQueue::class)->queries();
         $status = is_string($status) && isset($queues[$status]) ? $status : 'all';
         $counts = array_map(fn ($query) => $query->count(), $queues);
         $customers = $queues[$status]->latest('updated_at')->orderByDesc('id')->paginate(15)->withQueryString();
@@ -54,15 +46,22 @@ class VerificationController extends Controller
     {
         abort_unless($user->isCustomer(), 404, 'Customer tidak ditemukan.');
 
-        if (! $user->hasSubmittedDocuments()) {
-            return back()->with('error', 'Dokumen customer belum lengkap untuk dapat disetujui.');
-        }
+        $approved = DB::transaction(function () use ($user): bool {
+            $locked = User::query()->lockForUpdate()->findOrFail($user->id);
+            if (! $locked->hasSubmittedDocuments()) {
+                return false;
+            }
+            $locked->verification_status = 'verified';
+            $locked->verified_at = now();
+            $locked->verified_by = auth()->id();
+            $locked->rejection_reason = null;
+            $locked->saveOrFail();
 
-        $user->verification_status = 'verified';
-        $user->verified_at = now();
-        $user->verified_by = auth()->id();
-        $user->rejection_reason = null;
-        $user->save();
+            return true;
+        });
+        if (! $approved) {
+            return back()->with('error', 'Dokumen pelanggan belum lengkap atau berkas tidak ditemukan.');
+        }
 
         return redirect()->route('admin.verifications.show', $user)
             ->with('success', "Identitas customer {$user->name} berhasil diverifikasi dan disetujui.");

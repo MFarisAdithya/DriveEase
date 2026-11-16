@@ -40,9 +40,7 @@
             </a>
 
             @php
-                $pendingVerificationCount = \App\Models\User::where('verification_status', 'pending')
-                    ->whereHas('role', fn($q) => $q->where('name', 'customer'))
-                    ->count();
+                $pendingVerificationCount = app(\App\Services\VerificationQueue::class)->counts()['ready'];
             @endphp
             <a href="{{ route('admin.verifications.index') }}"
                class="flex items-center justify-between px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors {{ request()->routeIs('admin.verifications.*') ? 'bg-action-hover text-ink shadow-sm' : 'text-subtle hover:bg-surface-hover hover:text-ink' }}">

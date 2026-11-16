@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\IdentityDocuments;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -116,7 +117,8 @@ class User extends Authenticatable
     public function hasSubmittedDocuments(): bool
     {
         $ktp = $this->ktp_number ?: $this->nik_ktp;
-        return !empty($ktp) && !empty($this->sim_number) && !empty($this->ktp_image) && !empty($this->sim_image);
+
+        return ! empty($ktp) && ! empty($this->sim_number) && app(IdentityDocuments::class)->exists($this->ktp_image) && app(IdentityDocuments::class)->exists($this->sim_image);
     }
 
     /**
@@ -136,6 +138,7 @@ class User extends Authenticatable
             get: fn ($value) => $value ?: $this->attributes['nik_ktp'] ?? null,
             set: function ($value) {
                 $this->attributes['nik_ktp'] = $value;
+
                 return $value;
             }
         );

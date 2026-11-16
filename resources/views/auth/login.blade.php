@@ -89,6 +89,7 @@
             </div>
         </div>
 
+        @if (app()->environment(['local', 'testing']))
         <!-- Demo Accounts Helper -->
         <div class="mt-6 bg-surface-hover/80 rounded-xl border border-field-line/80 p-4 text-xs text-subtle">
             <p class="font-semibold text-subtle mb-2 flex items-center gap-1.5">
@@ -118,6 +119,7 @@
                 </button>
             </div>
         </div>
+        @endif
     </div>
 </div>
 @endsection

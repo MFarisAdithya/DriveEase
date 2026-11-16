@@ -16,6 +16,10 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        if (! app()->environment(['local', 'testing'])) {
+            throw new \RuntimeException('Seeder demo hanya boleh dijalankan pada lingkungan lokal atau pengujian.');
+        }
+
         // 1. Roles
         $adminRole = Role::updateOrCreate(
             ['name' => 'admin'],

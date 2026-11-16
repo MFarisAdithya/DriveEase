@@ -3,21 +3,21 @@
 namespace App\Http\Controllers;
 
 use App\Models\Car;
-use App\Models\User;
+use App\Services\VerificationQueue;
 use Illuminate\View\View;
 
 class DashboardController extends Controller
 {
     public function admin(): View
     {
+        $verificationCounts = app(VerificationQueue::class)->counts();
         $stats = [
             'total' => Car::count(),
             'available' => Car::where('status', 'available')->count(),
             'rented' => Car::where('status', 'rented')->count(),
             'maintenance' => Car::where('status', 'maintenance')->count(),
-            'pending_verifications' => User::where('verification_status', 'pending')
-                ->whereHas('role', fn($q) => $q->where('name', 'customer'))
-                ->count(),
+            'pending_verifications' => $verificationCounts['ready'],
+            'incomplete_verifications' => $verificationCounts['incomplete'],
         ];
 
         $recentCars = Car::with('carType')->latest()->take(5)->get();

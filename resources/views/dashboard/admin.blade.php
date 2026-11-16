@@ -87,9 +87,9 @@
         </div>
 
         <!-- Pending Verifications (Clickable to filtered list) -->
-        <a href="{{ route('admin.verifications.index', ['status' => 'pending']) }}" class="bg-surface rounded-xl p-5 border {{ $stats['pending_verifications'] > 0 ? 'border-warning-line ring-2 ring-warning-line' : 'border-line' }} shadow-sm hover:border-warning-line transition-all block group">
+        <a href="{{ route('admin.verifications.index', ['status' => 'ready']) }}" class="bg-surface rounded-xl p-5 border {{ $stats['pending_verifications'] > 0 ? 'border-warning-line ring-2 ring-warning-line' : 'border-line' }} shadow-sm hover:border-warning-line transition-all block group">
             <div class="flex items-center justify-between">
-                <span class="text-xs font-semibold uppercase tracking-wider text-warning group-hover:text-warning">Verifikasi Tertunda</span>
+                <span class="text-xs font-semibold uppercase tracking-wider text-warning group-hover:text-warning">Siap ditinjau</span>
                 <span class="p-2 rounded-lg bg-warning-surface text-warning group-hover:bg-warning-surface transition-colors">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
@@ -98,7 +98,8 @@
             </div>
             <p class="text-3xl font-bold text-warning mt-3">{{ $stats['pending_verifications'] }}</p>
             <p class="text-xs text-warning/80 mt-1 flex items-center gap-1 font-medium">
-                Customer menunggu persetujuan &rarr;
+                Pengajuan dengan berkas lengkap &rarr;
+                <span class="block">{{ $stats['incomplete_verifications'] }} menunggu kelengkapan</span>
             </p>
         </a>
             <p class="text-xs text-muted mt-1">Dalam masa perbaikan/bengkel</p>
