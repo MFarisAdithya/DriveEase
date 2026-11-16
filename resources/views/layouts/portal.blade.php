@@ -24,23 +24,23 @@
                 <!-- Navigation Links -->
                 <nav class="hidden md:flex items-center gap-4 text-xs font-semibold">
                     <a href="{{ route('cars.index') }}" class="px-3 py-1.5 rounded-lg {{ request()->routeIs('cars.*') ? 'bg-surface-hover text-ink' : 'text-subtle hover:text-ink' }} transition-colors">
-                        Katalog Armada
+                        Katalog mobil
                     </a>
                     @auth
                         @if(auth()->user()->isAdmin())
                             <a href="{{ route('admin.dashboard') }}" class="px-3 py-1.5 rounded-lg text-subtle hover:text-ink transition-colors">
-                                Admin Dashboard
+                                Ringkasan admin
                             </a>
                         @elseif(auth()->user()->isStaff())
                             <a href="{{ route('staff.dashboard') }}" class="px-3 py-1.5 rounded-lg {{ request()->routeIs('staff.dashboard') ? 'bg-surface-hover text-ink' : 'text-subtle hover:text-ink' }} transition-colors">
-                                Dashboard Staf
+                                Dasbor staf
                             </a>
                         @elseif(auth()->user()->isCustomer())
                             <a href="{{ route('customer.dashboard') }}" class="px-3 py-1.5 rounded-lg {{ request()->routeIs('customer.dashboard') ? 'bg-surface-hover text-ink' : 'text-subtle hover:text-ink' }} transition-colors">
-                                Dashboard Saya
+                                Dasbor saya
                             </a>
                             <a href="{{ route('customer.verification.create') }}" class="px-3 py-1.5 rounded-lg {{ request()->routeIs('customer.verification.*') ? 'bg-surface-hover text-ink' : 'text-subtle hover:text-ink' }} transition-colors">
-                                Verifikasi Dokumen
+                                Identitas saya
                             </a>
                         @endif
                     @endauth
@@ -68,7 +68,7 @@
                         Masuk
                     </a>
                     <a href="{{ route('register') }}" class="px-3.5 py-1.5 text-xs font-semibold bg-action hover:bg-action-hover text-ink rounded-lg transition-colors shadow-sm">
-                        Daftar Akun
+                        Daftar
                     </a>
                 @endauth
             </div>
@@ -103,7 +103,7 @@
     <footer class="bg-navigation border-t border-line py-6 text-center text-xs text-muted">
         <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
             <span>&copy; {{ date('Y') }} DriveEase — Sistem Informasi Manajemen Rental Kendaraan.</span>
-            <span class="text-muted">Armada Prima, Perjalanan Nyaman.</span>
+            <span class="text-muted">Katalog mobil dan pengelolaan rental.</span>
         </div>
     </footer>
 </div>

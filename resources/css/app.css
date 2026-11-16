@@ -48,3 +48,54 @@
     :focus-visible { outline: 2px solid var(--color-focus); outline-offset: 3px; }
     input:-webkit-autofill { -webkit-text-fill-color: var(--color-ink); -webkit-box-shadow: 0 0 0 1000px var(--color-surface-raised) inset; }
 }
+
+/* Pilot theme: enabled by individual pages before a wider rollout. */
+.theme-refresh {
+    color-scheme: light;
+    --color-canvas: #F5FAFC;
+    --color-surface: #FFFFFF;
+    --color-surface-raised: #EAF5FA;
+    --color-surface-hover: #B6DFED;
+    --color-navigation: #FFFFFF;
+    --color-ink: #002941;
+    --color-muted: #526878;
+    --color-subtle: #526878;
+    --color-line: #D5E4EB;
+    --color-field-line: #758A98;
+    --color-accent: #B6DFED;
+    --color-action: #FD6E6E;
+    --color-action-hover: #F85F64;
+    --color-link: #002941;
+    --color-focus: #005B80;
+    --color-success: #176447;
+    --color-success-surface: #E8F5EE;
+    --color-success-line: #9BC9AE;
+    --color-warning: #735014;
+    --color-warning-surface: #FFF4D6;
+    --color-warning-line: #D8BB7A;
+    --color-danger: #A32638;
+    --color-danger-surface: #FCECEF;
+    --color-danger-line: #DEADB5;
+}
+.theme-refresh [class*="color-scheme:dark"] { color-scheme: light; }
+.theme-refresh body > div > header a { min-height: 44px; display: inline-flex; align-items: center; }
+.theme-refresh body > div > main { max-width: 1264px; padding-top: 24px; }
+.theme-refresh aside { background: #002941; --color-ink: #FFFFFF; --color-muted: #B6DFED; --color-subtle: #B6DFED; --color-line: #31556B; --color-surface-hover: #16415A; --color-link: #B6DFED; }
+.theme-refresh aside a[class*="bg-action"], .theme-refresh aside .bg-action { color: #002941; }
+.theme-refresh aside nav a { min-height: 44px; }
+.theme-refresh .ui-button { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 10px 16px; border-radius: 8px; font-size: 14px; font-weight: 700; background: var(--color-action); color: var(--color-ink); }
+.theme-refresh .ui-button:hover { background: var(--color-action-hover); }
+.theme-refresh .ui-secondary { background: var(--color-surface); border: 1px solid var(--color-field-line); }
+.theme-refresh .ui-secondary:hover { background: var(--color-surface-raised); }
+.theme-refresh .ui-field { width: 100%; min-height: 48px; padding: 10px 12px; border: 1px solid var(--color-field-line); border-radius: 8px; background: var(--color-surface); font-size: 14px; }
+.theme-refresh .ui-label { display: block; margin-bottom: 8px; font-size: 14px; font-weight: 600; }
+.theme-refresh .ui-panel { border: 1px solid var(--color-line); border-radius: 12px; background: var(--color-surface); overflow: hidden; }
+.theme-refresh .vehicle-photo { position: relative; aspect-ratio: 16 / 9; background: var(--color-surface-raised); }
+.theme-refresh .vehicle-photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.theme-refresh .queue-table td { overflow-wrap: anywhere; }
+@media (max-width: 1279px) {
+    .theme-refresh body > div > main { padding-top: 16px; }
+    .theme-refresh .queue-table tbody tr { display: grid; grid-template-columns: 1fr 1fr; padding: 12px; gap: 8px; }
+    .theme-refresh .queue-table td { display: block; padding: 4px; }
+    .theme-refresh .queue-table td:first-child, .theme-refresh .queue-table td:last-child { grid-column: 1 / -1; }
+}

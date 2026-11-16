@@ -1,134 +1,90 @@
 @extends('layouts.portal')
-
-@section('title', 'Katalog Armada Kendaraan - DriveEase')
+@section('theme_class', 'theme-refresh')
+@section('title', 'Katalog kendaraan — DriveEase')
 
 @section('content')
-<div class="space-y-6 bg-canvas p-4 text-ink sm:p-8">
-    <header class="border-l-4 border-accent pl-4 py-2">
-        <h1 class="font-serif text-4xl font-normal tracking-tight text-ink">Katalog kendaraan</h1>
-        <p class="mt-2 text-sm text-muted">Bandingkan kapasitas, transmisi, dan tarif sewa harian.</p>
+<div class="space-y-6">
+    <header class="rounded-xl bg-accent px-5 py-6 md:px-8 md:py-8">
+        <p class="mb-2 text-sm font-semibold">Katalog kendaraan</p>
+        <h1 class="max-w-2xl text-[28px] leading-9 font-bold tracking-tight md:text-4xl md:leading-[44px]">Pilih mobil untuk perjalananmu</h1>
+        <p class="mt-3 text-sm md:text-base">Bandingkan kapasitas, transmisi, dan tarif harian dalam satu tempat.</p>
     </header>
-
-    <!-- Search & Filter Bar -->
-    <div class="pb-4 border-b border-line">
-        <form action="{{ route('cars.index') }}" method="GET" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
-            <!-- Search -->
-            <div class="lg:col-span-5 relative">
-                <input type="text" 
-                       aria-label="Cari kendaraan" name="search" 
-                       value="{{ request('search') }}" 
-                       placeholder="Cari nama mobil atau merek (misal: Innova, Honda)..." 
-                       class="w-full pl-9 pr-3 py-2.5 text-xs rounded-lg border border-field-line bg-surface-raised focus:outline-none focus:border-focus focus:ring-1 focus:ring-focus">
-                <svg class="w-4 h-4 text-subtle absolute left-3 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                </svg>
-            </div>
-
-            <!-- Category -->
-            <div class="lg:col-span-3">
-                <select aria-label="Kategori kendaraan" name="car_type_id" class="w-full text-xs py-2.5 px-3 rounded-lg border border-field-line bg-surface-raised focus:outline-none focus:border-focus">
-                    <option value="">Semua Kategori</option>
-                    @foreach ($carTypes as $type)
-                        <option value="{{ $type->id }}" {{ request('car_type_id') == $type->id ? 'selected' : '' }}>
-                            {{ $type->name }}
-                        </option>
-                    @endforeach
-                </select>
-            </div>
-
-            <!-- Transmission -->
-            <div class="lg:col-span-2">
-                <select aria-label="Transmisi" name="transmission" class="w-full text-xs py-2.5 px-3 rounded-lg border border-field-line bg-surface-raised focus:outline-none focus:border-focus">
-                    <option value="">Semua Transmisi</option>
-                    <option value="automatic" {{ request('transmission') === 'automatic' ? 'selected' : '' }}>Otomatis</option>
-                    <option value="manual" {{ request('transmission') === 'manual' ? 'selected' : '' }}>Manual</option>
-                </select>
-            </div>
-
-            <!-- Submit Button -->
-            <div class="lg:col-span-2 flex items-center gap-2">
-                <button type="submit" class="w-full py-2.5 px-4 bg-action hover:bg-action-hover text-ink text-xs font-semibold rounded-lg transition-colors shadow-sm text-center">
-                    Terapkan
-                </button>
-                @if(request()->anyFilled(['search', 'car_type_id', 'transmission']))
-                    <a href="{{ route('cars.index') }}" class="p-2.5 text-xs text-ink hover:bg-surface-raised rounded-lg border border-field-line transition-colors shrink-0" title="Hapus Filter">
-                        Hapus filter
-                    </a>
-                @endif
-            </div>
-        </form>
-    </div>
-
-    <!-- Vehicle Cards Grid -->
-    <div>
-        <div class="flex items-center justify-between mb-4">
-            <p class="text-xs text-muted font-medium">
-                <strong class="text-ink">{{ $cars->total() }}</strong> {{ request()->anyFilled(['search', 'car_type_id', 'transmission']) ? 'kendaraan ditemukan' : 'kendaraan dalam katalog' }}
-            </p>
+    <form action="{{ route('cars.index') }}" method="GET" class="grid grid-cols-2 items-end gap-3 md:gap-4 lg:grid-cols-12">
+        <div class="col-span-2 lg:col-span-5">
+            <label class="ui-label" for="car-search">Nama atau merek</label>
+            <input id="car-search" name="search" value="{{ request('search') }}" placeholder="Contoh: Avanza atau Honda" class="ui-field">
         </div>
-
-        <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <div class="lg:col-span-3">
+            <label class="ui-label" for="car-category">Kategori</label>
+            <select id="car-category" name="car_type_id" class="ui-field">
+                <option value="">Semua kategori</option>
+                @foreach ($carTypes as $type)
+                    <option value="{{ $type->id }}" @selected(request('car_type_id') == $type->id)>{{ $type->name }}</option>
+                @endforeach
+            </select>
+        </div>
+        <div class="lg:col-span-2">
+            <label class="ui-label" for="car-transmission">Transmisi</label>
+            <select id="car-transmission" name="transmission" class="ui-field">
+                <option value="">Semua transmisi</option>
+                <option value="automatic" @selected(request('transmission') === 'automatic')>Otomatis</option>
+                <option value="manual" @selected(request('transmission') === 'manual')>Manual</option>
+            </select>
+        </div>
+        <button class="ui-button col-span-2 lg:col-span-2">Cari mobil</button>
+    </form>
+    <section aria-label="Hasil pencarian kendaraan">
+        <div class="mb-4 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-5">
+            <p class="text-sm"><strong>{{ $cars->total() }} mobil</strong> {{ request()->anyFilled(['search', 'car_type_id', 'transmission']) ? 'ditemukan dengan filter ini' : 'dalam katalog' }}</p>
+            @if (request()->anyFilled(['search', 'car_type_id', 'transmission']))
+                <a href="{{ route('cars.index') }}" class="ui-button ui-secondary">Hapus filter</a>
+            @endif
+        </div>
+        <div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
             @forelse ($cars as $car)
-                <article class="flex flex-col overflow-hidden border border-line bg-surface">
-                    @php
-                        $modelPhoto = collect(config('catalog.photos'))->first(
-                            fn ($file, $model) => str_starts_with(strtolower(trim($car->name)).' ', $model.' ')
-                        );
-                        $hasUnitPhoto = $car->image && Storage::disk('public')->exists($car->image);
-                    @endphp
-                    @if ($hasUnitPhoto || $modelPhoto)
-                        <figure class="relative">
-                            <img src="{{ $hasUnitPhoto ? Storage::disk('public')->url($car->image) : asset('images/models/'.$modelPhoto) }}"
-                                 alt="{{ $car->name }}" loading="lazy" class="aspect-[16/9] w-full object-cover">
+                @php
+                    $modelPhoto = collect(config('catalog.photos'))->first(fn ($file, $model) => str_starts_with(strtolower(trim($car->name)).' ', $model.' '));
+                    $hasUnitPhoto = $car->image && Storage::disk('public')->exists($car->image);
+                @endphp
+                <article class="ui-panel flex min-w-0 flex-col">
+                    <figure class="vehicle-photo">
+                        <div class="flex h-full items-center justify-center p-5 text-sm text-muted">Foto kendaraan belum tersedia</div>
+                        @if ($hasUnitPhoto || $modelPhoto)
+                            <img src="{{ $hasUnitPhoto ? Storage::disk('public')->url($car->image) : asset('images/models/'.$modelPhoto) }}" alt="{{ $car->name }}" loading="lazy" onerror="this.hidden = true; this.parentElement.querySelector('figcaption')?.remove()">
                             @unless ($hasUnitPhoto)
-                                <figcaption class="absolute bottom-2 right-2 bg-black/75 px-2 py-1 text-xs text-ink">Foto model</figcaption>
+                                <figcaption class="absolute bottom-3 right-3 rounded bg-white px-2 py-1 text-xs text-ink">Foto model</figcaption>
                             @endunless
-                        </figure>
-                    @endif
-                    <div class="p-5">
-                        <p class="text-xs font-medium text-link">{{ $car->carType?->name ?? 'Mobil' }} &middot; {{ $car->model_year }}</p>
-                        <h2 class="mt-1 font-serif text-2xl font-normal tracking-tight">
-                            <a class="hover:underline" href="{{ route('cars.show', $car) }}">{{ $car->name }}</a>
-                        </h2>
-                        <p class="mt-1 text-sm text-muted">{{ $car->brand }} &middot; {{ $car->transmission === 'automatic' ? 'Otomatis' : 'Manual' }} &middot; {{ $car->capacity }} kursi</p>
-
+                        @endif
+                    </figure>
+                    <div class="flex flex-1 flex-col p-5">
+                        <p class="text-sm text-muted">{{ $car->carType?->name ?? 'Mobil' }} · {{ $car->model_year }}</p>
+                        <h2 class="mt-2 text-xl leading-7 font-semibold break-words">{{ $car->name }}</h2>
+                        <dl class="mt-auto grid grid-cols-2 gap-3 pt-5 text-sm">
+                            <div><dt class="text-muted">Transmisi</dt><dd class="mt-1 font-semibold">{{ $car->transmission === 'automatic' ? 'Otomatis' : 'Manual' }}</dd></div>
+                            <div><dt class="text-muted">Kapasitas</dt><dd class="mt-1 font-semibold">{{ $car->capacity }} kursi</dd></div>
+                        </dl>
                     </div>
-                    <div class="mt-auto border-t border-line px-5 py-4">
-                        <p class="text-sm text-muted">{{ ['available' => 'Tersedia', 'rented' => 'Sedang disewa', 'maintenance' => 'Perawatan'][$car->status] ?? 'Belum diketahui' }}</p>
-                        <p class="mt-1"><strong class="text-xl tabular-nums">Rp {{ number_format($car->price_per_day, 0, ',', '.') }}</strong> / hari</p>
-                        <a class="mt-2 inline-block text-sm font-medium text-link underline underline-offset-4" href="{{ route('cars.show', $car) }}">Lihat detail</a>
+                    <div class="border-t border-line p-5">
+                        <p class="mb-2 text-sm font-semibold {{ $car->status === 'available' ? 'text-success' : 'text-muted' }}">{{ ['available' => 'Tersedia', 'rented' => 'Sedang disewa', 'maintenance' => 'Dalam perawatan'][$car->status] ?? 'Status belum tersedia' }}</p>
+                        <p><strong class="text-2xl font-bold tabular-nums">Rp{{ number_format($car->price_per_day, 0, ',', '.') }}</strong><span class="text-sm text-muted"> / hari</span></p>
+                        <a class="ui-button ui-secondary mt-4 w-full" href="{{ route('cars.show', $car) }}">Lihat mobil<span class="sr-only"> {{ $car->name }}</span></a>
                     </div>
                 </article>
             @empty
-                <div class="col-span-full bg-surface rounded-xl p-12 text-center border border-line text-muted">
-                    <svg class="w-12 h-12 text-subtle mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 19H5V8h14m-3-5H8L5 6v13a2 2 0 002 2h10a2 2 0 002-2V6l-3-3z"/>
-                    </svg>
-                    <p class="font-bold text-ink">Tidak ada armada yang sesuai dengan pencarian Anda.</p>
-                    <p class="text-xs text-subtle mt-1">Coba gunakan kata kunci lain atau hapus filter kategori.</p>
-                    <a href="{{ route('cars.index') }}" class="mt-4 inline-flex items-center px-4 py-2 text-xs font-semibold text-ink bg-surface-raised border border-field-line rounded-lg hover:bg-line transition-colors">
-                        Hapus semua filter
-                    </a>
+                <div class="ui-panel col-span-full p-8 text-center">
+                    <h2 class="text-xl font-bold">Mobil belum ditemukan</h2>
+                    <p class="mt-2 text-muted">Tidak ada armada yang sesuai dengan pencarian ini. Coba ubah pencarian atau hapus filter.</p>
+                    <a href="{{ route('cars.index') }}" class="ui-button mt-5">Hapus filter</a>
                 </div>
             @endforelse
         </div>
-
-        <a class="mt-4 inline-block text-xs underline" href="{{ asset('images/models/kredit.html') }}">Kredit foto model</a>
-
-        <!-- Pagination -->
+        <div class="mt-5 flex flex-wrap justify-between gap-2 text-xs text-muted">
+            <p>Status menunjukkan kondisi kendaraan saat ini, bukan ketersediaan pada tanggal tertentu.</p>
+            <a class="inline-flex min-h-11 items-center underline" href="{{ asset('images/models/kredit.html') }}">Kredit foto model</a>
+        </div>
         @if ($cars->hasPages())
-            <div class="mt-8 bg-surface rounded-xl p-4 border border-line shadow-sm">
-                <nav aria-label="Halaman katalog" class="flex items-center justify-between text-sm">
-                    @if ($cars->previousPageUrl())
-                        <a href="{{ $cars->previousPageUrl() }}" class="underline">Sebelumnya</a>
-                    @endif
-                    <span>Halaman {{ $cars->currentPage() }} dari {{ $cars->lastPage() }}</span>
-                    @if ($cars->nextPageUrl())
-                        <a href="{{ $cars->nextPageUrl() }}" class="underline">Berikutnya</a>
-                    @endif
-                </nav>
-            </div>
+            <div class="ui-panel mt-5 p-4">{{ $cars->links('layouts.pagination') }}</div>
         @endif
-    </div>
+    </section>
 </div>
 @endsection
