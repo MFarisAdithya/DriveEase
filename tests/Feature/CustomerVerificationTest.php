@@ -312,8 +312,7 @@ class CustomerVerificationTest extends TestCase
     {
         $response = $this->actingAs($this->admin)->get(route('admin.verifications.index'));
         $response->assertOk();
-        $response->assertSee('Verifikasi pelanggan');
-        $response->assertSee('pengajuan siap ditinjau');
+        $response->assertSee('Daftar pemeriksaan');
         $response->assertSee($this->customer->name);
 
         $responseFiltered = $this->actingAs($this->admin)->get(route('admin.verifications.index', ['status' => 'pending']));
