@@ -7,9 +7,7 @@
     <div class="w-full max-w-md">
         <!-- Logo & Header -->
         <div class="text-center mb-8">
-            <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-action text-ink font-bold text-2xl shadow-lg mb-3">
-                DE
-            </div>
+            <div class="brand-lockup"><img src="{{ asset('images/driveease-logo.png') }}" alt="DriveEase" width="220" height="72"></div>
             <h1 class="text-2xl font-bold text-ink tracking-tight">DriveEase Rental</h1>
             <p class="text-sm text-muted mt-1">Sistem Informasi Manajemen Rental Kendaraan</p>
         </div>

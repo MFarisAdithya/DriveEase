@@ -7,9 +7,7 @@
     <div class="w-full max-w-md">
         <!-- Logo & Header -->
         <div class="text-center mb-8">
-            <a href="{{ route('cars.index') }}" class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-action text-ink font-bold text-2xl shadow-lg mb-3 hover:bg-action transition-colors">
-                DE
-            </a>
+            <a href="{{ route('cars.index') }}" class="brand-lockup mx-auto"><img src="{{ asset('images/driveease-logo.png') }}" alt="DriveEase" width="220" height="72"></a>
             <h1 class="text-2xl font-bold text-ink tracking-tight">Daftar Akun Pelanggan</h1>
             <p class="text-sm text-muted mt-1">Bergabung bersama DriveEase untuk kemudahan sewa armada</p>
         </div>
