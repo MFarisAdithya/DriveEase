@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', function () {
     if (Auth::check()) {
         $user = Auth::user();
+
         return match ($user->role?->name) {
             'admin' => redirect()->route('admin.dashboard'),
             'staff' => redirect()->route('staff.dashboard'),
@@ -22,7 +23,8 @@ Route::get('/', function () {
             default => redirect()->route('login'),
         };
     }
-    return redirect()->route('login');
+
+    return redirect()->route('cars.index');
 })->name('home');
 
 // Public Dynamic Vehicle Catalog

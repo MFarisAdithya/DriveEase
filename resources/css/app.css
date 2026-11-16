@@ -6,96 +6,75 @@
 @theme {
     --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
-}
 
-@theme {
-    --color-canvas: #191410;
-    --color-surface: #1E1712;
-    --color-surface-raised: #241C16;
-    --color-surface-hover: #34271D;
-    --color-navigation: #150F0B;
-    --color-ink: #E8DFD1;
-    --color-muted: #CCBDAC;
-    --color-subtle: #BAAA98;
-    --color-line: #49392D;
-    --color-field-line: #776553;
-    --color-accent: #A66A3F;
-    --color-action: #935831;
-    --color-action-hover: #844F2C;
-    --color-link: #E8AC80;
-    --color-focus: #C47F4E;
-    --color-success: #86D8B3;
-    --color-success-surface: #102F25;
-    --color-success-line: #316A54;
-    --color-success-action: #246347;
-    --color-danger: #FDA4AF;
-    --color-danger-surface: #371C23;
-    --color-danger-line: #824452;
-    --color-danger-action: #983E52;
-    --color-warning: #F1CF82;
-    --color-warning-surface: #342710;
-    --color-warning-line: #7F632F;
-    --color-warning-action: #795922;
-    --color-info: #E8DFD1;
-    --color-info-surface: #30251D;
-    --color-info-line: #776553;
-}
+    --color-brand-soft: #B6DFED;
+    --color-brand-navy: #002941;
+    --color-brand-coral: #FD6E6E;
 
-@layer base {
-    html { color-scheme: dark; }
-    input, select, textarea { background-color: var(--color-surface-raised); color: var(--color-ink); }
-    input::placeholder, textarea::placeholder { color: var(--color-subtle); opacity: 1; }
-    :focus-visible { outline: 2px solid var(--color-focus); outline-offset: 3px; }
-    input:-webkit-autofill { -webkit-text-fill-color: var(--color-ink); -webkit-box-shadow: 0 0 0 1000px var(--color-surface-raised) inset; }
-}
-
-/* Pilot theme: enabled by individual pages before a wider rollout. */
-.theme-refresh {
-    color-scheme: light;
     --color-canvas: #F5FAFC;
     --color-surface: #FFFFFF;
     --color-surface-raised: #EAF5FA;
-    --color-surface-hover: #B6DFED;
-    --color-navigation: #FFFFFF;
+    --color-surface-hover: #DCEEF7;
+    --color-navigation: #B6DFED;
+
     --color-ink: #002941;
     --color-muted: #526878;
     --color-subtle: #526878;
+
     --color-line: #D5E4EB;
     --color-field-line: #758A98;
+
     --color-accent: #B6DFED;
     --color-action: #FD6E6E;
-    --color-action-hover: #F85F64;
+    --color-action-hover: #F25757;
     --color-link: #002941;
     --color-focus: #005B80;
+
     --color-success: #176447;
     --color-success-surface: #E8F5EE;
-    --color-success-line: #9BC9AE;
+    --color-success-line: #A8DBC1;
+    --color-success-action: #176447;
+
     --color-warning: #735014;
     --color-warning-surface: #FFF4D6;
-    --color-warning-line: #D8BB7A;
+    --color-warning-line: #E8C77B;
+    --color-warning-action: #735014;
+
     --color-danger: #A32638;
     --color-danger-surface: #FCECEF;
-    --color-danger-line: #DEADB5;
+    --color-danger-line: #E7A8B3;
+    --color-danger-action: #A32638;
+
+    --color-info: #002941;
+    --color-info-surface: #EAF5FA;
+    --color-info-line: #B6DFED;
 }
-.theme-refresh [class*="color-scheme:dark"] { color-scheme: light; }
-.theme-refresh body > div > header a { min-height: 44px; display: inline-flex; align-items: center; }
-.theme-refresh body > div > main { max-width: 1264px; padding-top: 24px; }
-.theme-refresh aside { background: #002941; --color-ink: #FFFFFF; --color-muted: #B6DFED; --color-subtle: #B6DFED; --color-line: #31556B; --color-surface-hover: #16415A; --color-link: #B6DFED; }
-.theme-refresh aside a[class*="bg-action"], .theme-refresh aside .bg-action { color: #002941; }
-.theme-refresh aside nav a { min-height: 44px; }
-.theme-refresh .ui-button { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 10px 16px; border-radius: 8px; font-size: 14px; font-weight: 700; background: var(--color-action); color: var(--color-ink); }
-.theme-refresh .ui-button:hover { background: var(--color-action-hover); }
-.theme-refresh .ui-secondary { background: var(--color-surface); border: 1px solid var(--color-field-line); }
-.theme-refresh .ui-secondary:hover { background: var(--color-surface-raised); }
-.theme-refresh .ui-field { width: 100%; min-height: 48px; padding: 10px 12px; border: 1px solid var(--color-field-line); border-radius: 8px; background: var(--color-surface); font-size: 14px; }
-.theme-refresh .ui-label { display: block; margin-bottom: 8px; font-size: 14px; font-weight: 600; }
-.theme-refresh .ui-panel { border: 1px solid var(--color-line); border-radius: 12px; background: var(--color-surface); overflow: hidden; }
-.theme-refresh .vehicle-photo { position: relative; aspect-ratio: 16 / 9; background: var(--color-surface-raised); }
-.theme-refresh .vehicle-photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.theme-refresh .queue-table td { overflow-wrap: anywhere; }
-@media (max-width: 1279px) {
-    .theme-refresh body > div > main { padding-top: 16px; }
-    .theme-refresh .queue-table tbody tr { display: grid; grid-template-columns: 1fr 1fr; padding: 12px; gap: 8px; }
-    .theme-refresh .queue-table td { display: block; padding: 4px; }
-    .theme-refresh .queue-table td:first-child, .theme-refresh .queue-table td:last-child { grid-column: 1 / -1; }
+
+@layer base {
+    html {
+        color-scheme: light;
+    }
+
+    input,
+    select,
+    textarea {
+        background-color: var(--color-surface);
+        color: var(--color-ink);
+    }
+
+    input::placeholder,
+    textarea::placeholder {
+        color: var(--color-muted);
+        opacity: 1;
+    }
+
+    :focus-visible {
+        outline: 2px solid var(--color-focus);
+        outline-offset: 2px;
+    }
+
+    input:-webkit-autofill {
+        -webkit-text-fill-color: var(--color-ink);
+        -webkit-box-shadow: 0 0 0 1000px var(--color-surface) inset;
+    }
 }

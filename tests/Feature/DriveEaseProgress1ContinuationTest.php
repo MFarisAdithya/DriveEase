@@ -147,8 +147,8 @@ class DriveEaseProgress1ContinuationTest extends TestCase
     {
         $response = $this->get(route('cars.index'));
         $response->assertStatus(200);
-        $response->assertSee('Katalog kendaraan');
-        $response->assertSee('Bandingkan kapasitas');
+        $response->assertSee('Pilih mobil untuk perjalananmu');
+        $response->assertSee('Bandingkan tarif harian, kapasitas, dan spesifikasi mobil.');
     }
 
     public function test_vehicle_catalog_search_filters_correctly(): void
@@ -161,7 +161,7 @@ class DriveEaseProgress1ContinuationTest extends TestCase
 
         $emptyResponse = $this->get(route('cars.index', ['search' => 'NonExistentBrandXYZ123']));
         $emptyResponse->assertStatus(200);
-        $emptyResponse->assertSee('Tidak ada armada yang sesuai');
+        $emptyResponse->assertSee('Mobil belum ditemukan');
     }
 
     public function test_vehicle_catalog_category_filtering(): void

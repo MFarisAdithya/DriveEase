@@ -29,12 +29,12 @@ class DriveEaseProgress1Test extends TestCase
     }
 
     /**
-     * Test 1: Guest is redirected to login.
+     * Test 1: Guest at root is redirected to cars catalog, protected routes redirect to login.
      */
     public function test_guest_is_redirected_to_login(): void
     {
         $response = $this->get('/');
-        $response->assertRedirect(route('login'));
+        $response->assertRedirect(route('cars.index'));
 
         $adminResponse = $this->get('/admin/dashboard');
         $adminResponse->assertRedirect(route('login'));

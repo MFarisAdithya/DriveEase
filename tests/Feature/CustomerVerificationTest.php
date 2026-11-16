@@ -14,8 +14,11 @@ class CustomerVerificationTest extends TestCase
     use DatabaseTransactions;
 
     protected User $admin;
+
     protected User $staff;
+
     protected User $customer;
+
     protected User $otherCustomer;
 
     protected function setUp(): void
@@ -309,7 +312,8 @@ class CustomerVerificationTest extends TestCase
     {
         $response = $this->actingAs($this->admin)->get(route('admin.verifications.index'));
         $response->assertOk();
-        $response->assertSee('Daftar pemeriksaan');
+        $response->assertSee('Verifikasi pelanggan');
+        $response->assertSee('pengajuan siap ditinjau');
         $response->assertSee($this->customer->name);
 
         $responseFiltered = $this->actingAs($this->admin)->get(route('admin.verifications.index', ['status' => 'pending']));
