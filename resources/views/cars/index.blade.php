@@ -43,17 +43,16 @@
         <div class="vehicle-grid grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
             @forelse ($cars as $car)
                 @php
-                    $modelPhoto = collect(config('catalog.photos'))->first(fn ($file, $model) => str_starts_with(strtolower(trim($car->name)).' ', $model.' '));
-                    $hasUnitPhoto = $car->image && Storage::disk('public')->exists($car->image);
+                    $photo = $car->resolvePhoto();
                 @endphp
                 <article class="ui-panel flex min-w-0 flex-col">
                     <figure class="vehicle-photo">
                         <div class="flex h-full items-center justify-center p-5 text-sm text-muted">Foto kendaraan belum tersedia</div>
-                        @if ($hasUnitPhoto || $modelPhoto)
-                            <img src="{{ $hasUnitPhoto ? Storage::disk('public')->url($car->image) : asset('images/models/'.$modelPhoto) }}" alt="{{ $car->name }}" loading="lazy" onerror="this.hidden = true; this.parentElement.querySelector('figcaption')?.remove()">
-                            @unless ($hasUnitPhoto)
+                        @if ($photo['url'])
+                            <img src="{{ $photo['url'] }}" alt="{{ $car->name }}" loading="lazy" onerror="this.hidden = true; this.parentElement.querySelector('figcaption')?.remove()">
+                            @if ($photo['is_model'])
                                 <figcaption class="absolute bottom-3 right-3 rounded bg-white px-2 py-1 text-xs text-ink">Foto model</figcaption>
-                            @endunless
+                            @endif
                         @endif
                     </figure>
                     <div class="flex flex-1 flex-col p-5">
@@ -67,7 +66,7 @@
                     <div class="border-t border-line p-5">
                         <p class="mb-2 text-sm font-semibold {{ $car->status === 'available' ? 'text-success' : 'text-muted' }}">{{ ['available' => 'Tersedia', 'rented' => 'Sedang disewa', 'maintenance' => 'Dalam perawatan'][$car->status] ?? 'Status belum tersedia' }}</p>
                         <p><strong class="text-2xl font-bold tabular-nums">Rp{{ number_format($car->price_per_day, 0, ',', '.') }}</strong><span class="text-sm text-muted"> / hari</span></p>
-                        <a class="ui-button ui-secondary mt-4 w-full" href="{{ route('cars.show', $car) }}">Lihat mobil<span class="sr-only"> {{ $car->name }}</span></a>
+                        <a class="ui-button ui-secondary mt-4 w-full" href="{{ route('cars.show', array_merge(['car' => $car], request()->only(['search', 'car_type_id', 'transmission', 'page']))) }}">Lihat mobil<span class="sr-only"> {{ $car->name }}</span></a>
                     </div>
                 </article>
             @empty

@@ -3,17 +3,22 @@
 @section('title', 'Masuk ke Sistem - DriveEase')
 
 @section('body')
-<div class="min-h-screen flex items-center justify-center p-4 bg-canvas">
-    <div class="w-full max-w-md">
-        <!-- Logo & Header -->
-        <div class="text-center mb-8">
-            <div class="brand-lockup"><img src="{{ asset('images/driveease-logo.png') }}" alt="DriveEase" width="220" height="72"></div>
-            <h1 class="text-2xl font-bold text-ink tracking-tight">DriveEase Rental</h1>
-            <p class="text-sm text-muted mt-1">Sistem Informasi Manajemen Rental Kendaraan</p>
+<div class="relative min-h-screen flex items-center justify-center px-4 pt-10 pb-36 sm:pb-44 bg-canvas overflow-hidden">
+    @include('partials.driveease-backdrop')
+
+    <div class="relative z-10 w-full max-w-md">
+        <!-- Logo -->
+        <div class="text-center mb-6">
+            <a href="{{ route('home') }}" class="inline-flex justify-center focus:outline-none">
+                @include('partials.driveease-logo', [
+                    'sizeClass' => 'h-16 sm:h-[78px]',
+                    'haloSize' => 'w-16 h-16 sm:w-20 sm:h-20',
+                ])
+            </a>
         </div>
 
         <!-- Login Card -->
-        <div class="bg-surface rounded-2xl shadow-xl border border-line p-8">
+        <div class="bg-white/95 backdrop-blur-md rounded-3xl shadow-[0_24px_60px_rgba(11,40,64,0.09)] border border-[#C6DFEE] p-8">
             <h2 class="text-lg font-bold text-ink mb-6">Masuk ke Akun Anda</h2>
 
             @if (session('success'))
@@ -76,7 +81,7 @@
                 <!-- Submit Button -->
                 <div class="pt-2">
                     <button type="submit" class="w-full py-2.5 px-4 bg-action hover:bg-action-hover text-ink font-semibold text-sm rounded-lg shadow-sm hover:shadow transition-colors">
-                        Masuk ke Dashboard
+                        Masuk ke Dasbor
                     </button>
                 </div>
             </form>
@@ -96,7 +101,7 @@
                 <svg class="w-4 h-4 text-link" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                 </svg>
-                Akun Demo Uji Coba (Password: password123)
+                Akun Demo Uji Coba (Kata sandi: password123)
             </p>
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2">
                 <button type="button" 
@@ -114,7 +119,7 @@
                 <button type="button" 
                         onclick="document.getElementById('email').value='customer@driveease.test'; document.getElementById('password').value='password123';"
                         class="p-2 bg-navigation/60 rounded border border-field-line hover:border-focus text-left transition-colors">
-                    <span class="block font-medium text-link">Customer</span>
+                    <span class="block font-medium text-link">Pelanggan</span>
                     <span class="text-[11px] text-muted truncate block">customer@driveease.test</span>
                 </button>
             </div>

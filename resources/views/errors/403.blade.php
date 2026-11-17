@@ -18,7 +18,7 @@
         <div class="flex items-center justify-center gap-3">
             @auth
                 <a href="{{ route('home') }}" class="px-5 py-2.5 bg-action hover:bg-action-hover text-ink text-xs font-semibold rounded-lg shadow-sm transition-colors">
-                    Kembali ke Dashboard Anda
+                    Kembali ke Dasbor Anda
                 </a>
             @else
                 <a href="{{ route('login') }}" class="px-5 py-2.5 bg-action hover:bg-action-hover text-ink text-xs font-semibold rounded-lg shadow-sm transition-colors">

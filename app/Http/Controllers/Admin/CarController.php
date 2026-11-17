@@ -64,7 +64,7 @@ class CarController extends Controller
             'car_type_id' => ['required', 'exists:car_types,id'],
             'brand' => ['required', 'string', 'max:50'],
             'plate_number' => ['required', 'string', 'max:20', 'unique:cars,plate_number'],
-            'model_year' => ['required', 'integer', 'min:1990', 'max:' . ($currentYear + 1)],
+            'model_year' => ['required', 'integer', 'min:1990', 'max:'.($currentYear + 1)],
             'transmission' => ['required', 'in:manual,automatic'],
             'capacity' => ['required', 'integer', 'min:1', 'max:50'],
             'price_per_day' => ['required', 'numeric', 'min:1'],
@@ -87,13 +87,13 @@ class CarController extends Controller
             'price_per_day.required' => 'Tarif sewa per hari wajib diisi.',
             'price_per_day.min' => 'Tarif sewa harus lebih dari 0.',
             'status.required' => 'Status kendaraan wajib dipilih.',
-            'status.in' => 'Status kendaraan harus salah satu dari: available, rented, maintenance.',
+            'status.in' => 'Pilih status tersedia, sedang disewa, atau dalam perawatan.',
         ]);
 
         Car::create($validated);
 
         return redirect()->route('admin.cars.index')
-            ->with('success', 'Kendaraan "' . $validated['name'] . '" berhasil ditambahkan.');
+            ->with('success', 'Kendaraan "'.$validated['name'].'" berhasil ditambahkan.');
     }
 
     /**
@@ -133,7 +133,7 @@ class CarController extends Controller
                 'max:20',
                 Rule::unique('cars', 'plate_number')->ignore($car->id),
             ],
-            'model_year' => ['required', 'integer', 'min:1990', 'max:' . ($currentYear + 1)],
+            'model_year' => ['required', 'integer', 'min:1990', 'max:'.($currentYear + 1)],
             'transmission' => ['required', 'in:manual,automatic'],
             'capacity' => ['required', 'integer', 'min:1', 'max:50'],
             'price_per_day' => ['required', 'numeric', 'min:1'],
@@ -156,13 +156,13 @@ class CarController extends Controller
             'price_per_day.required' => 'Tarif sewa per hari wajib diisi.',
             'price_per_day.min' => 'Tarif sewa harus lebih dari 0.',
             'status.required' => 'Status kendaraan wajib dipilih.',
-            'status.in' => 'Status kendaraan harus salah satu dari: available, rented, maintenance.',
+            'status.in' => 'Pilih status tersedia, sedang disewa, atau dalam perawatan.',
         ]);
 
         $car->update($validated);
 
         return redirect()->route('admin.cars.index')
-            ->with('success', 'Data kendaraan "' . $car->name . '" berhasil diperbarui.');
+            ->with('success', 'Data kendaraan "'.$car->name.'" berhasil diperbarui.');
     }
 
     /**
@@ -174,6 +174,6 @@ class CarController extends Controller
         $car->delete();
 
         return redirect()->route('admin.cars.index')
-            ->with('success', 'Kendaraan "' . $name . '" berhasil dihapus dari sistem.');
+            ->with('success', 'Kendaraan "'.$name.'" berhasil dihapus dari sistem.');
     }
 }

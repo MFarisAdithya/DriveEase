@@ -29,12 +29,13 @@ class DriveEaseProgress1Test extends TestCase
     }
 
     /**
-     * Test 1: Guest at root is redirected to cars catalog, protected routes redirect to login.
+     * Test 1: Guest at root sees landing page, protected routes redirect to login.
      */
     public function test_guest_is_redirected_to_login(): void
     {
         $response = $this->get('/');
-        $response->assertRedirect(route('cars.index'));
+        $response->assertOk();
+        $response->assertSee('Sewa Kendaraan');
 
         $adminResponse = $this->get('/admin/dashboard');
         $adminResponse->assertRedirect(route('login'));
@@ -67,7 +68,7 @@ class DriveEaseProgress1Test extends TestCase
 
         $dashboardResponse = $this->actingAs($admin)->get('/admin/dashboard');
         $dashboardResponse->assertStatus(200);
-        $dashboardResponse->assertSee('Dashboard Ringkasan');
+        $dashboardResponse->assertSee('Dasbor Ringkasan');
     }
 
     /**

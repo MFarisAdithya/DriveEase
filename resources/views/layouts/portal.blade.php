@@ -1,26 +1,31 @@
 @extends('layouts.app')
 
 @section('body')
-<div class="min-h-screen bg-canvas text-ink flex flex-col">
+<div class="min-h-screen bg-canvas text-ink flex flex-col relative overflow-x-clip pb-24 sm:pb-32">
+    @include('partials.driveease-backdrop')
+
     <!-- Top Navbar -->
-    <header class="bg-navigation border-b border-field-line text-ink sticky top-0 z-30">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+    <header class="bg-navigation/90 backdrop-blur-md border-b border-field-line text-ink sticky top-0 z-30">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 py-2 flex items-center justify-between">
             <!-- Brand & Navigation -->
             <div class="flex items-center gap-6">
                 <a href="{{ route('cars.index') }}" class="flex items-center gap-3">
-                    <div class="brand-lockup"><img src="{{ asset('images/driveease-logo.png') }}" alt="DriveEase" width="220" height="72"></div>
+                    @include('partials.driveease-logo', [
+                        'sizeClass' => 'h-11 sm:h-12',
+                        'haloSize' => 'w-11 h-11 sm:w-12 sm:h-12',
+                    ])
                     <div>
 
                         @auth
-                            <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-surface-hover text-ink border border-field-line">
-                                {{ auth()->user()->role?->display_name ?? 'User' }}
+                            <span class="hidden lg:inline-block ml-2 px-2 py-0.5 rounded text-xs font-medium bg-surface-hover text-ink border border-field-line">
+                                {{ auth()->user()->role?->display_name ?? 'Pengguna' }}
                             </span>
                         @endauth
                     </div>
                 </a>
 
                 <!-- Navigation Links -->
-                <nav class="hidden md:flex items-center gap-4 text-xs font-semibold">
+                <nav class="hidden lg:flex items-center gap-4 text-xs font-semibold">
                     <a href="{{ route('cars.index') }}" class="px-3 py-1.5 rounded-lg {{ request()->routeIs('cars.*') ? 'bg-surface-hover text-ink' : 'text-subtle hover:text-ink' }} transition-colors">
                         Katalog mobil
                     </a>
@@ -45,10 +50,27 @@
                 </nav>
             </div>
 
+            @auth
+                <details class="account-menu relative ml-auto mr-3 lg:hidden" data-account-menu>
+                    <summary class="ui-button ui-secondary cursor-pointer" aria-label="Buka menu akun">Menu</summary>
+                    <nav aria-label="Navigasi akun" class="absolute right-0 top-full z-40 mt-2 grid w-56 gap-1 rounded-xl border border-line bg-surface p-3 shadow-lg">
+                        <a class="rounded-lg p-3 hover:bg-surface-raised" href="{{ route('cars.index') }}">Katalog mobil</a>
+                        @if (auth()->user()->isAdmin())
+                            <a class="rounded-lg p-3 hover:bg-surface-raised" href="{{ route('admin.dashboard') }}">Ringkasan admin</a>
+                        @elseif (auth()->user()->isStaff())
+                            <a class="rounded-lg p-3 hover:bg-surface-raised" href="{{ route('staff.dashboard') }}">Dasbor staf</a>
+                        @elseif (auth()->user()->isCustomer())
+                            <a class="rounded-lg p-3 hover:bg-surface-raised" href="{{ route('customer.dashboard') }}">Dasbor saya</a>
+                            <a class="rounded-lg p-3 hover:bg-surface-raised" href="{{ route('customer.verification.create') }}">Identitas saya</a>
+                        @endif
+                    </nav>
+                </details>
+            @endauth
+
             <!-- User Menu / Auth Buttons -->
             <div class="flex items-center gap-3">
                 @auth
-                    <div class="text-right hidden sm:block">
+                    <div class="text-right hidden xl:block">
                         <p class="text-xs font-semibold text-ink">{{ auth()->user()->name }}</p>
                         <p class="text-[11px] text-muted">{{ auth()->user()->email }}</p>
                     </div>
@@ -74,7 +96,7 @@
     </header>
 
     <!-- Page Content -->
-    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <main class="relative z-10 flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-20">
         <!-- Flash Messages -->
         @if (session('success'))
             <div class="mb-6 p-4 rounded-lg bg-success-surface border border-success-line flex items-start gap-3 text-success">
@@ -98,7 +120,7 @@
     </main>
 
     <!-- Footer -->
-    <footer class="bg-navigation border-t border-line py-6 text-center text-xs text-muted">
+    <footer class="relative z-10 mt-8 bg-white/75 backdrop-blur-md border-y border-[#CFE4F2] py-6 text-center text-xs text-muted">
         <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
             <span>&copy; {{ date('Y') }} DriveEase — Sistem Informasi Manajemen Rental Kendaraan.</span>
             <span class="text-muted">Katalog mobil dan pengelolaan rental.</span>

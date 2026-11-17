@@ -1,0 +1,39 @@
+<?php
+
+return [
+    'required' => ':attribute wajib diisi.',
+    'string' => ':attribute harus berupa teks.',
+    'integer' => ':attribute harus berupa bilangan bulat.',
+    'numeric' => ':attribute harus berupa angka.',
+    'email' => 'Format :attribute tidak valid.',
+    'unique' => ':attribute sudah digunakan.',
+    'exists' => ':attribute yang dipilih tidak tersedia.',
+    'in' => ':attribute yang dipilih tidak valid.',
+    'confirmed' => 'Konfirmasi :attribute tidak cocok.',
+    'digits' => ':attribute harus tepat :digits digit angka.',
+    'image' => ':attribute harus berupa gambar.',
+    'file' => ':attribute harus berupa berkas.',
+    'uploaded' => ':attribute gagal diunggah. Periksa ukuran berkas dan coba kembali.',
+    'mimes' => ':attribute harus berformat :values.',
+    'max' => [
+        'string' => ':attribute maksimal :max karakter.',
+        'numeric' => ':attribute maksimal :max.',
+        'file' => ':attribute maksimal :max KB.',
+        'array' => ':attribute maksimal :max pilihan.',
+    ],
+    'min' => [
+        'string' => ':attribute minimal :min karakter.',
+        'numeric' => ':attribute minimal :min.',
+        'file' => ':attribute minimal :min KB.',
+        'array' => ':attribute minimal :min pilihan.',
+    ],
+    'attributes' => [
+        'name' => 'Nama', 'email' => 'Email', 'password' => 'Kata sandi',
+        'phone' => 'Nomor telepon', 'car_type_id' => 'Kategori kendaraan',
+        'brand' => 'Merek', 'plate_number' => 'Nomor pelat', 'model_year' => 'Tahun kendaraan',
+        'transmission' => 'Transmisi', 'capacity' => 'Kapasitas', 'price_per_day' => 'Tarif per hari',
+        'status' => 'Status', 'description' => 'Deskripsi', 'ktp_number' => 'NIK',
+        'sim_number' => 'Nomor SIM', 'ktp_image' => 'Foto KTP', 'sim_image' => 'Foto SIM',
+        'rejection_reason' => 'Alasan penolakan',
+    ],
+];

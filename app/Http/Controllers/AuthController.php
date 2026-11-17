@@ -32,7 +32,7 @@ class AuthController extends Controller
         ], [
             'email.required' => 'Email wajib diisi.',
             'email.email' => 'Format email tidak valid.',
-            'password.required' => 'Password wajib diisi.',
+            'password.required' => 'Kata sandi wajib diisi.',
         ]);
 
         $key = 'login:'.hash('sha256', $credentials['email'].'|'.$request->ip());
@@ -56,7 +56,7 @@ class AuthController extends Controller
         return back()
             ->withInput($request->only('email', 'remember'))
             ->withErrors([
-                'email' => 'Email atau password yang Anda masukkan salah.',
+                'email' => 'Email atau kata sandi yang Anda masukkan salah.',
             ]);
     }
 

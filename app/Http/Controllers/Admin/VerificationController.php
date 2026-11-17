@@ -32,7 +32,7 @@ class VerificationController extends Controller
      */
     public function show(User $user): View
     {
-        abort_unless($user->isCustomer(), 404, 'Customer tidak ditemukan.');
+        abort_unless($user->isCustomer(), 404, 'Pelanggan tidak ditemukan.');
 
         $user->load(['verifier', 'role']);
 
@@ -44,7 +44,7 @@ class VerificationController extends Controller
      */
     public function approve(Request $request, User $user): RedirectResponse
     {
-        abort_unless($user->isCustomer(), 404, 'Customer tidak ditemukan.');
+        abort_unless($user->isCustomer(), 404, 'Pelanggan tidak ditemukan.');
 
         $approved = DB::transaction(function () use ($user): bool {
             $locked = User::query()->lockForUpdate()->findOrFail($user->id);
@@ -64,7 +64,7 @@ class VerificationController extends Controller
         }
 
         return redirect()->route('admin.verifications.show', $user)
-            ->with('success', "Identitas customer {$user->name} berhasil diverifikasi dan disetujui.");
+            ->with('success', "Identitas pelanggan {$user->name} berhasil diverifikasi dan disetujui.");
     }
 
     /**
@@ -72,12 +72,12 @@ class VerificationController extends Controller
      */
     public function reject(Request $request, User $user): RedirectResponse
     {
-        abort_unless($user->isCustomer(), 404, 'Customer tidak ditemukan.');
+        abort_unless($user->isCustomer(), 404, 'Pelanggan tidak ditemukan.');
 
         $validated = $request->validate([
             'rejection_reason' => ['required', 'string', 'min:5', 'max:500'],
         ], [
-            'rejection_reason.required' => 'Alasan penolakan wajib diisi agar customer dapat memperbaiki dokumennya.',
+            'rejection_reason.required' => 'Alasan penolakan wajib diisi agar pelanggan dapat memperbaiki dokumennya.',
             'rejection_reason.min' => 'Alasan penolakan minimal 5 karakter.',
             'rejection_reason.max' => 'Alasan penolakan maksimal 500 karakter.',
         ]);
@@ -89,6 +89,6 @@ class VerificationController extends Controller
         $user->save();
 
         return redirect()->route('admin.verifications.show', $user)
-            ->with('success', "Verifikasi customer {$user->name} berhasil ditolak.");
+            ->with('success', "Verifikasi pelanggan {$user->name} berhasil ditolak.");
     }
 }

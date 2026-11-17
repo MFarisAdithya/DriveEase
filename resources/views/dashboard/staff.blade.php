@@ -1,6 +1,6 @@
 @extends('layouts.portal')
 
-@section('title', 'Dashboard Staf Operasional - DriveEase')
+@section('title', 'Dasbor Staf Operasional - DriveEase')
 
 @section('content')
 <div class="space-y-6">
@@ -61,7 +61,7 @@
                             <td class="py-3 px-5 font-mono text-xs font-semibold text-ink">
                                 {{ $car->plate_number }}
                             </td>
-                            <td class="py-3 px-5 text-xs text-muted capitalize">{{ $car->transmission }}</td>
+                            <td class="py-3 px-5 text-xs text-muted capitalize">{{ $car->transmission === 'automatic' ? 'Otomatis' : 'Manual' }}</td>
                             <td class="py-3 px-5 text-xs text-muted">{{ $car->capacity }} Kursi</td>
                             <td class="py-3 px-5 font-semibold text-ink text-xs">
                                 Rp {{ number_format($car->price_per_day, 0, ',', '.') }}

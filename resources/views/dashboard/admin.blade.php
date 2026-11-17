@@ -1,7 +1,7 @@
 @extends('layouts.admin')
 
-@section('title', 'Dashboard Administrator - DriveEase')
-@section('page_title', 'Dashboard Ringkasan Operasional')
+@section('title', 'Dasbor Administrator - DriveEase')
+@section('page_title', 'Dasbor Ringkasan Operasional')
 
 @section('content')
 <div class="space-y-8">

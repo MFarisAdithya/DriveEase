@@ -1,6 +1,6 @@
 @extends('layouts.portal')
 
-@section('title', 'Dashboard Pelanggan - DriveEase')
+@section('title', 'Dasbor Pelanggan - DriveEase')
 
 @section('content')
 <div class="space-y-6">
@@ -155,7 +155,7 @@
                         </div>
                         <div class="p-2.5 rounded-lg bg-surface-raised border border-line">
                             <span class="text-[10px] text-muted uppercase font-semibold block">Transmisi</span>
-                            <span class="text-xs font-bold text-ink block mt-0.5 capitalize">{{ $car->transmission }}</span>
+                            <span class="text-xs font-bold text-ink block mt-0.5 capitalize">{{ $car->transmission === 'automatic' ? 'Otomatis' : 'Manual' }}</span>
                         </div>
                         <div class="p-2.5 rounded-lg bg-surface-raised border border-line">
                             <span class="text-[10px] text-muted uppercase font-semibold block">Kapasitas</span>

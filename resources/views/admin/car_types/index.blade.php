@@ -100,7 +100,7 @@
                         <tr>
                             <td colspan="4" class="py-10 text-center text-muted">
                                 <p class="font-medium">Tidak ada kategori yang ditemukan.</p>
-                                <a href="{{ route('admin.car-types.index') }}" class="text-xs text-link hover:underline mt-1 inline-block">Reset filter</a>
+                                <a href="{{ route('admin.car-types.index') }}" class="text-xs text-link hover:underline mt-1 inline-block">Hapus filter</a>
                             </td>
                         </tr>
                     @endforelse

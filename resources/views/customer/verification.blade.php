@@ -1,6 +1,6 @@
 @extends('layouts.portal')
 
-@section('title', 'Verifikasi Identitas Customer - DriveEase')
+@section('title', 'Verifikasi Identitas Pelanggan - DriveEase')
 
 @section('content')
 <div class="max-w-3xl mx-auto space-y-6">
@@ -11,7 +11,7 @@
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
                 </svg>
-                Kembali ke Dashboard
+                Kembali ke Dasbor
             </a>
             <h2 class="text-2xl font-bold text-ink">Verifikasi Identitas Pelanggan</h2>
             <p class="text-sm text-muted mt-1">Lengkapi dokumen KTP dan SIM Anda agar dapat menyewa kendaraan di DriveEase.</p>
@@ -104,7 +104,7 @@
             <div>
                 <h4 class="text-base font-bold text-info">Lengkapi Identitas untuk Menyewa Mobil</h4>
                 <p class="text-sm text-info mt-1">
-                    Sesuai kebijakan keamanan rental DriveEase, customer wajib memiliki KTP (16 digit angka) dan SIM (14 digit angka) yang valid dan terverifikasi sebelum dapat melakukan reservasi.
+                    Sesuai kebijakan keamanan rental DriveEase, pelanggan wajib memiliki KTP (16 digit angka) dan SIM (14 digit angka) yang valid dan terverifikasi sebelum dapat melakukan reservasi.
                 </p>
             </div>
         </div>
@@ -128,7 +128,7 @@
             </div>
             <div>
                 <span class="text-muted block font-medium">Status Akun</span>
-                <span class="text-sm font-semibold capitalize text-ink mt-0.5 block">{{ $user->verification_status }}</span>
+                <span class="text-sm font-semibold capitalize text-ink mt-0.5 block">{{ ['pending' => 'Menunggu peninjauan', 'verified' => 'Disetujui', 'rejected' => 'Ditolak'][$user->verification_status] ?? 'Belum tersedia' }}</span>
             </div>
         </div>
     </div>

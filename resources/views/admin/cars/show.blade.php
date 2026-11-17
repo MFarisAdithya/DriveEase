@@ -78,7 +78,7 @@
                 </div>
                 <div class="p-4 rounded-lg bg-surface-raised border border-line">
                     <span class="text-[11px] font-medium text-muted uppercase tracking-wider block">Transmisi</span>
-                    <span class="text-sm font-bold text-ink mt-1 block capitalize">{{ $car->transmission }}</span>
+                    <span class="text-sm font-bold text-ink mt-1 block capitalize">{{ $car->transmission === 'automatic' ? 'Otomatis' : 'Manual' }}</span>
                 </div>
                 <div class="p-4 rounded-lg bg-surface-raised border border-line">
                     <span class="text-[11px] font-medium text-muted uppercase tracking-wider block">Kapasitas</span>

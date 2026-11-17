@@ -62,7 +62,7 @@
 
     <!-- Customer Basic Information Grid -->
     <div class="bg-surface rounded-xl border border-line shadow-sm p-6">
-        <h3 class="text-xs font-bold uppercase tracking-wider text-muted mb-4">Data Profil Customer</h3>
+        <h3 class="text-xs font-bold uppercase tracking-wider text-muted mb-4">Data Profil Pelanggan</h3>
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-xs">
             <div>
                 <span class="text-muted block font-medium">Nama Lengkap</span>
@@ -208,7 +208,7 @@
                         Setujui Verifikasi Identitas
                     </div>
                     <p class="text-xs text-muted leading-relaxed">
-                        Menyetujui dokumen akan mengaktifkan hak customer untuk melakukan pemesanan dan reservasi armada kendaraan.
+                        Menyetujui dokumen akan mengaktifkan hak pelanggan untuk melakukan pemesanan dan reservasi armada kendaraan.
                     </p>
                     @if (!$user->hasSubmittedDocuments())
                         <p class="text-xs text-danger font-semibold mt-2">
@@ -222,7 +222,7 @@
                     @method('PATCH')
                     <button type="submit" 
                             {{ !$user->hasSubmittedDocuments() ? 'disabled' : '' }}
-                            onclick="return confirm('Apakah Anda yakin ingin menyetujui verifikasi identitas customer ini?')"
+                            onclick="return confirm('Apakah Anda yakin ingin menyetujui verifikasi identitas pelanggan ini?')"
                             class="w-full px-4 py-2.5 bg-success-action hover:bg-success-action disabled:bg-surface-raised disabled:cursor-not-allowed text-ink text-xs font-bold rounded-lg shadow-sm transition-colors flex items-center justify-center gap-2">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
@@ -245,7 +245,7 @@
                             Tolak Verifikasi &amp; Beri Alasan
                         </div>
                         <p class="text-xs text-muted leading-relaxed mb-3">
-                            Customer akan menerima alasan penolakan dan diminta mengunggah perbaikan dokumen.
+                            Pelanggan akan menerima alasan penolakan dan diminta mengunggah perbaikan dokumen.
                         </p>
 
                         <div>
@@ -266,7 +266,7 @@
 
                     <div class="mt-4">
                         <button type="submit" 
-                                onclick="return confirm('Apakah Anda yakin ingin menolak verifikasi customer ini?')"
+                                onclick="return confirm('Apakah Anda yakin ingin menolak verifikasi pelanggan ini?')"
                                 class="w-full px-4 py-2.5 bg-danger-action hover:bg-danger-action text-ink text-xs font-bold rounded-lg shadow-sm transition-colors flex items-center justify-center gap-2">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>

@@ -10,6 +10,22 @@ use Illuminate\View\View;
 class PublicCarController extends Controller
 {
     /**
+     * Display the public landing page showcase.
+     */
+    public function landing(): View
+    {
+        $featuredCars = Car::with('carType')
+            ->orderByRaw("CASE WHEN status = 'available' THEN 0 ELSE 1 END")
+            ->orderBy('id')
+            ->get()
+            ->unique(fn (Car $car): string => strtolower(trim($car->name)))
+            ->take(3)
+            ->values();
+
+        return view('landing', compact('featuredCars'));
+    }
+
+    /**
      * Display a listing of the vehicles for public / customers.
      */
     public function index(Request $request): View
@@ -49,7 +65,7 @@ class PublicCarController extends Controller
     /**
      * Display the specified vehicle details.
      */
-    public function show(Car $car): View
+    public function show(Request $request, Car $car): View
     {
         $car->load('carType');
 
@@ -60,6 +76,9 @@ class PublicCarController extends Controller
             ->take(3)
             ->get();
 
-        return view('cars.show', compact('car', 'relatedCars'));
+        $catalogFilters = collect($request->only(['search', 'car_type_id', 'transmission', 'page']))
+            ->filter(fn ($value) => is_string($value) && strlen($value) <= 255)->all();
+
+        return view('cars.show', compact('car', 'relatedCars', 'catalogFilters'));
     }
 }

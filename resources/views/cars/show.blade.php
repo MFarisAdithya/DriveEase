@@ -6,7 +6,7 @@
 <div class="max-w-5xl mx-auto space-y-8">
     <!-- Breadcrumb / Back Link -->
     <div>
-        <a href="{{ route('cars.index') }}" class="inline-flex items-center gap-2 text-xs font-semibold text-muted hover:text-ink transition-colors">
+        <a href="{{ route('cars.index', $catalogFilters) }}" class="inline-flex items-center gap-2 text-xs font-semibold text-muted hover:text-ink transition-colors">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
             </svg>
@@ -70,7 +70,7 @@
                     </div>
                     <div class="p-4 rounded-xl bg-surface-raised border border-line">
                         <span class="text-[11px] text-muted uppercase font-semibold block">Tipe Transmisi</span>
-                        <span class="text-sm font-bold text-ink block mt-1 capitalize">{{ $car->transmission }}</span>
+                        <span class="text-sm font-bold text-ink block mt-1 capitalize">{{ $car->transmission === 'automatic' ? 'Otomatis' : 'Manual' }}</span>
                     </div>
                     <div class="p-4 rounded-xl bg-surface-raised border border-line">
                         <span class="text-[11px] text-muted uppercase font-semibold block">Kapasitas Penumpang</span>
@@ -87,7 +87,7 @@
             <div>
                 <h2 class="text-xs font-bold text-muted uppercase tracking-wider mb-3">Deskripsi & Kelengkapan Fasilitas</h2>
                 <div class="p-5 rounded-xl bg-surface-raised border border-line text-sm text-ink leading-relaxed">
-                    {{ $car->description ?: 'Kendaraan dalam kondisi prima, servis rutin berkala terjamin, serta dilengkapi surat-surat resmi operasional.' }}
+                    {{ $car->description ?: 'Deskripsi kendaraan belum tersedia.' }}
                 </div>
             </div>
 
@@ -98,7 +98,7 @@
                 </svg>
                 <div class="leading-relaxed">
                     <strong class="font-semibold block mb-0.5">Informasi Reservasi & Ketersediaan</strong>
-                    Status ketersediaan di atas menunjukkan kesiapan operasional unit. Pemilihan tanggal sewa dan penguncian jadwal reservasi (*booking system*) akan diaktifkan pada pembaruan tahap berikutnya (Progress 2).
+                    Status menunjukkan kondisi kendaraan saat ini. Reservasi berdasarkan tanggal masih dalam pengembangan.
                 </div>
             </div>
         </div>
@@ -117,7 +117,7 @@
                             <span class="text-xs font-extrabold text-ink">
                                 Rp {{ number_format($rel->price_per_day, 0, ',', '.') }} <span class="text-[10px] font-normal text-muted">/ hari</span>
                             </span>
-                            <a href="{{ route('cars.show', $rel) }}" class="text-xs font-semibold text-link hover:underline">
+                            <a href="{{ route('cars.show', array_merge(['car' => $rel], $catalogFilters)) }}" class="text-xs font-semibold text-link hover:underline">
                                 Rincian &rarr;
                             </a>
                         </div>

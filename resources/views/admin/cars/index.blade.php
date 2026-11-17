@@ -44,7 +44,7 @@
             </button>
 
             @if(request()->hasAny(['search', 'car_type_id', 'status']))
-                <a href="{{ route('admin.cars.index') }}" class="text-xs text-danger hover:underline">Reset</a>
+                <a href="{{ route('admin.cars.index') }}" class="text-xs text-danger hover:underline">Hapus filter</a>
             @endif
         </form>
 
@@ -149,7 +149,7 @@
                         <tr>
                             <td colspan="7" class="py-10 text-center text-muted">
                                 <p class="font-medium">Tidak ada kendaraan yang sesuai dengan kriteria pencarian.</p>
-                                <a href="{{ route('admin.cars.index') }}" class="text-xs text-link hover:underline mt-1 inline-block">Reset filter</a>
+                                <a href="{{ route('admin.cars.index') }}" class="text-xs text-link hover:underline mt-1 inline-block">Hapus filter</a>
                             </td>
                         </tr>
                     @endforelse
