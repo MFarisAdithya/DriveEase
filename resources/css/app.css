@@ -279,3 +279,32 @@
     .theme-refresh .vehicle-grid article dl { padding-top: 12px; }
     .theme-refresh .vehicle-grid article dl dt { font-size: 12px; }
 }
+
+/* Shared motion: native navigation never waits for an animation. */
+@view-transition { navigation: auto; }
+@media (prefers-reduced-motion: no-preference) {
+    ::view-transition-old(root) { animation: driveease-page-out 140ms ease-in both; }
+    ::view-transition-new(root) { animation: driveease-page-in 260ms cubic-bezier(.22,1,.36,1) both; }
+    .theme-refresh main { animation: none; }
+    .theme-refresh :is(button, summary, a.ui-button, a.bg-action, nav a) {
+        transition: scale 150ms ease, translate 180ms ease, border-radius 220ms ease, background-color 180ms ease, box-shadow 180ms ease;
+    }
+    .theme-refresh :is(button, summary, a.ui-button, a.bg-action, nav a):active:not(:disabled) {
+        scale: .97;
+    }
+    .theme-refresh header details nav { transform-origin: top center; }
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+    .theme-refresh :is(button, a.ui-button, a.bg-action):hover:not(:disabled) { translate: 0 -2px; }
+    .theme-refresh nav a:hover { translate: 2px 0; }
+}
+@keyframes driveease-page-in {
+    from { opacity: .4; transform: translateY(10px) scale(.992); }
+    to { opacity: 1; transform: none; }
+}
+@keyframes driveease-page-out {
+    to { opacity: 0; transform: translateY(-6px) scale(.995); }
+}
+@media (prefers-reduced-motion: reduce) {
+    ::view-transition-old(root), ::view-transition-new(root) { animation: none !important; }
+}
