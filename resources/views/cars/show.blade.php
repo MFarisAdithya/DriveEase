@@ -68,7 +68,7 @@
                     </span>
                     <span class="text-xs text-muted font-medium">/ 24 jam</span>
                 </div>
-                <p class="text-[11px] text-muted mt-1">Tarif lepas kunci, belum termasuk supir & BBM</p>
+                <p class="text-[11px] text-muted mt-1">Tarif lepas kunci, belum termasuk supir &amp; BBM</p>
             </div>
         </div>
 
@@ -99,21 +99,88 @@
 
             <!-- Description -->
             <div>
-                <h2 class="text-xs font-bold text-muted uppercase tracking-wider mb-3">Deskripsi & Kelengkapan Fasilitas</h2>
+                <h2 class="text-xs font-bold text-muted uppercase tracking-wider mb-3">Deskripsi &amp; Kelengkapan Fasilitas</h2>
                 <div class="p-5 rounded-xl bg-surface-raised border border-line text-sm text-ink leading-relaxed">
                     {{ $car->description ?: 'Deskripsi kendaraan belum tersedia.' }}
                 </div>
             </div>
 
-            <!-- Operational Notice -->
-            <div class="p-4 rounded-xl bg-info-surface border border-info-line flex items-start gap-3 text-xs text-info">
-                <svg class="w-5 h-5 text-info shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
-                <div class="leading-relaxed">
-                    <strong class="font-semibold block mb-0.5">Informasi Reservasi & Ketersediaan</strong>
-                    Status menunjukkan kondisi kendaraan saat ini. Reservasi berdasarkan tanggal masih dalam pengembangan.
+            <!-- Period Availability Checker (G-03, C-04) -->
+            <div class="rounded-xl border border-line bg-surface-raised p-6 space-y-4">
+                <div>
+                    <h2 class="text-sm font-bold text-ink">Cek Ketersediaan &amp; Estimasi Biaya (WIB)</h2>
+                    <p class="text-xs text-muted mt-0.5">Durasi sewa 1 hari = 24 jam sejak jadwal pengambilan dengan jeda persiapan 1 jam antarpenyewaan.</p>
                 </div>
+
+                <form method="GET" action="{{ route('cars.show', $car) }}" class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+                    @foreach (['search', 'car_type_id', 'transmission', 'page'] as $filterKey)
+                        @if (request()->filled($filterKey))
+                            <input type="hidden" name="{{ $filterKey }}" value="{{ request($filterKey) }}">
+                        @endif
+                    @endforeach
+                    <div class="sm:col-span-6">
+                        <label for="detail_pickup_at" class="block text-xs font-semibold text-ink mb-1">Waktu Pengambilan (WIB)</label>
+                        <input id="detail_pickup_at" name="pickup_at" type="datetime-local" value="{{ request('pickup_at') }}" required class="w-full rounded-lg border border-field-line bg-surface p-2.5 text-sm">
+                    </div>
+                    <div class="sm:col-span-3">
+                        <label for="detail_total_days" class="block text-xs font-semibold text-ink mb-1">Jumlah Hari</label>
+                        <input id="detail_total_days" name="total_days" type="number" min="1" max="365" value="{{ request('total_days', 1) }}" required class="w-full rounded-lg border border-field-line bg-surface p-2.5 text-sm">
+                    </div>
+                    <div class="sm:col-span-3">
+                        <button type="submit" class="w-full rounded-lg bg-action hover:bg-action-hover px-4 py-2.5 text-xs font-bold text-ink shadow-xs transition-colors">Periksa Jadwal</button>
+                    </div>
+                </form>
+
+                @if ($periodErrors->any())
+                    <ul role="alert" class="rounded-lg border border-danger-line bg-danger-surface p-3 text-xs text-danger space-y-1">
+                        @foreach ($periodErrors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                @elseif ($periodCheck)
+                    <div class="rounded-lg border p-4 text-xs sm:text-sm space-y-2 {{ $periodCheck['available'] ? 'border-success-line bg-success-surface text-success' : 'border-danger-line bg-danger-surface text-danger' }}">
+                        <p class="font-bold">
+                            {{ $periodCheck['available'] ? 'Tersedia untuk periode yang dipilih' : 'Tidak tersedia pada periode yang dipilih' }}
+                        </p>
+                        @if ($periodCheck['reason'])
+                            <p>{{ $periodCheck['reason'] }}</p>
+                        @endif
+                        <p>
+                            Jadwal: <strong>{{ $periodCheck['pricing']['pickup_at']->format('d M Y H:i') }} WIB</strong>
+                            s.d. <strong>{{ $periodCheck['pricing']['return_at']->format('d M Y H:i') }} WIB</strong>
+                            ({{ $periodCheck['pricing']['total_days'] }} hari &times; Rp {{ number_format($periodCheck['pricing']['daily_price'], 0, ',', '.') }})
+                            &mdash; Total: <strong>Rp {{ number_format($periodCheck['pricing']['total_amount'], 0, ',', '.') }}</strong>
+                        </p>
+
+                        @if ($periodCheck['available'])
+                            <div class="pt-2">
+                                @auth
+                                    @if (auth()->user()->isCustomer())
+                                        @if (auth()->user()->canMakeReservation())
+                                            @if (Route::has('customer.bookings.create'))
+                                                <a href="{{ route('customer.bookings.create', ['car_id' => $car->id, 'pickup_at' => request('pickup_at'), 'total_days' => request('total_days')]) }}" class="inline-flex items-center rounded-lg bg-action hover:bg-action-hover px-4 py-2 text-xs font-bold text-ink shadow-xs">
+                                                    Pesan Kendaraan Ini &rarr;
+                                                </a>
+                                            @endif
+                                        @else
+                                            <a href="{{ route('customer.verification.create') }}" class="inline-flex items-center rounded-lg border border-warning-line bg-warning-surface px-4 py-2 text-xs font-bold text-warning">
+                                                Lengkapi Verifikasi Identitas untuk Memesan &rarr;
+                                            </a>
+                                        @endif
+                                    @elseif (auth()->user()->isAdmin() && Route::has('admin.bookings.create'))
+                                        <a href="{{ route('admin.bookings.create', ['car_id' => $car->id, 'pickup_at' => request('pickup_at'), 'total_days' => request('total_days')]) }}" class="inline-flex items-center rounded-lg bg-action hover:bg-action-hover px-4 py-2 text-xs font-bold text-ink shadow-xs">
+                                            Buat Pemesanan Langsung &rarr;
+                                        </a>
+                                    @endif
+                                @else
+                                    <a href="{{ route('login') }}" class="inline-flex items-center rounded-lg bg-action hover:bg-action-hover px-4 py-2 text-xs font-bold text-ink shadow-xs">
+                                        Masuk untuk Memesan &rarr;
+                                    </a>
+                                @endauth
+                            </div>
+                        @endif
+                    </div>
+                @endif
             </div>
         </div>
     </div>
