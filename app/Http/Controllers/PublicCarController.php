@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Car;
 use App\Models\CarType;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class PublicCarController extends Controller
@@ -14,7 +15,7 @@ class PublicCarController extends Controller
      */
     public function landing(): View
     {
-        $featuredCars = Car::with('carType')
+        $featuredCars = Car::activeInventory()->with('carType')
             ->orderByRaw("CASE WHEN status = 'available' THEN 0 ELSE 1 END")
             ->orderBy('id')
             ->get()
@@ -22,7 +23,13 @@ class PublicCarController extends Controller
             ->take(3)
             ->values();
 
-        return view('landing', compact('featuredCars'));
+        // select() membatasi data yang diteruskan ke Blade pada informasi publik.
+        // Rincian rekening hanya digunakan admin dan alur pembayaran.
+        $rentalInfo = DB::table('rental_settings')
+            ->select('business_name', 'services', 'address', 'contact', 'operating_hours', 'terms')
+            ->find(1);
+
+        return view('landing', compact('featuredCars', 'rentalInfo'));
     }
 
     /**
@@ -30,7 +37,7 @@ class PublicCarController extends Controller
      */
     public function index(Request $request): View
     {
-        $query = Car::with('carType');
+        $query = Car::activeInventory()->with('carType');
 
         // Search by name or brand
         if ($request->filled('search')) {
@@ -67,10 +74,11 @@ class PublicCarController extends Controller
      */
     public function show(Request $request, Car $car): View
     {
+        abort_if($car->archived_at !== null, 404);
         $car->load('carType');
 
         // Other recommendations in same category
-        $relatedCars = Car::with('carType')
+        $relatedCars = Car::activeInventory()->with('carType')
             ->where('car_type_id', $car->car_type_id)
             ->where('id', '!=', $car->id)
             ->take(3)

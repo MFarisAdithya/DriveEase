@@ -204,12 +204,20 @@
                 </div>
             </div>
 
+            <div>
+                <label for="maintenance_reason" class="block text-sm font-semibold">Alasan perawatan (wajib jika status perawatan)</label>
+                <input id="maintenance_reason" name="maintenance_reason" value="{{ old('maintenance_reason', $car->maintenance_reason ?? '') }}" class="w-full rounded-lg border border-field-line p-2">
+                @error('maintenance_reason')
+                    <p role="alert" class="text-sm text-danger">{{ $message }}</p>
+                @enderror
+            </div>
+
             <!-- Description -->
             <div>
                 <label for="description" class="block text-xs font-semibold text-ink uppercase tracking-wider mb-1.5">
                     Catatan & Deskripsi Kondisi
                 </label>
-                <textarea id="description" 
+                <textarea id="description"
                           name="description" 
                           rows="3" 
                           class="bg-surface-raised w-full px-3.5 py-2.5 rounded-lg border {{ $errors->has('description') ? 'border-danger-line focus:ring-danger-line' : 'border-field-line focus:border-focus focus:ring-focus' }} text-sm focus:outline-none focus:ring-2 transition-colors">{{ old('description', $car->description) }}</textarea>

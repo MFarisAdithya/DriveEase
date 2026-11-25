@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -21,6 +23,7 @@ class Car extends Model
         'capacity',
         'price_per_day',
         'status',
+        'maintenance_reason',
         'image',
         'description',
     ];
@@ -31,12 +34,22 @@ class Car extends Model
             'model_year' => 'integer',
             'capacity' => 'integer',
             'price_per_day' => 'decimal:2',
+            'archived_at' => 'datetime',
         ];
     }
 
     public function carType(): BelongsTo
     {
         return $this->belongsTo(CarType::class);
+    }
+
+    #[Scope]
+    protected function activeInventory(Builder $query): void
+    {
+        // whereNull() menambahkan syarat bahwa kolom archived_at masih kosong.
+        // Scope ini digunakan sebelum get(), count() atau paginate() agar
+        // katalog dan dasbor menghitung hanya unit yang belum diarsipkan.
+        $query->whereNull('archived_at');
     }
 
     /**

@@ -7,6 +7,7 @@ use App\Models\Car;
 use App\Models\CarType;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -69,6 +70,7 @@ class CarController extends Controller
             'capacity' => ['required', 'integer', 'min:1', 'max:50'],
             'price_per_day' => ['required', 'numeric', 'min:1'],
             'status' => ['required', 'in:available,rented,maintenance'],
+            'maintenance_reason' => ['exclude_unless:status,maintenance', 'required', 'string', 'max:2000'],
             'description' => ['nullable', 'string'],
         ], [
             'name.required' => 'Nama kendaraan wajib diisi.',
@@ -138,6 +140,7 @@ class CarController extends Controller
             'capacity' => ['required', 'integer', 'min:1', 'max:50'],
             'price_per_day' => ['required', 'numeric', 'min:1'],
             'status' => ['required', 'in:available,rented,maintenance'],
+            'maintenance_reason' => ['exclude_unless:status,maintenance', 'required', 'string', 'max:2000'],
             'description' => ['nullable', 'string'],
         ], [
             'name.required' => 'Nama kendaraan wajib diisi.',
@@ -159,7 +162,7 @@ class CarController extends Controller
             'status.in' => 'Pilih status tersedia, sedang disewa, atau dalam perawatan.',
         ]);
 
-        $car->update($validated);
+        $car->update($validated + ['maintenance_reason' => null]);
 
         return redirect()->route('admin.cars.index')
             ->with('success', 'Data kendaraan "'.$car->name.'" berhasil diperbarui.');
@@ -171,9 +174,23 @@ class CarController extends Controller
     public function destroy(Car $car): RedirectResponse
     {
         $name = $car->name;
-        $car->delete();
+        // exists() cukup memeriksa apakah ada histori untuk ID kendaraan ini.
+        // Jika ada, simpan waktu arsip tanpa menghapus baris yang dirujuk rental.
+        $archived = DB::transaction(function () use ($car): bool {
+            $lockedCar = Car::query()->lockForUpdate()->findOrFail($car->id);
+            if (DB::table('rentals')->where('car_id', $lockedCar->id)->exists()) {
+                $lockedCar->archived_at ??= now();
+                $lockedCar->save();
+
+                return true;
+            }
+
+            $lockedCar->delete();
+
+            return false;
+        });
 
         return redirect()->route('admin.cars.index')
-            ->with('success', 'Kendaraan "'.$name.'" berhasil dihapus dari sistem.');
+            ->with('success', 'Kendaraan "'.$name.'" berhasil '.($archived ? 'diarsipkan.' : 'dihapus dari sistem.'));
     }
 }

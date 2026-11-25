@@ -97,7 +97,9 @@
                                 Rp {{ number_format($car->price_per_day, 0, ',', '.') }}
                             </td>
                             <td class="py-3.5 px-5">
-                                @if ($car->status === 'available')
+                                @if ($car->archived_at)
+<span class="text-xs font-semibold text-subtle">Diarsipkan</span>
+@elseif ($car->status === 'available')
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-success-surface text-success">
                                         Tersedia
                                     </span>

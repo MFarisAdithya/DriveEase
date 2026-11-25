@@ -16,6 +16,20 @@
 
     <!-- Main Detail Card -->
     <div class="bg-surface rounded-2xl border border-line shadow-sm overflow-hidden">
+        @php
+            $photo = $car->resolvePhoto();
+        @endphp
+        @if ($photo['url'])
+            <figure class="relative aspect-[16/9] max-h-[420px] w-full bg-surface-raised border-b border-line overflow-hidden">
+                <img src="{{ $photo['url'] }}" alt="{{ $car->name }}" class="w-full h-full object-cover">
+                @if ($photo['is_model'])
+                    <figcaption class="absolute bottom-3 right-3 rounded bg-white/95 px-2.5 py-1 text-xs font-medium text-ink shadow-xs">
+                        Foto model
+                    </figcaption>
+                @endif
+            </figure>
+        @endif
+
         <!-- Header -->
         <div class="p-8 border-b border-line flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>

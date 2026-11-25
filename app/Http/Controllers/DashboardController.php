@@ -12,24 +12,24 @@ class DashboardController extends Controller
     {
         $verificationCounts = app(VerificationQueue::class)->counts();
         $stats = [
-            'total' => Car::count(),
-            'available' => Car::where('status', 'available')->count(),
-            'rented' => Car::where('status', 'rented')->count(),
-            'maintenance' => Car::where('status', 'maintenance')->count(),
+            'total' => Car::activeInventory()->count(),
+            'available' => Car::activeInventory()->where('status', 'available')->count(),
+            'rented' => Car::activeInventory()->where('status', 'rented')->count(),
+            'maintenance' => Car::activeInventory()->where('status', 'maintenance')->count(),
             'pending_verifications' => $verificationCounts['ready'],
             'incomplete_verifications' => $verificationCounts['incomplete'],
         ];
 
-        $recentCars = Car::with('carType')->latest()->take(5)->get();
+        $recentCars = Car::activeInventory()->with('carType')->latest()->take(5)->get();
 
         return view('dashboard.admin', compact('stats', 'recentCars'));
     }
 
     public function staff(): View
     {
-        $totalCars = Car::count();
-        $availableCars = Car::where('status', 'available')->count();
-        $cars = Car::with('carType')->latest()->get();
+        $totalCars = Car::activeInventory()->count();
+        $availableCars = Car::activeInventory()->where('status', 'available')->count();
+        $cars = Car::activeInventory()->with('carType')->latest()->get();
 
         return view('dashboard.staff', compact('totalCars', 'availableCars', 'cars'));
     }
@@ -37,7 +37,7 @@ class DashboardController extends Controller
     public function customer(): View
     {
         $user = auth()->user();
-        $availableCars = Car::with('carType')
+        $availableCars = Car::activeInventory()->with('carType')
             ->where('status', 'available')
             ->orderBy('price_per_day', 'asc')
             ->get();

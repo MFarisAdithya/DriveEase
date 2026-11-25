@@ -40,7 +40,9 @@
             <div>
                 <div class="flex items-center gap-3">
                     <h2 class="text-2xl font-bold text-ink">{{ $car->name }}</h2>
-                    @if ($car->status === 'available')
+                    @if ($car->archived_at)
+<span class="text-xs font-semibold text-subtle">Diarsipkan</span>
+@elseif ($car->status === 'available')
                         <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-success-surface text-success">
                             Tersedia
                         </span>
@@ -98,4 +100,7 @@
         </div>
     </div>
 </div>
+@if ($car->maintenance_reason)
+    <p class="mt-4 text-sm">Alasan perawatan: {{ $car->maintenance_reason }}</p>
+@endif
 @endsection
