@@ -124,9 +124,11 @@
     </aside>
 
     <!-- Main Content Area -->
-    <div class="flex-1 flex flex-col min-w-0 overflow-y-auto">
-        <div class="relative min-h-full flex flex-col overflow-x-clip pb-28 sm:pb-36">
-            @include('partials.driveease-backdrop')
+    {{-- Lapis luar menahan backdrop agar tetap diam (stay) mengikuti viewport admin saat konten digulir. --}}
+    <div class="relative flex-1 flex flex-col min-w-0 overflow-hidden">
+        @include('partials.driveease-backdrop')
+        <div class="relative z-10 flex-1 flex flex-col min-w-0 overflow-y-auto overflow-x-clip">
+            {{-- Gelombang dan latar ditempatkan pada pembungkus luar yang tetap diam. --}}
 
             <!-- Top Navbar -->
             <header class="sticky top-0 z-30 h-16 bg-surface/90 backdrop-blur-md text-ink border-b border-line flex items-center gap-3 px-4 md:justify-between md:px-8 shrink-0">
@@ -152,7 +154,7 @@
         </header>
 
         <!-- Page Body -->
-        <main class="relative z-10 flex-1 p-4 md:p-8 pb-24">
+        <main class="relative z-10 flex-1 p-4 md:p-8 pb-28 sm:pb-36">
             <!-- Flash Messages -->
             @if (session('success'))
                 <div class="mb-6 p-4 rounded-lg bg-success-surface border border-success-line flex items-start gap-3 text-success">
