@@ -218,7 +218,10 @@ class FinalAcceptanceAndPwlTest extends TestCase
         $payment = $otherRental->payments()->firstOrFail();
 
         $this->actingAs($customer)->get(route('customer.bookings.show', $otherRental))->assertForbidden();
-        $this->actingAs($staff)->patch(route('admin.payments.approve', $payment), ['verified_amount' => 425000])->assertForbidden();
+        $this->actingAs($staff)->patch(route('admin.payments.approve', $payment), [
+            'verified_amount' => 425000,
+            'received_at' => now('Asia/Jakarta')->format('Y-m-d\TH:i'),
+        ])->assertForbidden();
         $this->actingAs($admin)->get(route('admin.bookings.show', $otherRental))->assertOk();
 
         // API parity: ketersediaan JSON memblokir rentang bentrok ($otherRental) dan mengembalikan 422 pada periode salah.
@@ -264,6 +267,7 @@ class FinalAcceptanceAndPwlTest extends TestCase
         $payment = $rental->payments()->firstOrFail();
         $this->actingAs($admin)->patch(route('admin.payments.approve', $payment), [
             'verified_amount' => 480000,
+            'received_at' => now('Asia/Jakarta')->format('Y-m-d\TH:i'),
         ])->assertRedirect();
 
         $backupDir = storage_path('framework/testing/backup_'.uniqid());

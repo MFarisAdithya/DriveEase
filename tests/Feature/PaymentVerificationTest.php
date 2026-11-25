@@ -88,11 +88,13 @@ class PaymentVerificationTest extends TestCase
         // Approval kurang dari nominal tagihan harus ditolak.
         $this->actingAs($admin)->patch(route('admin.payments.approve', $payment), [
             'verified_amount' => ((float) $rental->total_amount) - 50000,
+            'received_at' => now('Asia/Jakarta')->format('Y-m-d\TH:i'),
         ])->assertSessionHasErrors('verified_amount');
 
         // Approval penuh melunasi dan mengonfirmasi pesanan.
         $this->patch(route('admin.payments.approve', $payment), [
             'verified_amount' => (float) $rental->total_amount,
+            'received_at' => now('Asia/Jakarta')->format('Y-m-d\TH:i'),
         ])->assertRedirect(route('admin.bookings.show', $rental));
 
         $rental->refresh();
@@ -102,11 +104,13 @@ class PaymentVerificationTest extends TestCase
         $this->assertEquals((float) $rental->total_amount, (float) $rental->paid_amount);
         $this->assertSame($admin->id, $rental->payment_verified_by);
         $this->assertNotNull($rental->payment_verified_at);
+        $this->assertNotNull($payment->received_at);
         $this->assertSame(RentalPayment::STATUS_APPROVED, $payment->status);
 
         // Approval ulang tidak boleh menggandakan pembayaran.
         $this->patch(route('admin.payments.approve', $payment), [
             'verified_amount' => (float) $rental->total_amount,
+            'received_at' => now('Asia/Jakarta')->format('Y-m-d\TH:i'),
         ])->assertSessionHasErrors('payment');
     }
 
@@ -141,6 +145,7 @@ class PaymentVerificationTest extends TestCase
         $this->patch(route('admin.payments.reject', $firstPayment), [
             'rejection_reason' => 'Transfer kurang dari total tagihan, silakan lunasi kekurangannya.',
             'received_amount' => $partialReceived,
+            'received_at' => now('Asia/Jakarta')->format('Y-m-d\TH:i'),
         ])->assertRedirect();
 
         $rental->refresh();
@@ -167,6 +172,7 @@ class PaymentVerificationTest extends TestCase
         $secondPayment = $rental->payments()->firstOrFail();
         $this->actingAs($admin)->patch(route('admin.payments.approve', $secondPayment), [
             'verified_amount' => $remaining,
+            'received_at' => now('Asia/Jakarta')->format('Y-m-d\TH:i'),
         ])->assertRedirect();
 
         $rental->refresh();
@@ -272,6 +278,7 @@ class PaymentVerificationTest extends TestCase
         $payment = $walkInRental->payments()->firstOrFail();
         $this->patch(route('admin.payments.approve', $payment), [
             'verified_amount' => (float) $walkInRental->total_amount,
+            'received_at' => now('Asia/Jakarta')->format('Y-m-d\TH:i'),
         ])->assertRedirect();
 
         $this->assertSame(Rental::STATUS_CONFIRMED, $walkInRental->fresh()->rental_status);

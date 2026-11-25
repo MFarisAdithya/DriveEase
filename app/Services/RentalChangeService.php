@@ -128,7 +128,7 @@ class RentalChangeService
                     'request_type' => $changeRequest->request_type,
                     'proposed_pickup_at' => $pricing['pickup_at']->toIso8601String(),
                     'proposed_total_days' => $totalDays,
-                    'proposed_total_amount' => $pricing['total_amount'],
+                    'proposed_total_amount' => $proposedTotalAmount,
                 ]
             );
 

@@ -100,7 +100,7 @@ class CancellationAndRefundTest extends TestCase
         $pickupAt = CarbonImmutable::now('Asia/Jakarta')->addDays(4)->setTime(10, 0);
         $rental = app(RentalBookingService::class)->createBooking($customer, $car->id, $pickupAt, 1, true);
         $payment = app(RentalPaymentService::class)->submitProof($rental, $customer, UploadedFile::fake()->image('bayar.jpg'));
-        app(RentalPaymentService::class)->approvePayment($payment, $admin, (float) $rental->total_amount);
+        app(RentalPaymentService::class)->approvePayment($payment, $admin, (float) $rental->total_amount, now('Asia/Jakarta'));
         $rental->refresh();
 
         // Pelanggan mengajukan pembatalan (4 hari sebelum ambil -> estimasi 100%).
@@ -173,7 +173,7 @@ class CancellationAndRefundTest extends TestCase
         $pickupSoon = CarbonImmutable::now('Asia/Jakarta')->addHours(10);
         $rentalTier50 = app(RentalBookingService::class)->createBooking($customer, $car->id, $pickupSoon, 1, true);
         $payment1 = app(RentalPaymentService::class)->submitProof($rentalTier50, $customer, UploadedFile::fake()->image('tier50.jpg'));
-        app(RentalPaymentService::class)->approvePayment($payment1, $admin, (float) $rentalTier50->total_amount);
+        app(RentalPaymentService::class)->approvePayment($payment1, $admin, (float) $rentalTier50->total_amount, now('Asia/Jakarta'));
         $rentalTier50->refresh();
 
         $this->actingAs($admin)->patch(route('admin.bookings.cancel-with-refund', $rentalTier50), [
@@ -198,7 +198,7 @@ class CancellationAndRefundTest extends TestCase
         $pickupNoShow = CarbonImmutable::now('Asia/Jakarta')->addMinutes(30);
         $rentalNoShow = app(RentalBookingService::class)->createBooking($customer, $car->id, $pickupNoShow, 1, true);
         $payment2 = app(RentalPaymentService::class)->submitProof($rentalNoShow, $customer, UploadedFile::fake()->image('noshow.jpg'));
-        app(RentalPaymentService::class)->approvePayment($payment2, $admin, (float) $rentalNoShow->total_amount);
+        app(RentalPaymentService::class)->approvePayment($payment2, $admin, (float) $rentalNoShow->total_amount, now('Asia/Jakarta'));
 
         $this->actingAs($admin)->patch(route('admin.bookings.cancel-with-refund', $rentalNoShow), [
             'cancellation_type' => Rental::CANCEL_NO_SHOW,
@@ -235,7 +235,7 @@ class CancellationAndRefundTest extends TestCase
         $pickupExpired = CarbonImmutable::now('Asia/Jakarta')->addDays(2)->setTime(10, 0);
         $rentalExpired = app(RentalBookingService::class)->createBooking($customer, $car->id, $pickupExpired, 1, true);
         $partialPayment = app(RentalPaymentService::class)->submitProof($rentalExpired, $customer, UploadedFile::fake()->image('parsial.jpg'));
-        app(RentalPaymentService::class)->rejectPayment($partialPayment, $admin, 'Transfer masih kurang Rp 200.000.', 150000);
+        app(RentalPaymentService::class)->rejectPayment($partialPayment, $admin, 'Transfer masih kurang Rp 200.000.', 150000, now('Asia/Jakarta'));
 
         $rentalExpired->refresh();
         $this->assertEquals(150000.0, (float) $rentalExpired->paid_amount);

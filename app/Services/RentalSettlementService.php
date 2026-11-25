@@ -4,10 +4,12 @@ namespace App\Services;
 
 use App\Models\Car;
 use App\Models\Rental;
+use App\Models\RentalCashFlow;
 use App\Models\RentalExtension;
 use App\Models\RentalSetting;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -286,7 +288,7 @@ class RentalSettlementService
     }
 
     /**
-     * Verifikasi pelunasan tagihan tambahan dan catat referensi pembayaran resmi oleh admin (A-09).
+     * Verifikasi pelunasan biaya tambahan, catat arus kas masuk pada tanggal dana diterima (WIB), dan simpan referensi resmi (A-09, A-12).
      *
      * @throws ValidationException
      */
@@ -294,7 +296,8 @@ class RentalSettlementService
         Rental $rental,
         User $admin,
         float $verifiedAmount,
-        string $paymentReference
+        string $paymentReference,
+        ?CarbonInterface $receivedAt = null
     ): Rental {
         if (! $admin->isAdmin()) {
             throw ValidationException::withMessages([
@@ -309,10 +312,17 @@ class RentalSettlementService
             ]);
         }
 
+        if ($receivedAt === null) {
+            throw ValidationException::withMessages([
+                'received_at' => 'Tanggal aktual dana tagihan tambahan diterima (WIB) wajib diisi.',
+            ]);
+        }
+
         $normalizedAmount = round($verifiedAmount, 2);
         $nowWib = CarbonImmutable::now(RentalScheduleService::TIMEZONE);
+        $receivedAtWib = CarbonImmutable::instance($receivedAt)->timezone(RentalScheduleService::TIMEZONE);
 
-        return DB::transaction(function () use ($rental, $admin, $normalizedAmount, $trimmedRef, $nowWib): Rental {
+        return DB::transaction(function () use ($rental, $admin, $normalizedAmount, $trimmedRef, $receivedAtWib, $nowWib): Rental {
             // Ikuti urutan kunci global: Car -> Rental.
             Car::query()->lockForUpdate()->findOrFail($rental->car_id);
             $lockedRental = Rental::query()->lockForUpdate()->findOrFail($rental->id);
@@ -360,6 +370,18 @@ class RentalSettlementService
                 'status_notice' => $notice,
             ] + $overpaymentData)->saveOrFail();
 
+            // Catat arus masuk tagihan tambahan (termasuk kelebihan bayar jika ada) pada tanggal dana diterima (WIB).
+            RentalCashFlow::create([
+                'rental_id' => $lockedRental->id,
+                'recorded_by' => $admin->id,
+                'direction' => RentalCashFlow::DIRECTION_INFLOW,
+                'category' => RentalCashFlow::CATEGORY_ADDITIONAL_CHARGE,
+                'amount' => $normalizedAmount,
+                'occurred_at' => $receivedAtWib,
+                'reference' => $trimmedRef,
+                'notes' => 'Pelunasan tagihan tambahan pascapengembalian.',
+            ]);
+
             $lockedRental->recordHistory(
                 $admin,
                 'additional_charge_paid',
@@ -368,6 +390,7 @@ class RentalSettlementService
                 'Pelunasan tagihan tambahan diverifikasi admin.',
                 [
                     'verified_amount' => $normalizedAmount,
+                    'received_at' => $receivedAtWib->toIso8601String(),
                     'overpayment_amount' => $excessAmount,
                     'total_additional_paid' => $newPaid,
                     'payment_reference' => $trimmedRef,
@@ -379,7 +402,7 @@ class RentalSettlementService
     }
 
     /**
-     * Tolak bukti pembayaran tagihan tambahan dengan alasan wajib dan catat dana masuk parsial bila ada (A-09).
+     * Tolak bukti pembayaran tagihan tambahan dengan alasan wajib serta pencatatan dana parsial dan tanggal terimanya (A-09, A-12).
      *
      * @throws ValidationException
      */
@@ -387,7 +410,8 @@ class RentalSettlementService
         Rental $rental,
         User $admin,
         string $reason,
-        float $receivedAmount = 0.0
+        float $receivedAmount = 0.0,
+        ?CarbonInterface $receivedAt = null
     ): Rental {
         if (! $admin->isAdmin()) {
             throw ValidationException::withMessages([
@@ -409,9 +433,18 @@ class RentalSettlementService
             ]);
         }
 
-        $nowWib = CarbonImmutable::now(RentalScheduleService::TIMEZONE);
+        if ($normalizedReceived > 0 && $receivedAt === null) {
+            throw ValidationException::withMessages([
+                'received_at' => 'Tanggal aktual dana tagihan tambahan diterima (WIB) wajib diisi apabila terdapat dana masuk sebagian.',
+            ]);
+        }
 
-        return DB::transaction(function () use ($rental, $admin, $trimmedReason, $normalizedReceived, $nowWib): Rental {
+        $nowWib = CarbonImmutable::now(RentalScheduleService::TIMEZONE);
+        $receivedAtWib = $receivedAt !== null
+            ? CarbonImmutable::instance($receivedAt)->timezone(RentalScheduleService::TIMEZONE)
+            : null;
+
+        return DB::transaction(function () use ($rental, $admin, $trimmedReason, $normalizedReceived, $receivedAtWib, $nowWib): Rental {
             // Ikuti urutan kunci global: Car -> Rental.
             Car::query()->lockForUpdate()->findOrFail($rental->car_id);
             $lockedRental = Rental::query()->lockForUpdate()->findOrFail($rental->id);
@@ -443,6 +476,18 @@ class RentalSettlementService
                     .'. Sisa tagihan tambahan Rp '.number_format($lockedRental->remainingAdditionalChargeBalance(), 0, ',', '.').'.',
             ])->saveOrFail();
 
+            if ($normalizedReceived > 0 && $receivedAtWib !== null) {
+                RentalCashFlow::create([
+                    'rental_id' => $lockedRental->id,
+                    'recorded_by' => $admin->id,
+                    'direction' => RentalCashFlow::DIRECTION_INFLOW,
+                    'category' => RentalCashFlow::CATEGORY_ADDITIONAL_CHARGE,
+                    'amount' => $normalizedReceived,
+                    'occurred_at' => $receivedAtWib,
+                    'notes' => 'Pembayaran sebagian tagihan tambahan saat bukti ditolak: '.$trimmedReason,
+                ]);
+            }
+
             $lockedRental->recordHistory(
                 $admin,
                 'additional_charge_rejected',
@@ -451,6 +496,7 @@ class RentalSettlementService
                 $trimmedReason,
                 [
                     'received_amount' => $normalizedReceived,
+                    'received_at' => $receivedAtWib?->toIso8601String(),
                     'remaining_balance' => $lockedRental->remainingAdditionalChargeBalance(),
                 ]
             );

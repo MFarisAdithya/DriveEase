@@ -115,7 +115,7 @@ class BookingChangesAndExtensionsTest extends TestCase
         $pickupAt = CarbonImmutable::now('Asia/Jakarta')->addDays(4)->setTime(9, 0);
         $rental = $bookingService->createBooking($customer, $originalCar->id, $pickupAt, 2, true);
         $payment = $paymentService->submitProof($rental, $customer, UploadedFile::fake()->image('lunas.jpg'));
-        $paymentService->approvePayment($payment, $admin, (float) $rental->total_amount);
+        $paymentService->approvePayment($payment, $admin, (float) $rental->total_amount, now('Asia/Jakarta'));
         $rental->refresh();
 
         // Admin mengusulkan penggantian kendaraan lebih mahal dengan selisih biaya 0 (A-06).
@@ -191,7 +191,7 @@ class BookingChangesAndExtensionsTest extends TestCase
         $pickupAt = CarbonImmutable::now('Asia/Jakarta')->addDays(2)->setTime(9, 0);
         $rental = $bookingService->createBooking($customer, $car->id, $pickupAt, 2, true);
         $payment = $paymentService->submitProof($rental, $customer, UploadedFile::fake()->image('lunas.jpg'));
-        $paymentService->approvePayment($payment, $admin, (float) $rental->total_amount);
+        $paymentService->approvePayment($payment, $admin, (float) $rental->total_amount, now('Asia/Jakarta'));
         $rental->refresh();
 
         $originalReturnAt = $rental->return_at->copy()->timezone('Asia/Jakarta');
@@ -238,11 +238,13 @@ class BookingChangesAndExtensionsTest extends TestCase
         // Verifikasi dengan nominal aktual kurang dari tagihan perpanjangan harus ditolak.
         $this->actingAs($admin)->patch(route('admin.extensions.payment.approve', $extension), [
             'verified_amount' => 500000,
+            'received_at' => now('Asia/Jakarta')->format('Y-m-d\TH:i'),
         ])->assertSessionHasErrors('verified_amount');
 
         // Admin memverifikasi bukti pembayaran dengan nominal aktual penuh -> return_at, total_days, total_amount, paid_amount diperbarui.
         $this->actingAs($admin)->patch(route('admin.extensions.payment.approve', $extension), [
             'verified_amount' => 1000000,
+            'received_at' => now('Asia/Jakarta')->format('Y-m-d\TH:i'),
         ])->assertRedirect(route('admin.bookings.show', $rental));
 
         $rental->refresh();
@@ -271,7 +273,7 @@ class BookingChangesAndExtensionsTest extends TestCase
         $pickupAt = CarbonImmutable::now('Asia/Jakarta')->addDays(2)->setTime(9, 0);
         $rental = $bookingService->createBooking($customer, $car->id, $pickupAt, 2, true);
         $payment = $paymentService->submitProof($rental, $customer, UploadedFile::fake()->image('lunas1.jpg'));
-        $paymentService->approvePayment($payment, $admin, (float) $rental->total_amount);
+        $paymentService->approvePayment($payment, $admin, (float) $rental->total_amount, now('Asia/Jakarta'));
         $rental->refresh();
 
         // Pelanggan mengajukan perpanjangan 2 hari saat jadwal tambahan masih kosong.
@@ -297,6 +299,7 @@ class BookingChangesAndExtensionsTest extends TestCase
         // Pemeriksaan ulang tahap 2 (SYS-09) harus menolak aktivasi jadwal perpanjangan karena kini bentrok!
         $this->actingAs($admin)->patch(route('admin.extensions.payment.approve', $extension), [
             'verified_amount' => 800000,
+            'received_at' => now('Asia/Jakarta')->format('Y-m-d\TH:i'),
         ])->assertSessionHasErrors('extension_id');
 
         $rental->refresh();
@@ -344,6 +347,7 @@ class BookingChangesAndExtensionsTest extends TestCase
         $this->actingAs($admin)->patch(route('admin.extensions.payment.reject', $extension), [
             'rejection_reason' => 'Jadwal tambahan sudah ditempati pesanan berikutnya; dana perpanjangan dikembalikan penuh.',
             'received_amount' => 800000,
+            'received_at' => now('Asia/Jakarta')->format('Y-m-d\TH:i'),
             'cancel_extension' => 1,
         ])->assertRedirect(route('admin.bookings.show', $rental));
 
@@ -383,7 +387,7 @@ class BookingChangesAndExtensionsTest extends TestCase
         $pickupAt = CarbonImmutable::now('Asia/Jakarta')->addDays(2)->setTime(9, 0);
         $rental = $bookingService->createBooking($customer, $car->id, $pickupAt, 2, true);
         $payment = $paymentService->submitProof($rental, $customer, UploadedFile::fake()->image('lunas2.jpg'));
-        $paymentService->approvePayment($payment, $admin, (float) $rental->total_amount);
+        $paymentService->approvePayment($payment, $admin, (float) $rental->total_amount, now('Asia/Jakarta'));
 
         // Pesanan pelanggan lain terpasang tepat 90 menit setelah batas kembali awal -> memperpanjang 1 hari bentrok di tahap 1.
         $nextPickup = $rental->return_at->copy()->timezone('Asia/Jakarta')->addMinutes(90);

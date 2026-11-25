@@ -304,6 +304,16 @@ class Rental extends Model
     }
 
     /**
+     * Ambil catatan arus kas aktual berbasis tanggal penerimaan dan realisasi refund (WIB).
+     */
+    public function cashFlows(): HasMany
+    {
+        // hasMany() mengikat satu pesanan ke banyak entri buku kas (parsial, lunas, tambahan, maupun refund)
+        // dan diurutkan menurun berdasarkan waktu aktual terjadinya arus kas.
+        return $this->hasMany(RentalCashFlow::class)->orderByDesc('occurred_at')->orderByDesc('id');
+    }
+
+    /**
      * Filter rentals that still hold a vehicle's schedule at the given moment.
      */
     #[Scope]

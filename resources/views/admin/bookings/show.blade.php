@@ -98,7 +98,12 @@
                                 <span class="text-muted"> &middot; Dikirim {{ $payment->submitted_at?->timezone('Asia/Jakarta')->format('d M Y H:i') }} WIB</span>
                                 <p class="mt-1">Nominal diklaim: <strong>Rp {{ number_format((float) $payment->claimed_amount, 0, ',', '.') }}</strong></p>
                                 @if ($payment->verified_by)
-                                    <p class="text-muted">Diverifikasi oleh {{ $payment->verifier?->name }} pada {{ $payment->verified_at?->timezone('Asia/Jakarta')->format('d M Y H:i') }} WIB (Rp {{ number_format((float) $payment->verified_amount, 0, ',', '.') }})</p>
+                                    <p class="text-muted">
+                                        Diverifikasi oleh {{ $payment->verifier?->name }} pada {{ $payment->verified_at?->timezone('Asia/Jakarta')->format('d M Y H:i') }} WIB (Rp {{ number_format((float) $payment->verified_amount, 0, ',', '.') }})
+                                        @if ($payment->received_at)
+                                            &middot; Dana diterima: <strong class="text-ink">{{ $payment->received_at->timezone('Asia/Jakarta')->format('d M Y H:i') }} WIB</strong>
+                                        @endif
+                                    </p>
                                 @endif
                                 @if ($payment->rejection_reason)
                                     <p class="text-danger">Alasan penolakan: {{ $payment->rejection_reason }}</p>
@@ -116,6 +121,8 @@
                                     @method('PATCH')
                                     <label for="verified_amount_{{ $payment->id }}" class="block font-bold text-success">Setujui Pembayaran Lunas (Rp)</label>
                                     <input id="verified_amount_{{ $payment->id }}" name="verified_amount" type="number" min="1" value="{{ (int) $rental->remainingBalance() }}" required class="w-full rounded-lg border border-field-line bg-surface p-2 text-xs">
+                                    <label for="received_at_{{ $payment->id }}" class="block font-semibold text-ink">Tanggal Dana Diterima (WIB)</label>
+                                    <input id="received_at_{{ $payment->id }}" name="received_at" type="datetime-local" value="{{ now('Asia/Jakarta')->format('Y-m-d\TH:i') }}" required class="w-full rounded-lg border border-field-line bg-surface p-2 text-xs">
                                     <button type="submit" class="rounded-lg bg-success-action px-4 py-2 font-bold text-white">Verifikasi Lunas &amp; Konfirmasi</button>
                                 </form>
 
@@ -126,6 +133,8 @@
                                     <input id="rejection_reason_{{ $payment->id }}" name="rejection_reason" required minlength="5" placeholder="Contoh: Nominal transfer kurang atau foto buram" class="w-full rounded-lg border border-field-line bg-surface p-2 text-xs">
                                     <label for="received_amount_{{ $payment->id }}" class="block font-semibold text-ink">Nominal Masuk Sebagian (Opsional, 0 jika ditolak penuh)</label>
                                     <input id="received_amount_{{ $payment->id }}" name="received_amount" type="number" min="0" value="0" class="w-full rounded-lg border border-field-line bg-surface p-2 text-xs">
+                                    <label for="reject_received_at_{{ $payment->id }}" class="block font-semibold text-ink">Tanggal Dana Sebagian Diterima (WIB, wajib bila &gt; 0)</label>
+                                    <input id="reject_received_at_{{ $payment->id }}" name="received_at" type="datetime-local" class="w-full rounded-lg border border-field-line bg-surface p-2 text-xs">
                                     <button type="submit" class="rounded-lg bg-danger-action px-4 py-2 font-bold text-white">Tolak Bukti Pembayaran</button>
                                 </form>
                             </div>
@@ -359,12 +368,16 @@
                                     Dana terverifikasi masuk perpanjangan: <strong class="text-ink">Rp {{ number_format((float) $extension->paid_amount, 0, ',', '.') }}</strong>
                                     &middot; Sisa tagihan: <strong class="text-ink">Rp {{ number_format($extension->remainingExtensionBalance(), 0, ',', '.') }}</strong>
                                 </p>
-                                <form method="POST" action="{{ route('admin.extensions.payment.approve', $extension) }}" class="flex flex-col sm:flex-row gap-2 items-stretch sm:items-end">
+                                <form method="POST" action="{{ route('admin.extensions.payment.approve', $extension) }}" class="grid grid-cols-1 sm:grid-cols-3 gap-2 items-end">
                                     @csrf
                                     @method('PATCH')
-                                    <div class="sm:w-56">
+                                    <div>
                                         <label for="ext_verified_amount_{{ $extension->id }}" class="block font-semibold text-ink mb-1">Nominal Aktual Diterima (Rp)</label>
                                         <input id="ext_verified_amount_{{ $extension->id }}" name="verified_amount" type="number" step="0.01" min="1" value="{{ number_format($extension->remainingExtensionBalance(), 2, '.', '') }}" required class="w-full rounded-lg border border-field-line bg-surface p-2">
+                                    </div>
+                                    <div>
+                                        <label for="ext_received_at_{{ $extension->id }}" class="block font-semibold text-ink mb-1">Tanggal Dana Diterima (WIB)</label>
+                                        <input id="ext_received_at_{{ $extension->id }}" name="received_at" type="datetime-local" value="{{ now('Asia/Jakarta')->format('Y-m-d\TH:i') }}" required class="w-full rounded-lg border border-field-line bg-surface p-2">
                                     </div>
                                     <button type="submit" class="rounded-lg bg-action hover:bg-action-hover px-4 py-2 font-bold text-ink shrink-0">
                                         Verifikasi Lunas &amp; Aktifkan Jadwal Baru
@@ -373,9 +386,19 @@
                                 <form method="POST" action="{{ route('admin.extensions.payment.reject', $extension) }}" class="space-y-2 border-t border-line pt-2">
                                     @csrf
                                     @method('PATCH')
-                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                        <input name="rejection_reason" required placeholder="Alasan penolakan / pembatalan perpanjangan" class="rounded-lg border border-field-line bg-surface p-2">
-                                        <input name="received_amount" type="number" step="0.01" min="0" placeholder="Dana masuk (opsional, Rp)" class="rounded-lg border border-field-line bg-surface p-2">
+                                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                        <div>
+                                            <label for="ext_reject_reason_{{ $extension->id }}" class="block font-semibold text-ink mb-1">Alasan Penolakan / Batal</label>
+                                            <input id="ext_reject_reason_{{ $extension->id }}" name="rejection_reason" required placeholder="Alasan penolakan / pembatalan perpanjangan" class="w-full rounded-lg border border-field-line bg-surface p-2">
+                                        </div>
+                                        <div>
+                                            <label for="ext_reject_received_{{ $extension->id }}" class="block font-semibold text-ink mb-1">Dana Masuk (Opsional, Rp)</label>
+                                            <input id="ext_reject_received_{{ $extension->id }}" name="received_amount" type="number" step="0.01" min="0" placeholder="0" class="w-full rounded-lg border border-field-line bg-surface p-2">
+                                        </div>
+                                        <div>
+                                            <label for="ext_reject_received_at_{{ $extension->id }}" class="block font-semibold text-ink mb-1">Tanggal Dana Masuk (WIB, wajib bila &gt; 0)</label>
+                                            <input id="ext_reject_received_at_{{ $extension->id }}" name="received_at" type="datetime-local" class="w-full rounded-lg border border-field-line bg-surface p-2">
+                                        </div>
                                     </div>
                                     <div class="flex flex-wrap items-center justify-between gap-2">
                                         <label class="inline-flex items-center gap-2 text-ink">
@@ -539,7 +562,7 @@
 
                 @if ($rental->rental_status === \App\Models\Rental::STATUS_RETURNED && $rental->additional_charge_status === \App\Models\Rental::ADDITIONAL_CHARGE_PENDING_APPROVAL)
                     <div class="rounded-xl border border-line bg-surface-raised p-4 space-y-3 text-xs">
-                        <form method="POST" action="{{ route('admin.bookings.additional-charges.approve', $rental) }}" class="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                        <form method="POST" action="{{ route('admin.bookings.additional-charges.approve', $rental) }}" class="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
                             @csrf
                             @method('PATCH')
                             <div>
@@ -550,9 +573,13 @@
                                 <label for="add_payment_ref" class="block font-semibold mb-1">Referensi Pembayaran</label>
                                 <input id="add_payment_ref" name="payment_reference" required placeholder="TRF-ADD-001" class="w-full rounded-lg border border-field-line bg-surface p-2">
                             </div>
+                            <div>
+                                <label for="add_received_at" class="block font-semibold mb-1">Tanggal Dana Diterima (WIB)</label>
+                                <input id="add_received_at" name="received_at" type="datetime-local" value="{{ now('Asia/Jakarta')->format('Y-m-d\TH:i') }}" required class="w-full rounded-lg border border-field-line bg-surface p-2">
+                            </div>
                             <button type="submit" class="rounded-lg bg-action hover:bg-action-hover px-4 py-2 font-bold text-ink">Verifikasi Pelunasan Tambahan</button>
                         </form>
-                        <form method="POST" action="{{ route('admin.bookings.additional-charges.reject', $rental) }}" class="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end border-t border-line pt-3">
+                        <form method="POST" action="{{ route('admin.bookings.additional-charges.reject', $rental) }}" class="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end border-t border-line pt-3">
                             @csrf
                             @method('PATCH')
                             <div>
@@ -562,6 +589,10 @@
                             <div>
                                 <label for="add_received_amount" class="block font-semibold mb-1">Dana Masuk Parsial (Opsional)</label>
                                 <input id="add_received_amount" name="received_amount" type="number" step="0.01" min="0" placeholder="0" class="w-full rounded-lg border border-field-line bg-surface p-2">
+                            </div>
+                            <div>
+                                <label for="add_reject_received_at" class="block font-semibold mb-1">Tanggal Dana Masuk (WIB, wajib bila &gt; 0)</label>
+                                <input id="add_reject_received_at" name="received_at" type="datetime-local" class="w-full rounded-lg border border-field-line bg-surface p-2">
                             </div>
                             <button type="submit" class="rounded-lg border border-danger-line bg-danger-surface px-4 py-2 font-bold text-danger">Tolak Bukti Tambahan</button>
                         </form>
@@ -581,6 +612,38 @@
                         </button>
                     </form>
                 @endif
+            </div>
+        @endif
+
+        @if ($rental->cashFlows->isNotEmpty())
+            <div class="space-y-3 border-t border-line pt-4">
+                <h3 class="text-sm font-bold text-ink">Buku Arus Kas Transaksi (Berbasis Kas WIB)</h3>
+                <div class="overflow-x-auto rounded-xl border border-line">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr class="bg-surface-raised text-[11px] font-semibold text-muted uppercase tracking-wider border-b border-line">
+                                <th class="py-2.5 px-4">Tanggal Kas (WIB)</th>
+                                <th class="py-2.5 px-4">Kategori</th>
+                                <th class="py-2.5 px-4">Arah</th>
+                                <th class="py-2.5 px-4">Referensi</th>
+                                <th class="py-2.5 px-4 text-right">Nominal</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-line">
+                            @foreach ($rental->cashFlows as $flow)
+                                <tr>
+                                    <td class="py-2.5 px-4 whitespace-nowrap font-semibold text-ink">{{ $flow->occurred_at?->timezone('Asia/Jakarta')->format('d M Y H:i') }} WIB</td>
+                                    <td class="py-2.5 px-4 text-ink">{{ $flow->categoryLabel() }}</td>
+                                    <td class="py-2.5 px-4 text-muted">{{ $flow->directionLabel() }}</td>
+                                    <td class="py-2.5 px-4 font-mono text-muted">{{ $flow->reference ?? '-' }}</td>
+                                    <td class="py-2.5 px-4 text-right font-bold {{ $flow->direction === \App\Models\RentalCashFlow::DIRECTION_INFLOW ? 'text-success' : 'text-danger' }}">
+                                        {{ $flow->direction === \App\Models\RentalCashFlow::DIRECTION_INFLOW ? '+' : '-' }}Rp {{ number_format((float) $flow->amount, 0, ',', '.') }}
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
             </div>
         @endif
 

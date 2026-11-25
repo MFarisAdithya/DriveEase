@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Rental;
+use App\Models\RentalCashFlow;
 use App\Models\RentalChangeRequest;
 use App\Models\RentalExtension;
 use App\Models\User;
@@ -13,70 +14,38 @@ use Illuminate\Support\Collection;
 class RentalReportService
 {
     /**
-     * Hitung ringkasan keuangan satu transaksi tanpa penghitungan ganda atas perpanjangan aktif (A-12).
+     * Bangun laporan keuangan berbasis kas (WIB) berdasarkan tanggal aktual dana diterima dan realisasi refund (A-01, A-12).
      *
      * @return array{
-     *     gross_receipts: float,
-     *     processed_refunds: float,
-     *     pending_refunds: float,
-     *     net_receipts: float
-     * }
-     */
-    public function summarizeRentalFinancials(Rental $rental): array
-    {
-        $rental->loadMissing('extensions');
-
-        // Perpanjangan berstatus completed sudah diakumulasikan ke $rental->paid_amount saat diaktifkan.
-        // Karena itu, hanya dana masuk pada perpanjangan non-completed (misalnya parsial lalu ditolak/kedaluwarsa)
-        // yang ditambahkan agar total penerimaan kotor tidak terhitung dua kali.
-        $nonCompletedExtensionPaid = (float) $rental->extensions
-            ->where('status', '!=', RentalExtension::STATUS_COMPLETED)
-            ->sum('paid_amount');
-
-        $grossReceipts = round(
-            (float) $rental->paid_amount
-            + (float) $rental->additional_charge_paid_amount
-            + $nonCompletedExtensionPaid,
-            2
-        );
-
-        // max() menjaga akurasi kompatibilitas mundur apabila kolom refund_realized_amount bernilai nol
-        // namun refund_status lama sudah berstatus processed dengan nominal di refund_amount.
-        $mainProcessedRefund = max(
-            (float) $rental->refund_realized_amount,
-            $rental->refund_status === Rental::REFUND_PROCESSED ? (float) $rental->refund_amount : 0.0
-        );
-        $extensionProcessedRefund = (float) $rental->extensions
-            ->where('refund_status', RentalExtension::REFUND_PROCESSED)
-            ->sum('refund_amount');
-        $processedRefunds = round($mainProcessedRefund + $extensionProcessedRefund, 2);
-
-        $extensionPendingRefund = (float) $rental->extensions
-            ->where('refund_status', RentalExtension::REFUND_PENDING)
-            ->sum('refund_amount');
-        $pendingRefunds = round($rental->pendingRefundBalance() + $extensionPendingRefund, 2);
-
-        return [
-            'gross_receipts' => $grossReceipts,
-            'processed_refunds' => $processedRefunds,
-            'pending_refunds' => $pendingRefunds,
-            'net_receipts' => round($grossReceipts - $processedRefunds, 2),
-        ];
-    }
-
-    /**
-     * Bangun rekap transaksi, penerimaan kotor, refund, dan penerimaan bersih pada periode WIB tertentu (A-12).
-     *
-     * @return array{
-     *     rows: Collection<int, array{rental: Rental, gross_receipts: float, processed_refunds: float, pending_refunds: float, net_receipts: float}>,
+     *     rows: Collection<int, array{
+     *         cash_flow: RentalCashFlow,
+     *         rental: Rental|null,
+     *         occurred_at: CarbonInterface|null,
+     *         direction: string,
+     *         category: string,
+     *         category_label: string,
+     *         inflow_amount: float,
+     *         outflow_amount: float,
+     *         reference: string|null
+     *     }>,
+     *     pending_refund_items: Collection<int, array{
+     *         rental: Rental,
+     *         source_label: string,
+     *         amount: float,
+     *         updated_at: CarbonInterface|null
+     *     }>,
      *     summary: array{
+     *         total_cash_entries: int,
      *         total_transactions: int,
-     *         completed_transactions: int,
-     *         cancelled_or_expired_transactions: int,
+     *         inflow_count: int,
+     *         outflow_count: int,
      *         gross_receipts: float,
      *         processed_refunds: float,
      *         pending_refunds: float,
-     *         net_receipts: float
+     *         pending_refunds_liability: float,
+     *         net_receipts: float,
+     *         unrecorded_legacy_count: int,
+     *         unrecorded_legacy_amount: float
      *     }
      * }
      */
@@ -89,52 +58,147 @@ class RentalReportService
         $startAt = CarbonImmutable::instance($fromWib)->timezone(RentalScheduleService::TIMEZONE)->startOfDay();
         $endAt = CarbonImmutable::instance($toWib)->timezone(RentalScheduleService::TIMEZONE)->endOfDay();
 
-        // Filter periode memakai pickup_at WIB karena seluruh durasi sewa dan jadwal transaksi diikat ke zona WIB.
-        $rentals = Rental::query()
-            ->with(['user', 'car', 'extensions'])
-            ->whereBetween('pickup_at', [$startAt->format('Y-m-d H:i:s'), $endAt->format('Y-m-d H:i:s')])
-            ->when($rentalStatus !== null && $rentalStatus !== '', fn ($q) => $q->where('rental_status', $rentalStatus))
-            ->when(
-                in_array($bookingChannel, [Rental::CHANNEL_ONLINE, Rental::CHANNEL_WALK_IN], true),
-                fn ($q) => $q->where('booking_channel', $bookingChannel)
-            )
-            ->orderByDesc('pickup_at')
+        $normalizedStatus = is_string($rentalStatus) && $rentalStatus !== '' ? $rentalStatus : null;
+        $normalizedChannel = in_array($bookingChannel, [Rental::CHANNEL_ONLINE, Rental::CHANNEL_WALK_IN], true)
+            ? $bookingChannel
+            : null;
+
+        // Kebijakan SKPL A-12 (berbasis kas):
+        // Seluruh penerimaan maupun realisasi refund disaring berdasarkan rental_cash_flows.occurred_at (WIB),
+        // yakni tanggal aktual dana diterima atau ditransfer kembali sesuai konfirmasi admin.
+        $cashFlows = RentalCashFlow::query()
+            ->with(['rental.user', 'rental.car', 'recorder', 'payment', 'extension'])
+            ->whereBetween('occurred_at', [$startAt->format('Y-m-d H:i:s'), $endAt->format('Y-m-d H:i:s')])
+            ->when($normalizedStatus !== null || $normalizedChannel !== null, function ($query) use ($normalizedStatus, $normalizedChannel): void {
+                $query->whereHas('rental', function ($rq) use ($normalizedStatus, $normalizedChannel): void {
+                    if ($normalizedStatus !== null) {
+                        $rq->where('rental_status', $normalizedStatus);
+                    }
+                    if ($normalizedChannel !== null) {
+                        $rq->where('booking_channel', $normalizedChannel);
+                    }
+                });
+            })
+            ->orderByDesc('occurred_at')
             ->orderByDesc('id')
             ->get();
 
-        $rows = $rentals->map(function (Rental $rental): array {
-            $financials = $this->summarizeRentalFinancials($rental);
+        $rows = $cashFlows->map(function (RentalCashFlow $flow): array {
+            $amount = round((float) $flow->amount, 2);
+            $isInflow = $flow->direction === RentalCashFlow::DIRECTION_INFLOW;
 
             return [
-                'rental' => $rental,
-                'gross_receipts' => $financials['gross_receipts'],
-                'processed_refunds' => $financials['processed_refunds'],
-                'pending_refunds' => $financials['pending_refunds'],
-                'net_receipts' => $financials['net_receipts'],
+                'cash_flow' => $flow,
+                'rental' => $flow->rental,
+                'occurred_at' => $flow->occurred_at,
+                'direction' => $flow->direction,
+                'category' => $flow->category,
+                'category_label' => $flow->categoryLabel(),
+                'inflow_amount' => $isInflow ? $amount : 0.0,
+                'outflow_amount' => ! $isInflow ? $amount : 0.0,
+                'reference' => $flow->reference,
             ];
         });
 
-        // Total ringkasan dihitung langsung dari $rows agar kartu ringkasan selalu konsisten dengan baris rincian.
-        $summary = [
-            'total_transactions' => $rows->count(),
-            'completed_transactions' => $rentals->where('rental_status', Rental::STATUS_COMPLETED)->count(),
-            'cancelled_or_expired_transactions' => $rentals
-                ->whereIn('rental_status', [Rental::STATUS_CANCELLED, Rental::STATUS_EXPIRED])
-                ->count(),
-            'gross_receipts' => round((float) $rows->sum('gross_receipts'), 2),
-            'processed_refunds' => round((float) $rows->sum('processed_refunds'), 2),
-            'pending_refunds' => round((float) $rows->sum('pending_refunds'), 2),
-            'net_receipts' => round((float) $rows->sum('net_receipts'), 2),
-        ];
+        $grossReceipts = round((float) $rows->sum('inflow_amount'), 2);
+        $processedRefunds = round((float) $rows->sum('outflow_amount'), 2);
+        $netReceipts = round($grossReceipts - $processedRefunds, 2);
+
+        // Refund tertunda ditampilkan terpisah sebagai kewajiban dan tidak mengurangi kas sampai benar-benar ditransfer.
+        $pendingRentals = Rental::query()
+            ->with(['user', 'car'])
+            ->where('refund_status', Rental::REFUND_PENDING)
+            ->when($normalizedStatus !== null, fn ($q) => $q->where('rental_status', $normalizedStatus))
+            ->when($normalizedChannel !== null, fn ($q) => $q->where('booking_channel', $normalizedChannel))
+            ->orderByDesc('updated_at')
+            ->get();
+
+        $pendingExtensions = RentalExtension::query()
+            ->with(['rental.user', 'rental.car'])
+            ->where('refund_status', RentalExtension::REFUND_PENDING)
+            ->when($normalizedStatus !== null || $normalizedChannel !== null, function ($query) use ($normalizedStatus, $normalizedChannel): void {
+                $query->whereHas('rental', function ($rq) use ($normalizedStatus, $normalizedChannel): void {
+                    if ($normalizedStatus !== null) {
+                        $rq->where('rental_status', $normalizedStatus);
+                    }
+                    if ($normalizedChannel !== null) {
+                        $rq->where('booking_channel', $normalizedChannel);
+                    }
+                });
+            })
+            ->orderByDesc('updated_at')
+            ->get();
+
+        $pendingRefundItems = collect();
+
+        foreach ($pendingRentals as $pendingRental) {
+            $pendingBalance = $pendingRental->pendingRefundBalance();
+            if ($pendingBalance > 0) {
+                $pendingRefundItems->push([
+                    'rental' => $pendingRental,
+                    'source_label' => 'Refund Pesanan / Kelebihan Bayar',
+                    'amount' => $pendingBalance,
+                    'updated_at' => $pendingRental->updated_at,
+                ]);
+            }
+        }
+
+        foreach ($pendingExtensions as $pendingExtension) {
+            $extAmount = max(0.0, round((float) $pendingExtension->refund_amount, 2));
+            if ($extAmount > 0 && $pendingExtension->rental !== null) {
+                $pendingRefundItems->push([
+                    'rental' => $pendingExtension->rental,
+                    'source_label' => 'Refund Perpanjangan (#'.$pendingExtension->id.')',
+                    'amount' => $extAmount,
+                    'updated_at' => $pendingExtension->updated_at,
+                ]);
+            }
+        }
+
+        $pendingLiability = round((float) $pendingRefundItems->sum('amount'), 2);
+
+        // Deteksi transaksi historis pra-ledger yang belum memiliki catatan rental_cash_flows tanpa mengarang tanggalnya.
+        $legacyRentals = Rental::query()
+            ->with('extensions')
+            ->whereDoesntHave('cashFlows')
+            ->where(function ($query): void {
+                $query->where('paid_amount', '>', 0)
+                    ->orWhere('additional_charge_paid_amount', '>', 0)
+                    ->orWhere('refund_realized_amount', '>', 0);
+            })
+            ->when($normalizedStatus !== null, fn ($q) => $q->where('rental_status', $normalizedStatus))
+            ->when($normalizedChannel !== null, fn ($q) => $q->where('booking_channel', $normalizedChannel))
+            ->get();
+
+        $unrecordedLegacyAmount = round((float) $legacyRentals->sum(function (Rental $legacy): float {
+            $nonCompletedExtPaid = (float) $legacy->extensions
+                ->where('status', '!=', RentalExtension::STATUS_COMPLETED)
+                ->sum('paid_amount');
+
+            return (float) $legacy->paid_amount + (float) $legacy->additional_charge_paid_amount + $nonCompletedExtPaid;
+        }), 2);
 
         return [
             'rows' => $rows,
-            'summary' => $summary,
+            'pending_refund_items' => $pendingRefundItems,
+            'summary' => [
+                'total_cash_entries' => $rows->count(),
+                'total_transactions' => $cashFlows->pluck('rental_id')->unique()->count(),
+                'inflow_count' => $cashFlows->where('direction', RentalCashFlow::DIRECTION_INFLOW)->count(),
+                'outflow_count' => $cashFlows->where('direction', RentalCashFlow::DIRECTION_OUTFLOW)->count(),
+                'gross_receipts' => $grossReceipts,
+                'processed_refunds' => $processedRefunds,
+                'pending_refunds' => $pendingLiability,
+                'pending_refunds_liability' => $pendingLiability,
+                'net_receipts' => $netReceipts,
+                'unrecorded_legacy_count' => $legacyRentals->count(),
+                'unrecorded_legacy_amount' => $unrecordedLegacyAmount,
+            ],
         ];
     }
 
     /**
-     * Kumpulkan metrik antrean kerja dan rekap keuangan bulan berjalan untuk dasbor admin dari database aktual (A-01).
+     * Kumpulkan metrik antrean kerja dan rekap kas bulan berjalan untuk dasbor admin dari database aktual (A-01, A-12).
      *
      * @return array{
      *     pending_payments: int,
@@ -142,13 +206,17 @@ class RentalReportService
      *     pending_extensions: int,
      *     pending_changes: int,
      *     month_summary: array{
+     *         total_cash_entries: int,
      *         total_transactions: int,
-     *         completed_transactions: int,
-     *         cancelled_or_expired_transactions: int,
+     *         inflow_count: int,
+     *         outflow_count: int,
      *         gross_receipts: float,
      *         processed_refunds: float,
      *         pending_refunds: float,
-     *         net_receipts: float
+     *         pending_refunds_liability: float,
+     *         net_receipts: float,
+     *         unrecorded_legacy_count: int,
+     *         unrecorded_legacy_amount: float
      *     },
      *     actionable_bookings: Collection<int, Rental>
      * }

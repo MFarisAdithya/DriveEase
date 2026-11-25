@@ -8,6 +8,7 @@ use App\Models\RentalChangeRequest;
 use App\Models\RentalExtension;
 use App\Services\RentalChangeService;
 use App\Services\RentalExtensionService;
+use App\Services\RentalScheduleService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -105,12 +106,16 @@ class BookingChangeController extends Controller
     {
         $validated = $request->validate([
             'verified_amount' => ['required', 'numeric', 'min:1'],
+            'received_at' => ['required', 'date'],
+        ], [
+            'received_at.required' => 'Tanggal aktual dana perpanjangan diterima (WIB) wajib diisi.',
         ]);
 
         $this->extensionService->approveExtensionPayment(
             $extension,
             $request->user(),
-            (float) $validated['verified_amount']
+            (float) $validated['verified_amount'],
+            CarbonImmutable::parse((string) $validated['received_at'], RentalScheduleService::TIMEZONE),
         );
 
         return redirect()
@@ -119,24 +124,32 @@ class BookingChangeController extends Controller
     }
 
     /**
-     * Tolak bukti pembayaran perpanjangan atau batalkan perpanjangan dengan pencatatan refund dana masuk (A-08, A2).
+     * Tolak bukti pembayaran perpanjangan atau batalkan perpanjangan dengan pencatatan refund dana masuk (A-08, A2, A-12).
      */
     public function rejectExtensionPayment(Request $request, RentalExtension $extension): RedirectResponse
     {
         $validated = $request->validate([
             'rejection_reason' => ['required', 'string', 'max:500'],
             'received_amount' => ['nullable', 'numeric', 'min:0'],
+            'received_at' => ['nullable', 'date'],
             'cancel_extension' => ['nullable', 'boolean'],
         ]);
 
         $cancelExtension = (bool) ($validated['cancel_extension'] ?? false);
+        $receivedAmount = isset($validated['received_amount']) && $validated['received_amount'] !== ''
+            ? (float) $validated['received_amount']
+            : 0.0;
+        $receivedAt = isset($validated['received_at']) && trim((string) $validated['received_at']) !== ''
+            ? CarbonImmutable::parse((string) $validated['received_at'], RentalScheduleService::TIMEZONE)
+            : null;
 
         $this->extensionService->rejectExtensionPayment(
             $extension,
             $request->user(),
             $validated['rejection_reason'],
-            isset($validated['received_amount']) && $validated['received_amount'] !== '' ? (float) $validated['received_amount'] : 0.0,
-            $cancelExtension
+            $receivedAmount,
+            $cancelExtension,
+            $receivedAt,
         );
 
         $message = $cancelExtension

@@ -20,7 +20,7 @@ class ReportController extends Controller
     ) {}
 
     /**
-     * Tampilkan rekap transaksi, penerimaan pembayaran, refund, dan penerimaan bersih berdasarkan periode WIB (A-12).
+     * Tampilkan rekap arus kas berbasis tanggal aktual penerimaan dana & realisasi refund WIB (A-12).
      */
     public function index(Request $request): View
     {
@@ -53,6 +53,7 @@ class ReportController extends Controller
 
         return view('admin.reports.index', [
             'rows' => $report['rows'],
+            'pendingRefundItems' => $report['pending_refund_items'],
             'summary' => $report['summary'],
             'dateFrom' => $fromWib->toDateString(),
             'dateTo' => $toWib->toDateString(),

@@ -94,7 +94,7 @@ class FieldOperationsAndReadinessTest extends TestCase
         $pickupAt = CarbonImmutable::now('Asia/Jakarta')->addHours(4)->startOfHour();
         $rental = $bookingService->createBooking($customer, $car->id, $pickupAt, 2, true);
         $payment = $paymentService->submitProof($rental, $customer, UploadedFile::fake()->image('bayar.jpg'));
-        $paymentService->approvePayment($payment, $admin, (float) $rental->total_amount);
+        $paymentService->approvePayment($payment, $admin, (float) $rental->total_amount, now('Asia/Jakarta'));
         $rental->refresh();
 
         // Dasbor staf menampilkan jadwal pengambilan terkonfirmasi & aksi persiapan (S-01).
@@ -186,14 +186,14 @@ class FieldOperationsAndReadinessTest extends TestCase
         $pickupAt1 = CarbonImmutable::now('Asia/Jakarta')->addHours(2)->startOfHour();
         $rental1 = $bookingService->createBooking($customer1, $car->id, $pickupAt1, 1, true);
         $pay1 = $paymentService->submitProof($rental1, $customer1, UploadedFile::fake()->image('p1.jpg'));
-        $paymentService->approvePayment($pay1, $admin, (float) $rental1->total_amount);
+        $paymentService->approvePayment($pay1, $admin, (float) $rental1->total_amount, now('Asia/Jakarta'));
         $rental1->refresh();
 
         // Pesanan ke-2 terpasang tepat 65 menit setelah batas kembali pesanan ke-1.
         $pickupAt2 = $rental1->return_at->copy()->timezone('Asia/Jakarta')->addMinutes(65);
         $rental2 = $bookingService->createBooking($customer2, $car->id, $pickupAt2, 1, true);
         $pay2 = $paymentService->submitProof($rental2, $customer2, UploadedFile::fake()->image('p2.jpg'));
-        $paymentService->approvePayment($pay2, $admin, (float) $rental2->total_amount);
+        $paymentService->approvePayment($pay2, $admin, (float) $rental2->total_amount, now('Asia/Jakarta'));
 
         // Staf melakukan serah-terima pesanan ke-1.
         $this->actingAs($staff)->post(route('staff.schedules.pickup', $rental1), [

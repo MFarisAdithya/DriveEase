@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Car;
 use App\Models\Rental;
+use App\Models\RentalCashFlow;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -394,6 +395,18 @@ class RentalFinancialService
             $lockedRental->status_notice = 'Pengembalian dana sebesar Rp '.number_format($normalizedAmount, 0, ',', '.')
                 .' telah ditransfer (Ref: '.$trimmedReference.').';
             $lockedRental->saveOrFail();
+
+            // Catat kas keluar refund pada tanggal realisasi transfer (WIB) agar mengurangi penerimaan kas periode tersebut (A-12).
+            RentalCashFlow::create([
+                'rental_id' => $lockedRental->id,
+                'recorded_by' => $admin->id,
+                'direction' => RentalCashFlow::DIRECTION_OUTFLOW,
+                'category' => RentalCashFlow::CATEGORY_RENTAL_REFUND,
+                'amount' => $normalizedAmount,
+                'occurred_at' => $lockedRental->refund_transferred_at,
+                'reference' => $trimmedReference,
+                'notes' => $lockedRental->refund_notes,
+            ]);
 
             $lockedRental->recordHistory(
                 $admin,

@@ -131,14 +131,14 @@
             <p class="text-xs text-muted mt-1">{{ $stats['pending_refunds_count'] ?? 0 }} refund &middot; {{ $stats['pending_extensions'] ?? 0 }} perpanjangan &middot; {{ $stats['pending_changes'] ?? 0 }} perubahan</p>
         </a>
         <a href="{{ route('admin.reports.index') }}" class="bg-surface rounded-xl p-5 border border-line shadow-sm hover:border-success-line transition-colors block">
-            <span class="text-xs font-semibold uppercase tracking-wider text-success">Penerimaan Kotor Bulan Ini</span>
+            <span class="text-xs font-semibold uppercase tracking-wider text-success">Penerimaan Kas Kotor Bulan Ini</span>
             <p class="text-2xl font-bold text-success mt-2">Rp {{ number_format((float) ($stats['month_gross_receipts'] ?? 0), 0, ',', '.') }}</p>
-            <p class="text-xs text-muted mt-1">{{ $stats['month_transactions'] ?? 0 }} transaksi pada periode berjalan</p>
+            <p class="text-xs text-muted mt-1">{{ $stats['month_transactions'] ?? 0 }} pesanan tercatat pada buku kas WIB</p>
         </a>
         <a href="{{ route('admin.reports.index') }}" class="bg-surface rounded-xl p-5 border border-line shadow-sm hover:border-action transition-colors block">
-            <span class="text-xs font-semibold uppercase tracking-wider text-ink">Penerimaan Bersih Bulan Ini</span>
+            <span class="text-xs font-semibold uppercase tracking-wider text-ink">Penerimaan Bersih (Kas) Bulan Ini</span>
             <p class="text-2xl font-bold text-ink mt-2">Rp {{ number_format((float) ($stats['month_net_receipts'] ?? 0), 0, ',', '.') }}</p>
-            <p class="text-xs text-muted mt-1">Refund terealisasi Rp {{ number_format((float) ($stats['month_processed_refunds'] ?? 0), 0, ',', '.') }} &rarr; Laporan</p>
+            <p class="text-xs text-muted mt-1">Refund terealisasi Rp {{ number_format((float) ($stats['month_processed_refunds'] ?? 0), 0, ',', '.') }} &middot; Kewajiban tertunda Rp {{ number_format((float) ($stats['month_pending_refunds'] ?? 0), 0, ',', '.') }}</p>
         </a>
     </div>
 

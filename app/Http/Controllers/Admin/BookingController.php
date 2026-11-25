@@ -34,6 +34,13 @@ class BookingController extends Controller
     {
         $this->scheduleService->releaseExpiredHolds();
 
+        $request->validate([
+            'date_from' => ['nullable', 'date'],
+            'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
+        ], [
+            'date_to.after_or_equal' => 'Tanggal akhir filter tidak boleh lebih awal dari tanggal mulai.',
+        ]);
+
         $query = Rental::with(['user', 'car.carType', 'creator']);
 
         if ($request->filled('rental_status')) {
@@ -256,6 +263,7 @@ class BookingController extends Controller
             'extensions.approver',
             'inspections.inspector',
             'histories.actor',
+            'cashFlows.recorder',
         ]);
         $availableReplacementCars = Car::bookableForSchedule()->with('carType')->orderBy('name')->get();
         $impactedNextBookings = $rental->car ? $operationService->detectImpactedNextBookings($rental->car) : collect();

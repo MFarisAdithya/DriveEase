@@ -110,6 +110,7 @@ class ReviewHardeningAndReconciliationTest extends TestCase
         $payment = $upcomingRental->payments()->firstOrFail();
         $this->actingAs($admin)->patch(route('admin.payments.approve', $payment), [
             'verified_amount' => (float) $upcomingRental->total_amount,
+            'received_at' => now('Asia/Jakarta')->format('Y-m-d\TH:i'),
         ])->assertRedirect();
 
         // Mengubah status unit menjadi maintenance via CRUD admin wajib menandai pesanan mendatang yang terdampak.
@@ -204,6 +205,7 @@ class ReviewHardeningAndReconciliationTest extends TestCase
         $payment = $rental->payments()->firstOrFail();
         $this->actingAs($admin)->patch(route('admin.payments.approve', $payment), [
             'verified_amount' => (float) $rental->total_amount,
+            'received_at' => now('Asia/Jakarta')->format('Y-m-d\TH:i'),
         ])->assertRedirect();
 
         $this->actingAs($admin)->delete(route('admin.cars.destroy', $car))
@@ -335,6 +337,7 @@ class ReviewHardeningAndReconciliationTest extends TestCase
 
         $this->actingAs($admin)->patch(route('admin.payments.approve', $payment), [
             'verified_amount' => 575000,
+            'received_at' => now('Asia/Jakarta')->format('Y-m-d\TH:i'),
         ])->assertRedirect(route('admin.bookings.show', $rental));
 
         $rental->refresh();
@@ -363,6 +366,7 @@ class ReviewHardeningAndReconciliationTest extends TestCase
 
         $this->actingAs($admin)->patch(route('admin.extensions.payment.approve', $extension), [
             'verified_amount' => 600000,
+            'received_at' => now('Asia/Jakarta')->format('Y-m-d\TH:i'),
         ])->assertRedirect(route('admin.bookings.show', $rental));
 
         $extension->refresh();
@@ -417,6 +421,7 @@ class ReviewHardeningAndReconciliationTest extends TestCase
         $this->actingAs($admin)->patch(route('admin.bookings.additional-charges.approve', $rental), [
             'verified_amount' => 125000,
             'payment_reference' => 'TRF-CHARGE-OVER-01',
+            'received_at' => now('Asia/Jakarta')->format('Y-m-d\TH:i'),
         ])->assertRedirect();
 
         $rental->refresh();

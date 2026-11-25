@@ -5,7 +5,7 @@ namespace Tests\Feature;
 use App\Models\Car;
 use App\Models\CarType;
 use App\Models\Rental;
-use App\Models\RentalExtension;
+use App\Models\RentalCashFlow;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\RentalBookingService;
@@ -37,7 +37,7 @@ class DashboardHistoryAndReportTest extends TestCase
             'address' => 'Jl. Laporan No. 1',
             'contact' => '081234567890',
             'operating_hours' => '08.00-21.00 WIB',
-            'terms' => 'Ketentuan uji dasbor, riwayat, dan laporan keuangan.',
+            'terms' => 'Ketentuan uji dasbor, riwayat, dan laporan keuangan berbasis kas.',
             'bank_name' => 'Bank Laporan DriveEase',
             'account_number' => '123456789012',
             'account_holder' => 'PT DriveEase Laporan',
@@ -55,10 +55,8 @@ class DashboardHistoryAndReportTest extends TestCase
         $pickupActionable = CarbonImmutable::now('Asia/Jakarta')->addDays(2)->setTime(9, 0);
         $pickupPaid = CarbonImmutable::now('Asia/Jakarta')->addDays(6)->setTime(10, 0);
 
-        // Pesanan 1 masih unpaid (membutuhkan unggah bukti pembayaran di dasbor pelanggan).
         $actionRental = $bookingService->createBooking($customer, $car->id, $pickupActionable, 1, true);
 
-        // Pesanan 2 dibayar lunas dan diverifikasi admin -> punya Bukti Transaksi Terkonfirmasi.
         $paidRental = $bookingService->createBooking($customer, $car->id, $pickupPaid, 1, true);
         $this->actingAs($customer)->post(route('customer.bookings.payments.store', $paidRental), [
             'payment_proof' => UploadedFile::fake()->image('paid-receipt.jpg'),
@@ -66,9 +64,9 @@ class DashboardHistoryAndReportTest extends TestCase
         $paidPayment = $paidRental->payments()->firstOrFail();
         $this->actingAs($admin)->patch(route('admin.payments.approve', $paidPayment), [
             'verified_amount' => (float) $paidRental->total_amount,
+            'received_at' => now('Asia/Jakarta')->format('Y-m-d\TH:i'),
         ])->assertRedirect();
 
-        // Pesanan 3 milik pelanggan lain tidak boleh tampil di dasbor/riwayat maupun diakses detailnya.
         $otherRental = $bookingService->createBooking($otherCustomer, $car->id, $pickupPaid->addDays(4), 1, true);
 
         // C-01: Dasbor pelanggan menampilkan status verifikasi, jumlah pesanan aktif/tindakan, dan pemberitahuan tindakan.
@@ -103,202 +101,254 @@ class DashboardHistoryAndReportTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_admin_dashboard_history_filters_and_period_report_reconcile_without_double_counting(): void
+    public function test_cash_basis_cross_month_reporting_matches_admin_dashboard_without_double_counting(): void
     {
         $admin = $this->createUserWithRole('admin');
         $staff = $this->createUserWithRole('staff');
-        $customer = $this->createVerifiedCustomer('Penyewa Laporan');
-        $car1 = $this->createBookableCar(500000);
-        $car2 = $this->createBookableCar(400000);
-        $car3 = $this->createBookableCar(350000);
+        $customer = $this->createVerifiedCustomer('Penyewa Basis Kas');
+        $car = $this->createBookableCar(500000);
+        $carRefundPending = $this->createBookableCar(300000);
+        $carLegacy = $this->createBookableCar(250000);
 
         $nowWib = CarbonImmutable::now('Asia/Jakarta');
-        $bookingService = app(RentalBookingService::class);
-        $extensionService = app(RentalExtensionService::class);
+        $monthBStart = $nowWib->startOfMonth(); // Bulan berjalan (Bulan B) -> harus cocok dengan A-01 dashboard
+        $monthAEnd = $monthBStart->subDay(); // Bulan sebelumnya (Bulan A)
+        $monthCStart = $monthBStart->addMonth(); // Bulan berikutnya (Bulan C)
 
-        // 1. Transaksi selesai dengan perpanjangan aktif + kelebihan bayar + tagihan tambahan lunas.
-        // Sewa utama tagihan 500rb, bayar 550rb (kelebihan 50rb); perpanjangan 500rb dibayar pas;
-        // BBM 100rb dibayar pas; refund kelebihan 50rb direalisasikan.
-        // Harapan: penerimaan kotor = 1.050.000 + 100.000 = 1.150.000 (tidak dobel hitung perpanjangan completed),
-        // refund terealisasi = 50.000, pending refund = 0, penerimaan bersih = 1.100.000.
-        $pickup1 = $nowWib->startOfMonth()->addHours(10);
-        $rental1 = Rental::forceCreate([
-            'rental_code' => 'RPT-A-'.strtoupper(substr(uniqid(), -6)),
+        $receivedInMonthA = $monthAEnd->setTime(15, 0);
+        $receivedInMonthBMain = $monthBStart->addDays(2)->setTime(10, 0);
+        $receivedInMonthBExt = $monthBStart->addDays(3)->setTime(11, 0);
+        $receivedInMonthBChargePartial = $monthBStart->addDays(5)->setTime(13, 0);
+        $receivedInMonthCChargeFinal = $monthCStart->addDays(2)->setTime(14, 0);
+        $refundInMonthC = $monthCStart->addDays(4)->setTime(16, 0);
+
+        // Pesanan dibuat & dijadwalkan di Bulan B (pickup_at masa mendatang dalam Bulan B), namun uang masuk tersebar lintas Bulan A, B, C.
+        $pickupMonthB = $nowWib->addHours(4)->startOfHour();
+        $rental = Rental::forceCreate([
+            'rental_code' => 'KAS-'.strtoupper(substr(uniqid(), -8)),
             'user_id' => $customer->id,
-            'car_id' => $car1->id,
-            'pickup_at' => $pickup1,
-            'return_at' => $pickup1->addDay(),
-            'start_date' => $pickup1->toDateString(),
-            'end_date' => $pickup1->addDay()->toDateString(),
+            'car_id' => $car->id,
+            'pickup_at' => $pickupMonthB,
+            'return_at' => $pickupMonthB->addDay(),
+            'start_date' => $pickupMonthB->toDateString(),
+            'end_date' => $pickupMonthB->addDay()->toDateString(),
             'total_days' => 1,
             'daily_price' => 500000,
             'total_amount' => 500000,
             'paid_amount' => 0,
+            'payment_deadline_at' => $nowWib->addHours(2),
             'payment_status' => Rental::PAYMENT_UNPAID,
             'rental_status' => Rental::STATUS_PENDING,
             'booking_channel' => Rental::CHANNEL_ONLINE,
             'payment_bank_name' => 'Bank Laporan DriveEase',
             'payment_account_number' => '123456789012',
             'payment_account_holder' => 'PT DriveEase Laporan',
-            'terms_accepted_at' => $pickup1,
+            'terms_accepted_at' => $monthAEnd->setTime(12, 0),
         ]);
 
-        $this->actingAs($customer)->post(route('customer.bookings.payments.store', $rental1), [
-            'payment_proof' => UploadedFile::fake()->image('rpt-main.jpg'),
-        ])->assertRedirect();
-        $this->actingAs($admin)->patch(route('admin.payments.approve', $rental1->payments()->firstOrFail()), [
-            'verified_amount' => 550000,
-        ])->assertRedirect();
+        // Unggah bukti ke-1 lalu ditolak dengan penerimaan parsial Rp 200.000 pada tanggal kas Bulan A.
+        $this->actingAs($customer)->post(route('customer.bookings.payments.store', $rental), [
+            'payment_proof' => UploadedFile::fake()->image('kas-m1.jpg'),
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $pay1 = $rental->payments()->firstOrFail();
 
-        $ext1 = $extensionService->requestExtension($rental1->fresh(), $customer, 1, 'Tambah 1 hari');
-        $ext1 = $extensionService->approveExtension($ext1, $admin);
-        $this->actingAs($customer)->post(route('customer.extensions.payment.store', $ext1), [
-            'payment_proof' => UploadedFile::fake()->image('rpt-ext.jpg'),
+        // Validasi menolak pencatatan dana masuk sebagian tanpa tanggal aktual terima (received_at).
+        $this->actingAs($admin)->patch(route('admin.payments.reject', $pay1), [
+            'rejection_reason' => 'Dana masuk masih kurang Rp 300.000.',
+            'received_amount' => 200000,
+        ])->assertSessionHasErrors('received_at');
+
+        $this->actingAs($admin)->patch(route('admin.payments.reject', $pay1), [
+            'rejection_reason' => 'Dana masuk sebagian pada akhir bulan lalu.',
+            'received_amount' => 200000,
+            'received_at' => $receivedInMonthA->format('Y-m-d\TH:i'),
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        // Pelanggan unggah pelunasan; admin verifikasi Rp 350.000 pada tanggal kas Bulan B (+50.000 overpayment refund pending).
+        $this->actingAs($customer)->post(route('customer.bookings.payments.store', $rental), [
+            'payment_proof' => UploadedFile::fake()->image('kas-m2.jpg'),
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $pay2 = $rental->payments()->firstOrFail();
+
+        // Validasi menolak persetujuan pembayaran tanpa received_at.
+        $this->actingAs($admin)->patch(route('admin.payments.approve', $pay2), [
+            'verified_amount' => 350000,
+        ])->assertSessionHasErrors('received_at');
+
+        $this->actingAs($admin)->patch(route('admin.payments.approve', $pay2), [
+            'verified_amount' => 350000,
+            'received_at' => $receivedInMonthBMain->format('Y-m-d\TH:i'),
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        // Perpanjangan Rp 500.000 diverifikasi pada tanggal kas Bulan B -> dicatat sekali saja sebagai extension_payment.
+        $extensionService = app(RentalExtensionService::class);
+        $ext = $extensionService->requestExtension($rental->fresh(), $customer, 1, 'Tambah 1 hari');
+        $ext = $extensionService->approveExtension($ext, $admin);
+        $this->actingAs($customer)->post(route('customer.extensions.payment.store', $ext), [
+            'payment_proof' => UploadedFile::fake()->image('kas-ext.jpg'),
         ])->assertRedirect();
-        $this->actingAs($admin)->patch(route('admin.extensions.payment.approve', $ext1), [
+        $this->actingAs($admin)->patch(route('admin.extensions.payment.approve', $ext), [
             'verified_amount' => 500000,
+            'received_at' => $receivedInMonthBExt->format('Y-m-d\TH:i'),
         ])->assertRedirect();
 
-        // Tambahkan juga perpanjangan ke-2 yang dibatalkan/kedaluwarsa dengan dana parsial 75rb belum direfund.
-        RentalExtension::forceCreate([
-            'rental_id' => $rental1->id,
-            'requested_by' => $customer->id,
-            'additional_days' => 1,
-            'previous_return_at' => $rental1->fresh()->return_at,
-            'proposed_return_at' => $rental1->fresh()->return_at->addDay(),
-            'daily_price' => 500000,
-            'additional_amount' => 500000,
-            'paid_amount' => 75000,
-            'verified_amount' => 75000,
-            'status' => RentalExtension::STATUS_EXPIRED,
-            'refund_amount' => 75000,
-            'refund_status' => RentalExtension::REFUND_PENDING,
-        ]);
-
+        // Serah-terima & kembali + tagihan tambahan Rp 100.000:
+        // sebagian Rp 40.000 diterima pada Bulan B, sisa Rp 60.000 diterima pada Bulan C.
         app(RentalOperationService::class)->confirmPickup(
-            $rental1->fresh(),
+            $rental->fresh(),
             $staff,
             [
                 'identity_checked' => true,
-                'actual_pickup_at' => $pickup1->format('Y-m-d\TH:i'),
+                'actual_pickup_at' => $pickupMonthB->format('Y-m-d\TH:i'),
                 'odometer_km' => 1000,
                 'fuel_level' => 'full',
             ],
-            UploadedFile::fake()->image('rpt-pickup.jpg')
+            UploadedFile::fake()->image('kas-pickup.jpg')
         );
-
-        $this->actingAs($staff)->post(route('staff.schedules.return', $rental1), [
-            'actual_return_at' => $rental1->fresh()->return_at->copy()->timezone('Asia/Jakarta')->format('Y-m-d\TH:i'),
+        $this->actingAs($staff)->post(route('staff.schedules.return', $rental), [
+            'actual_return_at' => $rental->fresh()->return_at->copy()->timezone('Asia/Jakarta')->format('Y-m-d\TH:i'),
             'odometer_km' => 1200,
             'fuel_level' => 'half',
             'has_damage' => 0,
-            'condition_photo' => UploadedFile::fake()->image('rpt-return.jpg'),
+            'condition_photo' => UploadedFile::fake()->image('kas-return.jpg'),
         ])->assertRedirect();
-
-        $this->actingAs($admin)->post(route('admin.bookings.additional-charges.assess', $rental1), [
+        $this->actingAs($admin)->post(route('admin.bookings.additional-charges.assess', $rental), [
             'fuel_fee_amount' => 100000,
             'fuel_fee_reason' => 'Kekurangan BBM pengembalian.',
             'damage_fee_amount' => 0,
         ])->assertRedirect();
 
-        $this->actingAs($customer)->post(route('customer.bookings.additional-charges.proof', $rental1), [
-            'additional_charge_proof' => UploadedFile::fake()->image('rpt-charge.jpg'),
+        $this->actingAs($customer)->post(route('customer.bookings.additional-charges.proof', $rental), [
+            'additional_charge_proof' => UploadedFile::fake()->image('kas-chg1.jpg'),
+        ])->assertRedirect();
+        $this->actingAs($admin)->patch(route('admin.bookings.additional-charges.reject', $rental), [
+            'rejection_reason' => 'Baru masuk Rp 40.000 pada Bulan B.',
+            'received_amount' => 40000,
+            'received_at' => $receivedInMonthBChargePartial->format('Y-m-d\TH:i'),
         ])->assertRedirect();
 
-        $this->actingAs($admin)->patch(route('admin.bookings.additional-charges.approve', $rental1), [
-            'verified_amount' => 100000,
-            'payment_reference' => 'RPT-FUEL-01',
+        $this->actingAs($customer)->post(route('customer.bookings.additional-charges.proof', $rental), [
+            'additional_charge_proof' => UploadedFile::fake()->image('kas-chg2.jpg'),
+        ])->assertRedirect();
+        $this->actingAs($admin)->patch(route('admin.bookings.additional-charges.approve', $rental), [
+            'verified_amount' => 60000,
+            'payment_reference' => 'KAS-CHG-60K',
+            'received_at' => $receivedInMonthCChargeFinal->format('Y-m-d\TH:i'),
         ])->assertRedirect();
 
-        $this->actingAs($admin)->patch(route('admin.bookings.refund', $rental1), [
+        // Realisasikan refund kelebihan bayar Rp 50.000 pada Bulan C.
+        $this->actingAs($admin)->patch(route('admin.bookings.refund', $rental), [
             'transfer_amount' => 50000,
-            'transferred_at' => $nowWib->format('Y-m-d\TH:i'),
-            'refund_reference' => 'RPT-REF-MAIN-01',
+            'transferred_at' => $refundInMonthC->format('Y-m-d\TH:i'),
+            'refund_reference' => 'KAS-REF-50K',
         ])->assertRedirect();
 
-        // 2. Transaksi bulan yang sama yang dibatalkan dengan refund 75% terealisasi (400rb masuk, 300rb refund).
-        $pickup2 = $nowWib->startOfMonth()->addDays(2)->setTime(11, 0);
-        $rental2 = Rental::forceCreate([
-            'rental_code' => 'RPT-B-'.strtoupper(substr(uniqid(), -6)),
+        // Tambahkan 1 pesanan lain yang memiliki kewajiban refund tertunda Rp 300.000 (belum ditransfer -> terpisah sebagai kewajiban).
+        $pickupPendingRefund = $monthBStart->addDays(8)->setTime(10, 0);
+        $rentalPending = Rental::forceCreate([
+            'rental_code' => 'LIAB-'.strtoupper(substr(uniqid(), -6)),
             'user_id' => $customer->id,
-            'car_id' => $car2->id,
-            'pickup_at' => $pickup2,
-            'return_at' => $pickup2->addDay(),
-            'start_date' => $pickup2->toDateString(),
-            'end_date' => $pickup2->addDay()->toDateString(),
+            'car_id' => $carRefundPending->id,
+            'pickup_at' => $pickupPendingRefund,
+            'return_at' => $pickupPendingRefund->addDay(),
+            'start_date' => $pickupPendingRefund->toDateString(),
+            'end_date' => $pickupPendingRefund->addDay()->toDateString(),
             'total_days' => 1,
-            'daily_price' => 400000,
-            'total_amount' => 400000,
-            'paid_amount' => 400000,
+            'daily_price' => 300000,
+            'total_amount' => 300000,
+            'paid_amount' => 300000,
             'payment_status' => Rental::PAYMENT_PAID,
             'rental_status' => Rental::STATUS_CONFIRMED,
             'booking_channel' => Rental::CHANNEL_WALK_IN,
-            'payment_bank_name' => 'Bank Laporan DriveEase',
-            'payment_account_number' => '123456789012',
-            'payment_account_holder' => 'PT DriveEase Laporan',
-            'terms_accepted_at' => $pickup2,
+            'terms_accepted_at' => $monthBStart,
+        ]);
+        $this->actingAs($admin)->patch(route('admin.bookings.cancel-with-refund', $rentalPending), [
+            'cancellation_type' => Rental::CANCEL_RENTAL_FAULT,
+            'cancellation_reason' => 'Refund belum ditransfer, harus tampil sebagai kewajiban terpisah.',
+        ])->assertRedirect();
+
+        // Tambahkan 1 transaksi historis pra-ledger tanpa tanggal penerimaan aktual -> TIDAK boleh dikarang masuk periode mana pun.
+        Rental::forceCreate([
+            'rental_code' => 'HIST-'.strtoupper(substr(uniqid(), -6)),
+            'user_id' => $customer->id,
+            'car_id' => $carLegacy->id,
+            'pickup_at' => $monthBStart->addDays(1)->setTime(8, 0),
+            'return_at' => $monthBStart->addDays(2)->setTime(8, 0),
+            'start_date' => $monthBStart->addDays(1)->toDateString(),
+            'end_date' => $monthBStart->addDays(2)->toDateString(),
+            'total_days' => 1,
+            'daily_price' => 250000,
+            'total_amount' => 250000,
+            'paid_amount' => 250000,
+            'payment_status' => Rental::PAYMENT_PAID,
+            'rental_status' => Rental::STATUS_COMPLETED,
+            'booking_channel' => Rental::CHANNEL_ONLINE,
+            'terms_accepted_at' => $monthAEnd,
         ]);
 
-        $this->actingAs($admin)->patch(route('admin.bookings.cancel-with-refund', $rental2), [
-            'cancellation_type' => Rental::CANCEL_RENTAL_FAULT,
-            'cancellation_reason' => 'Uji rekap pembatalan bulan berjalan.',
-        ])->assertRedirect();
+        $reportService = app(RentalReportService::class);
 
-        $this->actingAs($admin)->patch(route('admin.bookings.refund', $rental2), [
-            'transfer_amount' => 400000,
-            'transferred_at' => $nowWib->format('Y-m-d\TH:i'),
-            'refund_reference' => 'RPT-REF-CANCEL-02',
-        ])->assertRedirect();
+        // Laporan Bulan A: hanya parsial utama Rp 200.000 (bukan jadwal ambil Bulan B!).
+        $reportA = $reportService->buildPeriodReport($monthAEnd->startOfMonth(), $monthAEnd->endOfMonth());
+        $this->assertEquals(200000.0, $reportA['summary']['gross_receipts']);
+        $this->assertEquals(0.0, $reportA['summary']['processed_refunds']);
+        $this->assertEquals(200000.0, $reportA['summary']['net_receipts']);
 
-        // 3. Transaksi bulan depan agar tidak ikut terhitung dalam filter bulan berjalan.
-        $nextMonthPickup = $nowWib->addMonth()->startOfMonth()->addDays(2)->setTime(10, 0);
-        $futureRental = $bookingService->createBooking($customer, $car3->id, $nextMonthPickup, 1, true);
+        // Laporan Bulan B (bulan berjalan): 350.000 (sisa+overpay) + 500.000 (perpanjangan) + 40.000 (parsial BBM) = 890.000.
+        // Kewajiban refund tertunda Rp 300.000 TIDAK mengurangi kas bersih Bulan B.
+        $reportB = $reportService->buildPeriodReport($monthBStart, $monthBStart->endOfMonth());
+        $this->assertEquals(890000.0, $reportB['summary']['gross_receipts']);
+        $this->assertEquals(0.0, $reportB['summary']['processed_refunds']);
+        $this->assertEquals(890000.0, $reportB['summary']['net_receipts']);
+        $this->assertGreaterThanOrEqual(300000.0, $reportB['summary']['pending_refunds_liability']);
+        $this->assertGreaterThanOrEqual(1, $reportB['summary']['unrecorded_legacy_count']);
 
-        // Verifikasi angka layanan & dasbor admin (A-01).
-        $monthReport = app(RentalReportService::class)->buildPeriodReport($nowWib->startOfMonth(), $nowWib->endOfMonth());
-        $expectedSummary = $monthReport['summary'];
-
+        // Pastikan laporan A-12 & dasbor A-01 untuk bulan berjalan menghasilkan angka kas yang identik.
         $this->actingAs($admin)->get(route('admin.dashboard'))
             ->assertOk()
-            ->assertViewHas('monthSummary', fn ($summary) => $summary['gross_receipts'] === $expectedSummary['gross_receipts']
-                && $summary['net_receipts'] === $expectedSummary['net_receipts'])
-            ->assertSee($rental1->rental_code);
+            ->assertViewHas('monthSummary', fn (array $summary): bool => $summary['gross_receipts'] === $reportB['summary']['gross_receipts']
+                && $summary['processed_refunds'] === $reportB['summary']['processed_refunds']
+                && $summary['net_receipts'] === $reportB['summary']['net_receipts']
+                && $summary['pending_refunds_liability'] === $reportB['summary']['pending_refunds_liability']);
 
-        // A-11: Filter riwayat transaksi admin berdasarkan kode, periode WIB, rental_status, dan payment_status.
+        $this->actingAs($admin)->get(route('admin.reports.index', [
+            'date_from' => $monthBStart->toDateString(),
+            'date_to' => $monthBStart->endOfMonth()->toDateString(),
+        ]))
+            ->assertOk()
+            ->assertSee('Penerimaan Kas Kotor')
+            ->assertSee('Kewajiban Refund Tertunda')
+            ->assertSee('Catatan Data Historis Pra-Buku Kas')
+            ->assertSee($rental->rental_code);
+
+        // Laporan Bulan C: pelunasan tambahan Rp 60.000 dan realisasi refund Rp 50.000 -> bersih Rp 10.000.
+        $reportC = $reportService->buildPeriodReport($monthCStart, $monthCStart->endOfMonth());
+        $this->assertEquals(60000.0, $reportC['summary']['gross_receipts']);
+        $this->assertEquals(50000.0, $reportC['summary']['processed_refunds']);
+        $this->assertEquals(10000.0, $reportC['summary']['net_receipts']);
+
+        // Pastikan total buku kas seluruh entri milik $rental tepat 1.150.000 masuk dan 50.000 keluar (tanpa dobel).
+        $rentalFlows = RentalCashFlow::query()->where('rental_id', $rental->id)->get();
+        $this->assertEquals(1150000.0, (float) $rentalFlows->where('direction', RentalCashFlow::DIRECTION_INFLOW)->sum('amount'));
+        $this->assertEquals(50000.0, (float) $rentalFlows->where('direction', RentalCashFlow::DIRECTION_OUTFLOW)->sum('amount'));
+
+        // A-11: Filter riwayat transaksi admin berdasarkan kode, status sewa, status bayar, dan rentang jadwal.
         $this->actingAs($admin)->get(route('admin.bookings.index', [
-            'search' => $rental2->rental_code,
+            'search' => $rentalPending->rental_code,
             'rental_status' => Rental::STATUS_CANCELLED,
             'payment_status' => Rental::PAYMENT_PAID,
-            'date_from' => $pickup2->toDateString(),
-            'date_to' => $pickup2->toDateString(),
+            'date_from' => $pickupPendingRefund->toDateString(),
+            'date_to' => $pickupPendingRefund->toDateString(),
         ]))
             ->assertOk()
-            ->assertSee($rental2->rental_code)
-            ->assertDontSee($rental1->rental_code)
-            ->assertDontSee($futureRental->rental_code);
+            ->assertSee($rentalPending->rental_code)
+            ->assertDontSee($rental->rental_code);
 
-        // A-12: Laporan periode /admin/reports menampilkan total sesuai rincian transaksi & menolak rentang tanggal terbalik.
-        $this->actingAs($admin)->get(route('admin.reports.index', [
-            'date_from' => $nowWib->startOfMonth()->toDateString(),
-            'date_to' => $nowWib->endOfMonth()->toDateString(),
-        ]))
-            ->assertOk()
-            ->assertSee($rental1->rental_code)
-            ->assertSee($rental2->rental_code)
-            ->assertDontSee($futureRental->rental_code)
-            ->assertViewHas('rows', function ($rows) use ($expectedSummary): bool {
-                return round((float) $rows->sum('gross_receipts'), 2) === $expectedSummary['gross_receipts']
-                    && round((float) $rows->sum('processed_refunds'), 2) === $expectedSummary['processed_refunds']
-                    && round((float) $rows->sum('pending_refunds'), 2) === $expectedSummary['pending_refunds']
-                    && round((float) $rows->sum('net_receipts'), 2) === $expectedSummary['net_receipts'];
-            });
-
+        // Validasi tanggal terbalik ditolak dan non-admin mendapat 403.
         $this->actingAs($admin)->get(route('admin.reports.index', [
             'date_from' => '2026-12-10',
             'date_to' => '2026-12-01',
         ]))->assertSessionHasErrors('date_to');
-
-        // Staf & pelanggan dilarang mengakses laporan keuangan admin (403).
         $this->actingAs($staff)->get(route('admin.reports.index'))->assertForbidden();
         $this->actingAs($customer)->get(route('admin.reports.index'))->assertForbidden();
     }

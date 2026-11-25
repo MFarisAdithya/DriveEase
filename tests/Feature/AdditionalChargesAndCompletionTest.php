@@ -65,6 +65,7 @@ class AdditionalChargesAndCompletionTest extends TestCase
         // 2. Akun Admin memverifikasi pelunasan -> status confirmed.
         $this->actingAs($admin)->patch(route('admin.payments.approve', $payment), [
             'verified_amount' => (float) $rental->total_amount,
+            'received_at' => now('Asia/Jakarta')->format('Y-m-d\TH:i'),
         ])->assertRedirect(route('admin.bookings.show', $rental));
 
         // 3. Akun Staf mengonfirmasi serah-terima (picked_up) lalu mencatat pengembalian telat 2 jam + kerusakan (returned).
@@ -148,6 +149,7 @@ class AdditionalChargesAndCompletionTest extends TestCase
         $this->actingAs($admin)->patch(route('admin.bookings.additional-charges.approve', $rental), [
             'verified_amount' => 430000,
             'payment_reference' => 'TRF-ADD-430K',
+            'received_at' => now('Asia/Jakarta')->format('Y-m-d\TH:i'),
         ])->assertRedirect(route('admin.bookings.show', $rental));
 
         $rental->refresh();
@@ -183,7 +185,7 @@ class AdditionalChargesAndCompletionTest extends TestCase
 
         $rental = app(RentalBookingService::class)->createBooking($customer, $car->id, $pickupAt, 1, true);
         $pay = app(RentalPaymentService::class)->submitProof($rental, $customer, UploadedFile::fake()->image('m.jpg'));
-        app(RentalPaymentService::class)->approvePayment($pay, $admin, (float) $rental->total_amount);
+        app(RentalPaymentService::class)->approvePayment($pay, $admin, (float) $rental->total_amount, now('Asia/Jakarta'));
         $rental->refresh();
 
         // Buat pengajuan perpanjangan yang batal diaktifkan setelah uang transfer perpanjangan masuk -> refund_pending (A2).
@@ -191,7 +193,7 @@ class AdditionalChargesAndCompletionTest extends TestCase
         $extension = $extService->requestExtension($rental, $customer, 1);
         $extService->approveExtension($extension, $admin);
         $extService->submitExtensionPayment($extension, $customer, UploadedFile::fake()->image('ext.jpg'));
-        $extService->rejectExtensionPayment($extension, $admin, 'Slot bentrok saat verifikasi tahap akhir.', 400000, true);
+        $extService->rejectExtensionPayment($extension, $admin, 'Slot bentrok saat verifikasi tahap akhir.', 400000, true, now('Asia/Jakarta'));
 
         // Serah-terima & pengembalian bersih tepat waktu.
         $this->actingAs($staff)->post(route('staff.schedules.pickup', $rental), [
@@ -229,7 +231,7 @@ class AdditionalChargesAndCompletionTest extends TestCase
         // Uji pembersihan berkas saat DB gagal pada unggahan bukti tagihan tambahan (NFR-04).
         $rental2 = app(RentalBookingService::class)->createBooking($customer, $car->id, $pickupAt->addDays(4), 1, true);
         $pay2 = app(RentalPaymentService::class)->submitProof($rental2, $customer, UploadedFile::fake()->image('m2.jpg'));
-        app(RentalPaymentService::class)->approvePayment($pay2, $admin, (float) $rental2->total_amount);
+        app(RentalPaymentService::class)->approvePayment($pay2, $admin, (float) $rental2->total_amount, now('Asia/Jakarta'));
 
         // Siapkan kendaraan sebelum serah-terima rental2.
         app(RentalOperationService::class)->markVehicleReady($car, $staff);

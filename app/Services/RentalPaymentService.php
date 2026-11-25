@@ -4,9 +4,11 @@ namespace App\Services;
 
 use App\Models\Car;
 use App\Models\Rental;
+use App\Models\RentalCashFlow;
 use App\Models\RentalPayment;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -128,16 +130,27 @@ class RentalPaymentService
     }
 
     /**
-     * Verifikasi pelunasan uang masuk dan konfirmasikan pemesanan (A-07, SYS-07, SYS-13).
+     * Verifikasi pelunasan uang masuk, catat arus kas pada tanggal dana diterima (WIB), dan konfirmasikan pemesanan (A-07, A-12, SYS-07, SYS-13).
      *
      * @throws ValidationException
      */
-    public function approvePayment(RentalPayment $payment, User $admin, float $verifiedAmount): Rental
-    {
+    public function approvePayment(
+        RentalPayment $payment,
+        User $admin,
+        float $verifiedAmount,
+        ?CarbonInterface $receivedAt = null
+    ): Rental {
+        if ($receivedAt === null) {
+            throw ValidationException::withMessages([
+                'received_at' => 'Tanggal aktual dana diterima (WIB) wajib diisi.',
+            ]);
+        }
+
         $nowWib = CarbonImmutable::now(RentalScheduleService::TIMEZONE);
+        $receivedAtWib = CarbonImmutable::instance($receivedAt)->timezone(RentalScheduleService::TIMEZONE);
         $normalizedAmount = round($verifiedAmount, 2);
 
-        return DB::transaction(function () use ($payment, $admin, $normalizedAmount, $nowWib): Rental {
+        return DB::transaction(function () use ($payment, $admin, $normalizedAmount, $receivedAtWib, $nowWib): Rental {
             $carId = (int) Rental::query()->whereKey($payment->rental_id)->value('car_id');
             Car::query()->lockForUpdate()->findOrFail($carId);
             $lockedRental = Rental::query()->lockForUpdate()->findOrFail($payment->rental_id);
@@ -170,7 +183,20 @@ class RentalPaymentService
                 'verified_amount' => $normalizedAmount,
                 'verified_by' => $admin->id,
                 'verified_at' => $nowWib,
+                'received_at' => $receivedAtWib,
                 'rejection_reason' => null,
+            ]);
+
+            // Catat penerimaan kas sewa utama berdasarkan tanggal aktual dana diterima (WIB), bukan tanggal verifikasi admin.
+            RentalCashFlow::create([
+                'rental_id' => $lockedRental->id,
+                'rental_payment_id' => $lockedPayment->id,
+                'recorded_by' => $admin->id,
+                'direction' => RentalCashFlow::DIRECTION_INFLOW,
+                'category' => RentalCashFlow::CATEGORY_MAIN_PAYMENT,
+                'amount' => $normalizedAmount,
+                'occurred_at' => $receivedAtWib,
+                'notes' => 'Verifikasi pelunasan sewa utama (termasuk kelebihan bayar jika ada).',
             ]);
 
             $lockedRental->paid_amount = round((float) $lockedRental->paid_amount + $normalizedAmount, 2);
@@ -207,6 +233,7 @@ class RentalPaymentService
                 [
                     'payment_id' => $lockedPayment->id,
                     'verified_amount' => $normalizedAmount,
+                    'received_at' => $receivedAtWib->toIso8601String(),
                     'overpayment_amount' => $excessAmount,
                     'total_paid_amount' => (float) $lockedRental->paid_amount,
                 ]
@@ -217,7 +244,7 @@ class RentalPaymentService
     }
 
     /**
-     * Tolak bukti transfer dengan alasan wajib serta pencatatan dana parsial jika sudah masuk (A-07, SYS-06).
+     * Tolak bukti transfer dengan alasan wajib serta pencatatan dana parsial dan tanggal penerimaan aktual jika sudah masuk (A-07, A-12, SYS-06).
      *
      * @throws ValidationException
      */
@@ -225,7 +252,8 @@ class RentalPaymentService
         RentalPayment $payment,
         User $admin,
         string $reason,
-        float $receivedAmount = 0.0
+        float $receivedAmount = 0.0,
+        ?CarbonInterface $receivedAt = null
     ): Rental {
         $trimmedReason = trim($reason);
         if (mb_strlen($trimmedReason) < 5) {
@@ -241,9 +269,18 @@ class RentalPaymentService
             ]);
         }
 
-        $nowWib = CarbonImmutable::now(RentalScheduleService::TIMEZONE);
+        if ($normalizedReceived > 0 && $receivedAt === null) {
+            throw ValidationException::withMessages([
+                'received_at' => 'Tanggal aktual dana diterima (WIB) wajib diisi apabila terdapat dana masuk sebagian.',
+            ]);
+        }
 
-        return DB::transaction(function () use ($payment, $admin, $trimmedReason, $normalizedReceived, $nowWib): Rental {
+        $nowWib = CarbonImmutable::now(RentalScheduleService::TIMEZONE);
+        $receivedAtWib = $receivedAt !== null
+            ? CarbonImmutable::instance($receivedAt)->timezone(RentalScheduleService::TIMEZONE)
+            : null;
+
+        return DB::transaction(function () use ($payment, $admin, $trimmedReason, $normalizedReceived, $receivedAtWib, $nowWib): Rental {
             $carId = (int) Rental::query()->whereKey($payment->rental_id)->value('car_id');
             Car::query()->lockForUpdate()->findOrFail($carId);
             $lockedRental = Rental::query()->lockForUpdate()->findOrFail($payment->rental_id);
@@ -276,10 +313,23 @@ class RentalPaymentService
                 'rejection_reason' => $trimmedReason,
                 'verified_by' => $admin->id,
                 'verified_at' => $nowWib,
+                'received_at' => $normalizedReceived > 0 ? $receivedAtWib : null,
             ]);
 
-            if ($normalizedReceived > 0) {
+            if ($normalizedReceived > 0 && $receivedAtWib !== null) {
                 $lockedRental->paid_amount = round((float) $lockedRental->paid_amount + $normalizedReceived, 2);
+
+                // Catat penerimaan kas parsial pada tanggal uang benar-benar masuk rekening (WIB).
+                RentalCashFlow::create([
+                    'rental_id' => $lockedRental->id,
+                    'rental_payment_id' => $lockedPayment->id,
+                    'recorded_by' => $admin->id,
+                    'direction' => RentalCashFlow::DIRECTION_INFLOW,
+                    'category' => RentalCashFlow::CATEGORY_MAIN_PAYMENT,
+                    'amount' => $normalizedReceived,
+                    'occurred_at' => $receivedAtWib,
+                    'notes' => 'Pembayaran sebagian saat verifikasi bukti utama ditolak: '.$trimmedReason,
+                ]);
             }
 
             // Kebijakan SKPL memberi tenggat perbaikan 1 jam sejak penolakan, tanpa melewati jadwal pengambilan.
@@ -307,6 +357,7 @@ class RentalPaymentService
                 [
                     'payment_id' => $lockedPayment->id,
                     'received_amount' => $normalizedReceived,
+                    'received_at' => $receivedAtWib?->toIso8601String(),
                     'remaining_balance' => $newRemaining,
                     'fix_deadline_at' => $fixDeadline->toIso8601String(),
                 ]

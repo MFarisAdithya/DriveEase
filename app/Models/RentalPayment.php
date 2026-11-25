@@ -35,6 +35,7 @@ class RentalPayment extends Model
         'rejection_reason',
         'verified_by',
         'verified_at',
+        'received_at',
         'submitted_at',
     ];
 
@@ -54,6 +55,7 @@ class RentalPayment extends Model
             'claimed_amount' => 'decimal:2',
             'verified_amount' => 'decimal:2',
             'verified_at' => 'datetime',
+            'received_at' => 'datetime',
             'submitted_at' => 'datetime',
         ];
     }

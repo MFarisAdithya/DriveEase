@@ -1,7 +1,7 @@
 @extends('layouts.admin')
 
-@section('title', 'Laporan Keuangan Rental - DriveEase Admin')
-@section('page_title', 'Laporan Transaksi & Penerimaan Rental')
+@section('title', 'Laporan Keuangan Berbasis Kas - DriveEase Admin')
+@section('page_title', 'Laporan Transaksi & Arus Kas Rental (Berbasis Kas)')
 
 @section('content')
 <div class="space-y-6">
@@ -13,14 +13,23 @@
         </ul>
     @endif
 
+    @if (($summary['unrecorded_legacy_count'] ?? 0) > 0)
+        <div role="alert" class="rounded-xl border border-warning-line bg-warning-surface p-4 text-xs text-warning">
+            <strong>Catatan Data Historis Pra-Buku Kas:</strong>
+            Terdapat {{ $summary['unrecorded_legacy_count'] }} transaksi historis senilai total
+            <strong>Rp {{ number_format($summary['unrecorded_legacy_amount'], 0, ',', '.') }}</strong>
+            yang belum memiliki tanggal penerimaan kas terkonfirmasi sehingga tidak dimasukkan ke periode ini tanpa mengarang tanggal.
+        </div>
+    @endif
+
     <div class="bg-surface rounded-xl border border-line p-5 shadow-sm">
         <form method="GET" action="{{ route('admin.reports.index') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
             <div>
-                <label for="report_date_from" class="block text-xs font-semibold text-ink mb-1">Dari Tanggal (WIB)</label>
+                <label for="report_date_from" class="block text-xs font-semibold text-ink mb-1">Dari Tanggal Kas (WIB)</label>
                 <input id="report_date_from" name="date_from" type="date" value="{{ $dateFrom }}" class="w-full rounded-lg border border-field-line bg-surface-raised px-3 py-2 text-xs text-ink">
             </div>
             <div>
-                <label for="report_date_to" class="block text-xs font-semibold text-ink mb-1">Sampai Tanggal (WIB)</label>
+                <label for="report_date_to" class="block text-xs font-semibold text-ink mb-1">Sampai Tanggal Kas (WIB)</label>
                 <input id="report_date_to" name="date_to" type="date" value="{{ $dateTo }}" class="w-full rounded-lg border border-field-line bg-surface-raised px-3 py-2 text-xs text-ink">
             </div>
             <div>
@@ -53,37 +62,37 @@
 
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <div class="bg-surface rounded-xl border border-line p-5 shadow-sm">
-            <span class="text-xs font-semibold uppercase tracking-wider text-muted">Jumlah Transaksi</span>
-            <p class="text-2xl font-bold text-ink mt-2">{{ $summary['total_transactions'] }}</p>
-            <p class="text-xs text-muted mt-1">{{ $summary['completed_transactions'] }} selesai &middot; {{ $summary['cancelled_or_expired_transactions'] }} batal/kedaluwarsa</p>
+            <span class="text-xs font-semibold uppercase tracking-wider text-muted">Arus Kas Periode</span>
+            <p class="text-2xl font-bold text-ink mt-2">{{ $summary['total_cash_entries'] }}</p>
+            <p class="text-xs text-muted mt-1">{{ $summary['inflow_count'] }} masuk &middot; {{ $summary['outflow_count'] }} keluar ({{ $summary['total_transactions'] }} pesanan)</p>
         </div>
         <div class="bg-surface rounded-xl border border-line p-5 shadow-sm">
-            <span class="text-xs font-semibold uppercase tracking-wider text-success">Penerimaan Kotor</span>
+            <span class="text-xs font-semibold uppercase tracking-wider text-success">Penerimaan Kas Kotor</span>
             <p class="text-2xl font-bold text-success mt-2">Rp {{ number_format($summary['gross_receipts'], 0, ',', '.') }}</p>
-            <p class="text-xs text-muted mt-1">Sewa, perpanjangan, &amp; biaya tambahan</p>
+            <p class="text-xs text-muted mt-1">Berdasarkan tanggal dana diterima (WIB)</p>
         </div>
         <div class="bg-surface rounded-xl border border-line p-5 shadow-sm">
             <span class="text-xs font-semibold uppercase tracking-wider text-danger">Refund Terealisasi</span>
             <p class="text-2xl font-bold text-danger mt-2">Rp {{ number_format($summary['processed_refunds'], 0, ',', '.') }}</p>
-            <p class="text-xs text-muted mt-1">Dana telah ditransfer kembali</p>
+            <p class="text-xs text-muted mt-1">Berdasarkan tanggal transfer refund (WIB)</p>
         </div>
         <div class="bg-surface rounded-xl border border-line p-5 shadow-sm">
-            <span class="text-xs font-semibold uppercase tracking-wider text-warning">Refund Menunggu</span>
-            <p class="text-2xl font-bold text-warning mt-2">Rp {{ number_format($summary['pending_refunds'], 0, ',', '.') }}</p>
-            <p class="text-xs text-muted mt-1">Kewajiban refund belum ditransfer</p>
-        </div>
-        <div class="bg-surface rounded-xl border border-line p-5 shadow-sm">
-            <span class="text-xs font-semibold uppercase tracking-wider text-ink">Penerimaan Bersih</span>
+            <span class="text-xs font-semibold uppercase tracking-wider text-ink">Penerimaan Bersih (Kas)</span>
             <p class="text-2xl font-bold text-ink mt-2">Rp {{ number_format($summary['net_receipts'], 0, ',', '.') }}</p>
-            <p class="text-xs text-muted mt-1">Penerimaan kotor dikurangi refund terealisasi</p>
+            <p class="text-xs text-muted mt-1">Kas masuk dikurangi refund terealisasi</p>
+        </div>
+        <div class="bg-surface rounded-xl border border-warning-line p-5 shadow-sm">
+            <span class="text-xs font-semibold uppercase tracking-wider text-warning">Kewajiban Refund Tertunda</span>
+            <p class="text-2xl font-bold text-warning mt-2">Rp {{ number_format($summary['pending_refunds_liability'], 0, ',', '.') }}</p>
+            <p class="text-xs text-muted mt-1">Terpisah; tidak mengurangi kas sampai ditransfer</p>
         </div>
     </div>
 
     <div class="bg-surface rounded-xl border border-line shadow-sm overflow-hidden">
         <div class="p-5 border-b border-line flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
-                <h2 class="text-base font-bold text-ink">Rincian Transaksi Periode {{ $dateFrom }} s.d. {{ $dateTo }}</h2>
-                <p class="text-xs text-muted">Setiap angka pada kartu ringkasan dihitung langsung dari penjumlahan baris tabel berikut.</p>
+                <h2 class="text-base font-bold text-ink">Rincian Arus Kas Periode {{ $dateFrom }} s.d. {{ $dateTo }} (WIB)</h2>
+                <p class="text-xs text-muted">Setiap entri mencerminkan tanggal aktual penerimaan dana atau transfer refund oleh admin, terpisah dari jadwal sewa operasional.</p>
             </div>
         </div>
 
@@ -91,56 +100,110 @@
             <table class="w-full text-left border-collapse">
                 <thead>
                     <tr class="bg-surface-raised text-[11px] font-semibold text-muted uppercase tracking-wider border-b border-line">
+                        <th class="py-3 px-4">Tanggal Kas (WIB)</th>
                         <th class="py-3 px-4">Kode</th>
                         <th class="py-3 px-4">Pelanggan &amp; Unit</th>
-                        <th class="py-3 px-4">Jadwal Ambil (WIB)</th>
-                        <th class="py-3 px-4">Status</th>
-                        <th class="py-3 px-4 text-right">Penerimaan Kotor</th>
-                        <th class="py-3 px-4 text-right">Refund Terealisasi</th>
-                        <th class="py-3 px-4 text-right">Refund Menunggu</th>
-                        <th class="py-3 px-4 text-right">Penerimaan Bersih</th>
+                        <th class="py-3 px-4">Jenis Arus Kas</th>
+                        <th class="py-3 px-4">Jadwal Sewa (Operasional)</th>
+                        <th class="py-3 px-4">Referensi</th>
+                        <th class="py-3 px-4 text-right">Kas Masuk</th>
+                        <th class="py-3 px-4 text-right">Kas Keluar (Refund)</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-line text-xs">
                     @forelse ($rows as $row)
                         @php($rental = $row['rental'])
                         <tr class="hover:bg-surface-raised/70">
+                            <td class="py-3 px-4 font-semibold text-ink whitespace-nowrap">
+                                {{ $row['occurred_at']?->timezone('Asia/Jakarta')->format('d M Y H:i') }} WIB
+                            </td>
                             <td class="py-3 px-4 font-mono font-bold text-ink">
-                                <a href="{{ route('admin.bookings.show', $rental) }}" class="text-link hover:underline">{{ $rental->rental_code }}</a>
+                                @if ($rental)
+                                    <a href="{{ route('admin.bookings.show', $rental) }}" class="text-link hover:underline">{{ $rental->rental_code }}</a>
+                                @else
+                                    -
+                                @endif
                             </td>
                             <td class="py-3 px-4">
-                                <span class="font-semibold text-ink block">{{ $rental->user?->name ?? '-' }}</span>
-                                <span class="text-muted">{{ $rental->car?->name ?? '-' }} &middot; {{ $rental->channelLabel() }}</span>
-                            </td>
-                            <td class="py-3 px-4 text-muted">
-                                {{ $rental->pickup_at?->timezone('Asia/Jakarta')->format('d M Y H:i') }} WIB
+                                <span class="font-semibold text-ink block">{{ $rental?->user?->name ?? '-' }}</span>
+                                <span class="text-muted">{{ $rental?->car?->name ?? '-' }} &middot; {{ $rental?->channelLabel() ?? '-' }}</span>
                             </td>
                             <td class="py-3 px-4">
-                                <span class="font-semibold text-ink block">{{ $rental->rentalStatusLabel() }}</span>
-                                <span class="text-muted">{{ $rental->paymentStatusLabel() }}</span>
+                                <span class="font-semibold text-ink block">{{ $row['category_label'] }}</span>
+                                <span class="text-muted">{{ $rental?->rentalStatusLabel() ?? '-' }}</span>
                             </td>
-                            <td class="py-3 px-4 text-right font-semibold text-success">Rp {{ number_format($row['gross_receipts'], 0, ',', '.') }}</td>
-                            <td class="py-3 px-4 text-right font-semibold text-danger">Rp {{ number_format($row['processed_refunds'], 0, ',', '.') }}</td>
-                            <td class="py-3 px-4 text-right font-semibold text-warning">Rp {{ number_format($row['pending_refunds'], 0, ',', '.') }}</td>
-                            <td class="py-3 px-4 text-right font-bold text-ink">Rp {{ number_format($row['net_receipts'], 0, ',', '.') }}</td>
+                            <td class="py-3 px-4 text-muted whitespace-nowrap">
+                                {{ $rental?->pickup_at?->timezone('Asia/Jakarta')->format('d M Y H:i') ?? '-' }} WIB
+                            </td>
+                            <td class="py-3 px-4 font-mono text-muted">{{ $row['reference'] ?? '-' }}</td>
+                            <td class="py-3 px-4 text-right font-semibold text-success">
+                                @if ($row['inflow_amount'] > 0)
+                                    Rp {{ number_format($row['inflow_amount'], 0, ',', '.') }}
+                                @else
+                                    -
+                                @endif
+                            </td>
+                            <td class="py-3 px-4 text-right font-semibold text-danger">
+                                @if ($row['outflow_amount'] > 0)
+                                    Rp {{ number_format($row['outflow_amount'], 0, ',', '.') }}
+                                @else
+                                    -
+                                @endif
+                            </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="py-10 text-center text-sm text-muted">Tidak ada transaksi pada periode atau filter yang dipilih.</td>
+                            <td colspan="8" class="py-10 text-center text-sm text-muted">Tidak ada arus kas masuk atau refund terealisasi pada rentang tanggal kas tersebut.</td>
                         </tr>
                     @endforelse
                 </tbody>
                 @if ($rows->isNotEmpty())
                     <tfoot>
                         <tr class="bg-surface-raised border-t border-line text-xs font-bold text-ink">
-                            <td colspan="4" class="py-3 px-4 text-right uppercase tracking-wider">Total Periode ({{ $summary['total_transactions'] }} Transaksi)</td>
+                            <td colspan="6" class="py-3 px-4 text-right uppercase tracking-wider">Total Kas Periode ({{ $summary['total_cash_entries'] }} Entri &middot; Bersih Rp {{ number_format($summary['net_receipts'], 0, ',', '.') }})</td>
                             <td class="py-3 px-4 text-right text-success">Rp {{ number_format($summary['gross_receipts'], 0, ',', '.') }}</td>
                             <td class="py-3 px-4 text-right text-danger">Rp {{ number_format($summary['processed_refunds'], 0, ',', '.') }}</td>
-                            <td class="py-3 px-4 text-right text-warning">Rp {{ number_format($summary['pending_refunds'], 0, ',', '.') }}</td>
-                            <td class="py-3 px-4 text-right text-ink">Rp {{ number_format($summary['net_receipts'], 0, ',', '.') }}</td>
                         </tr>
                     </tfoot>
                 @endif
+            </table>
+        </div>
+    </div>
+
+    <div class="bg-surface rounded-xl border border-line shadow-sm overflow-hidden">
+        <div class="p-5 border-b border-line">
+            <h2 class="text-base font-bold text-ink">Kewajiban Refund Tertunda (Belum Ditransfer)</h2>
+            <p class="text-xs text-muted">Daftar kewajiban pengembalian dana aktif. Nilai ini baru mengurangi kas setelah admin mencatat tanggal realisasi transfer.</p>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-surface-raised text-[11px] font-semibold text-muted uppercase tracking-wider border-b border-line">
+                        <th class="py-3 px-4">Kode</th>
+                        <th class="py-3 px-4">Pelanggan &amp; Unit</th>
+                        <th class="py-3 px-4">Sumber Kewajiban</th>
+                        <th class="py-3 px-4 text-right">Nominal Tertunda</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-line text-xs">
+                    @forelse ($pendingRefundItems as $item)
+                        <tr class="hover:bg-surface-raised/70">
+                            <td class="py-3 px-4 font-mono font-bold text-ink">
+                                <a href="{{ route('admin.bookings.show', $item['rental']) }}" class="text-link hover:underline">{{ $item['rental']->rental_code }}</a>
+                            </td>
+                            <td class="py-3 px-4">
+                                <span class="font-semibold text-ink block">{{ $item['rental']->user?->name ?? '-' }}</span>
+                                <span class="text-muted">{{ $item['rental']->car?->name ?? '-' }}</span>
+                            </td>
+                            <td class="py-3 px-4 text-ink">{{ $item['source_label'] }}</td>
+                            <td class="py-3 px-4 text-right font-bold text-warning">Rp {{ number_format($item['amount'], 0, ',', '.') }}</td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="4" class="py-6 text-center text-xs text-muted">Tidak ada kewajiban refund tertunda saat ini.</td>
+                        </tr>
+                    @endforelse
+                </tbody>
             </table>
         </div>
     </div>

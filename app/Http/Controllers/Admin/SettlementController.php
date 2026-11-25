@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Rental;
+use App\Services\RentalScheduleService;
 use App\Services\RentalSettlementService;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
@@ -63,20 +65,24 @@ class SettlementController extends Controller
     }
 
     /**
-     * Verifikasi pelunasan biaya tambahan dan catat referensi pembayaran resmi oleh admin (A-09).
+     * Verifikasi pelunasan biaya tambahan beserta tanggal aktual dana diterima (WIB) dan referensi pembayaran (A-09, A-12).
      */
     public function approveChargePayment(Request $request, Rental $rental): RedirectResponse
     {
         $validated = $request->validate([
             'verified_amount' => ['required', 'numeric', 'min:1'],
             'payment_reference' => ['required', 'string', 'min:3', 'max:100'],
+            'received_at' => ['required', 'date'],
+        ], [
+            'received_at.required' => 'Tanggal aktual dana tagihan tambahan diterima (WIB) wajib diisi.',
         ]);
 
         $this->settlementService->approveAdditionalChargePayment(
             $rental,
             $request->user(),
             (float) $validated['verified_amount'],
-            (string) $validated['payment_reference']
+            (string) $validated['payment_reference'],
+            CarbonImmutable::parse((string) $validated['received_at'], RentalScheduleService::TIMEZONE),
         );
 
         return redirect()
@@ -85,20 +91,29 @@ class SettlementController extends Controller
     }
 
     /**
-     * Tolak bukti pembayaran tagihan tambahan dengan alasan wajib agar pelanggan dapat memperbaiki (A-09).
+     * Tolak bukti pembayaran tagihan tambahan dengan alasan wajib dan catat dana masuk parsial beserta tanggal terimanya (A-09, A-12).
      */
     public function rejectChargePayment(Request $request, Rental $rental): RedirectResponse
     {
         $validated = $request->validate([
             'rejection_reason' => ['required', 'string', 'min:5', 'max:500'],
             'received_amount' => ['nullable', 'numeric', 'min:0'],
+            'received_at' => ['nullable', 'date'],
         ]);
+
+        $receivedAmount = isset($validated['received_amount']) && $validated['received_amount'] !== ''
+            ? (float) $validated['received_amount']
+            : 0.0;
+        $receivedAt = isset($validated['received_at']) && trim((string) $validated['received_at']) !== ''
+            ? CarbonImmutable::parse((string) $validated['received_at'], RentalScheduleService::TIMEZONE)
+            : null;
 
         $this->settlementService->rejectAdditionalChargePayment(
             $rental,
             $request->user(),
             (string) $validated['rejection_reason'],
-            isset($validated['received_amount']) && $validated['received_amount'] !== '' ? (float) $validated['received_amount'] : 0.0
+            $receivedAmount,
+            $receivedAt,
         );
 
         return redirect()
