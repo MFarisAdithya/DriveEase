@@ -109,19 +109,19 @@
                         onclick="document.getElementById('email').value='admin@driveease.test'; document.getElementById('password').value='password123';"
                         class="p-2 bg-navigation/60 rounded border border-field-line hover:border-focus text-left transition-colors">
                     <span class="block font-medium text-link">Admin</span>
-                    <span class="text-[11px] text-muted truncate block">admin@driveease.test</span>
+                    <span class="text-[11px] text-muted break-all block">admin@driveease.test</span>
                 </button>
                 <button type="button" 
                         onclick="document.getElementById('email').value='staff@driveease.test'; document.getElementById('password').value='password123';"
                         class="p-2 bg-navigation/60 rounded border border-field-line hover:border-focus text-left transition-colors">
                     <span class="block font-medium text-link">Staf</span>
-                    <span class="text-[11px] text-muted truncate block">staff@driveease.test</span>
+                    <span class="text-[11px] text-muted break-all block">staff@driveease.test</span>
                 </button>
                 <button type="button" 
                         onclick="document.getElementById('email').value='customer@driveease.test'; document.getElementById('password').value='password123';"
                         class="p-2 bg-navigation/60 rounded border border-field-line hover:border-focus text-left transition-colors">
                     <span class="block font-medium text-link">Pelanggan</span>
-                    <span class="text-[11px] text-muted truncate block">customer@driveease.test</span>
+                    <span class="text-[11px] text-muted break-all block">customer@driveease.test</span>
                 </button>
             </div>
         </div>

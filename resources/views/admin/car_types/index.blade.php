@@ -10,12 +10,14 @@
         <!-- Search Form -->
         <form action="{{ route('admin.car-types.index') }}" method="GET" class="flex items-center gap-2 flex-1 max-w-md">
             <div class="relative w-full">
+                <label for="admin_car_type_search" class="sr-only">Cari kategori atau deskripsi kendaraan</label>
                 <input type="text" 
+                       id="admin_car_type_search"
                        name="search" 
                        value="{{ request('search') }}" 
                        placeholder="Cari kategori atau deskripsi..." 
                        class="bg-surface-raised w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-field-line focus:outline-none focus:border-focus focus:ring-1 focus:ring-focus">
-                <svg class="w-4 h-4 text-muted absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="w-4 h-4 text-muted absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                 </svg>
             </div>

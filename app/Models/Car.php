@@ -156,6 +156,38 @@ class Car extends Model
     }
 
     /**
+     * Kembalikan label status operasional kendaraan berbahasa Indonesia untuk antarmuka pengguna.
+     */
+    public function statusLabel(): string
+    {
+        // Bila kolom archived_at sudah terisi, unit selalu ditampilkan sebagai Diarsipkan
+        // terlepas dari status operasional sebelumnya agar histori tetap jelas terbaca.
+        if ($this->isArchived()) {
+            return 'Diarsipkan';
+        }
+
+        // Ekspresi match memetakan kode status internal Inggris ke label Bahasa Indonesia yang konsisten.
+        return match ($this->status) {
+            'available' => 'Tersedia',
+            'rented' => 'Sedang Disewa',
+            'maintenance' => 'Perawatan',
+            default => ucfirst((string) $this->status),
+        };
+    }
+
+    /**
+     * Kembalikan label jenis transmisi kendaraan berbahasa Indonesia.
+     */
+    public function transmissionLabel(): string
+    {
+        return match ($this->transmission) {
+            'automatic' => 'Otomatis',
+            'manual' => 'Manual',
+            default => ucfirst((string) $this->transmission),
+        };
+    }
+
+    /**
      * Kembalikan label status kesiapan operasional unit berbahasa Indonesia.
      */
     public function readinessLabel(): string

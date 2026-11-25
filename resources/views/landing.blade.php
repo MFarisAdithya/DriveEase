@@ -30,30 +30,46 @@
 
     <!-- Sticky Frosted Navigation Bar -->
     <header class="sticky top-0 z-40 w-full backdrop-blur-md bg-white/80 border-b border-[#D7EAF6]/80">
-        <div class="max-w-7xl mx-auto px-5 sm:px-10 lg:px-14 h-20 flex items-center justify-between gap-6">
-            <a href="{{ route('home') }}" class="inline-flex items-center focus:outline-none shrink-0">
+        <div class="max-w-7xl mx-auto px-4 sm:px-10 lg:px-14 h-20 flex items-center justify-between gap-2.5 sm:gap-6">
+            <a href="{{ route('home') }}" class="inline-flex items-center rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#FF6454] shrink-0">
                 @include('partials.driveease-logo', [
-                    'sizeClass' => 'h-12 sm:h-14 lg:h-16',
-                    'haloSize' => 'w-12 h-12 sm:w-14 sm:h-14',
+                    'sizeClass' => 'h-9 sm:h-14 lg:h-16',
+                    'haloSize' => 'w-9 h-9 sm:w-14 sm:h-14',
                 ])
             </a>
 
             <nav class="hidden md:flex items-center gap-5 lg:gap-8 text-sm font-semibold text-[#3C5266] whitespace-nowrap" aria-label="Navigasi Utama">
-                <a href="#beranda" class="hover:text-[#0B2840] transition-colors whitespace-nowrap">Beranda</a>
-                <a href="#keunggulan" class="hover:text-[#0B2840] transition-colors whitespace-nowrap">Keunggulan</a>
-                <a href="#armada" class="hover:text-[#0B2840] transition-colors whitespace-nowrap">Armada Pilihan</a>
-                <a href="#cara-sewa" class="hover:text-[#0B2840] transition-colors whitespace-nowrap">Cara Sewa</a>
+                <a href="#beranda" class="hover:text-[#0B2840] transition-colors whitespace-nowrap rounded focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#FF6454]">Beranda</a>
+                <a href="#keunggulan" class="hover:text-[#0B2840] transition-colors whitespace-nowrap rounded focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#FF6454]">Keunggulan</a>
+                <a href="#armada" class="hover:text-[#0B2840] transition-colors whitespace-nowrap rounded focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#FF6454]">Armada Pilihan</a>
+                <a href="#cara-sewa" class="hover:text-[#0B2840] transition-colors whitespace-nowrap rounded focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#FF6454]">Cara Sewa</a>
             </nav>
 
-            <div class="flex items-center gap-2.5 sm:gap-3.5 shrink-0">
+            <div class="flex items-center gap-1.5 sm:gap-3.5 shrink-0">
                 <a href="{{ route('login') }}"
-                   class="text-sm font-semibold text-[#0B2840] hover:text-[#FF6454] px-3.5 py-2 transition-colors">
+                   class="text-xs sm:text-sm font-semibold text-[#0B2840] hover:text-[#FF6454] px-2.5 sm:px-3.5 py-2 whitespace-nowrap rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#FF6454] transition-colors">
                     Masuk
                 </a>
                 <a href="{{ route('register') }}"
-                   class="text-sm font-semibold bg-[#0B2840] hover:bg-[#133b5c] text-white px-5 py-2.5 rounded-full shadow-sm transition-all active:scale-[0.98]">
-                    Daftar Akun
+                   class="text-xs sm:text-sm font-semibold bg-[#0B2840] hover:bg-[#133b5c] text-white px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-full shadow-sm whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#FF6454] transition-all active:scale-[0.98]">
+                    <span class="sm:hidden">Daftar</span>
+                    <span class="hidden sm:inline">Daftar Akun</span>
                 </a>
+
+                {{-- Elemen details menyediakan menu navigasi mobile tanpa JavaScript agar ramah keyboard (Tab + Enter). --}}
+                <details class="relative md:hidden">
+                    <summary class="list-none inline-flex items-center gap-1 rounded-full border border-[#D7EAF6] bg-white px-3 py-2 text-xs font-semibold text-[#0B2840] cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#FF6454]"
+                             aria-label="Buka menu navigasi">
+                        Menu
+                    </summary>
+                    <nav aria-label="Navigasi Mobile" class="absolute right-0 top-full z-50 mt-2 w-52 rounded-2xl border border-[#D7EAF6] bg-white p-2 shadow-lg grid gap-1 text-xs font-semibold text-[#3C5266]">
+                        <a href="#beranda" class="rounded-lg px-3 py-2.5 hover:bg-[#F4FAFE] hover:text-[#0B2840]">Beranda</a>
+                        <a href="#keunggulan" class="rounded-lg px-3 py-2.5 hover:bg-[#F4FAFE] hover:text-[#0B2840]">Keunggulan</a>
+                        <a href="#armada" class="rounded-lg px-3 py-2.5 hover:bg-[#F4FAFE] hover:text-[#0B2840]">Armada Pilihan</a>
+                        <a href="#cara-sewa" class="rounded-lg px-3 py-2.5 hover:bg-[#F4FAFE] hover:text-[#0B2840]">Cara Sewa</a>
+                        <a href="{{ route('cars.index') }}" class="rounded-lg px-3 py-2.5 hover:bg-[#F4FAFE] hover:text-[#0B2840]">Katalog Mobil</a>
+                    </nav>
+                </details>
             </div>
         </div>
     </header>

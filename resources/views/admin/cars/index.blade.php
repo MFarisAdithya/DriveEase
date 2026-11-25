@@ -11,7 +11,8 @@
         <form action="{{ route('admin.cars.index') }}" method="GET" class="flex flex-wrap items-center gap-3 flex-1">
             <!-- Search input -->
             <div class="relative min-w-[200px] flex-1">
-                <input type="text" 
+                <label for="admin_car_search" class="sr-only">Cari nama, merek, atau plat kendaraan</label>
+                <input type="text" id="admin_car_search" 
                        name="search" 
                        value="{{ request('search') }}" 
                        placeholder="Cari nama, merek, atau plat..." 
@@ -22,7 +23,8 @@
             </div>
 
             <!-- Category filter -->
-            <select name="car_type_id" class="bg-surface-raised text-xs py-2 px-3 rounded-lg border border-field-line focus:outline-none focus:border-focus">
+            <label for="admin_car_type_id" class="sr-only">Filter kategori kendaraan</label>
+            <select id="admin_car_type_id" name="car_type_id" class="bg-surface-raised text-xs py-2 px-3 rounded-lg border border-field-line focus:outline-none focus:border-focus">
                 <option value="">Semua Kategori</option>
                 @foreach ($carTypes as $type)
                     <option value="{{ $type->id }}" {{ request('car_type_id') == $type->id ? 'selected' : '' }}>
@@ -32,7 +34,8 @@
             </select>
 
             <!-- Status filter -->
-            <select name="status" class="bg-surface-raised text-xs py-2 px-3 rounded-lg border border-field-line focus:outline-none focus:border-focus">
+            <label for="admin_car_status" class="sr-only">Filter status kendaraan</label>
+            <select id="admin_car_status" name="status" class="bg-surface-raised text-xs py-2 px-3 rounded-lg border border-field-line focus:outline-none focus:border-focus">
                 <option value="">Semua Status</option>
                 <option value="available" {{ request('status') == 'available' ? 'selected' : '' }}>Tersedia</option>
                 <option value="rented" {{ request('status') == 'rented' ? 'selected' : '' }}>Sedang Disewa</option>
@@ -91,7 +94,7 @@
                                 </span>
                             </td>
                             <td class="py-3.5 px-5 text-xs text-muted">
-                                <p>{{ $car->model_year }} &bull; {{ ucfirst($car->transmission) }}</p>
+                                <p>{{ $car->model_year }} &bull; {{ $car->transmissionLabel() }}</p>
                                 <p class="text-muted">{{ $car->capacity }} Penumpang</p>
                             </td>
                             <td class="py-3.5 px-5 font-bold text-ink">

@@ -6,7 +6,7 @@
 <div class="space-y-6">
     <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
-            <h1 class="text-xl font-bold text-ink">Pemeriksaan &amp; Kesiapan Armada (S-05)</h1>
+            <h1 class="text-xl font-bold text-ink">Pemeriksaan &amp; Kesiapan Armada</h1>
             <p class="text-xs text-muted mt-0.5">Laporkan kerusakan unit yang ditemukan atau nyatakan unit layak setelah pemeriksaan serta persiapan selesai.</p>
         </div>
         <a href="{{ route('staff.schedules.index') }}" class="rounded-lg border border-line bg-surface px-4 py-2 text-xs font-bold text-ink hover:bg-surface-hover">
@@ -39,7 +39,7 @@
                         <h2 class="text-base font-bold text-ink">{{ $car->name }} ({{ $car->plate_number }})</h2>
                         <span class="rounded-full border border-line bg-surface-raised px-2.5 py-0.5 font-semibold text-ink">{{ $car->readinessLabel() }}</span>
                     </div>
-                    <p class="text-muted">{{ $car->carType?->name }} &middot; Status Unit: <strong class="text-ink">{{ ucfirst($car->status) }}</strong></p>
+                    <p class="text-muted">{{ $car->carType?->name }} &middot; Status Unit: <strong class="text-ink">{{ $car->statusLabel() }}</strong></p>
                     @if ($car->maintenance_reason)
                         <p class="text-danger"><strong>Catatan Kerusakan / Perawatan:</strong> {{ $car->maintenance_reason }}</p>
                     @endif
@@ -54,7 +54,8 @@
                             <form method="POST" action="{{ route('staff.cars.mark-ready', $car) }}" class="flex-1 flex flex-col sm:flex-row gap-2">
                                 @csrf
                                 @method('PATCH')
-                                <input name="readiness_notes" placeholder="Catatan persiapan unit (opsional)" class="flex-1 rounded-lg border border-field-line bg-surface-raised p-2">
+                                <label for="readiness_notes_{{ $car->id }}" class="sr-only">Catatan persiapan {{ $car->name }}</label>
+                                <input id="readiness_notes_{{ $car->id }}" name="readiness_notes" placeholder="Catatan persiapan unit (opsional)" class="flex-1 rounded-lg border border-field-line bg-surface-raised p-2">
                                 <button type="submit" class="rounded-lg bg-action hover:bg-action-hover px-3 py-2 font-bold text-ink shrink-0">
                                     Nyatakan Siap Sewa
                                 </button>
@@ -64,7 +65,8 @@
                         <form method="POST" action="{{ route('staff.cars.report-damage', $car) }}" class="flex-1 flex flex-col sm:flex-row gap-2">
                             @csrf
                             @method('PATCH')
-                            <input name="maintenance_reason" required minlength="5" placeholder="Laporkan kerusakan / kendala unit" class="flex-1 rounded-lg border border-field-line bg-surface-raised p-2">
+                            <label for="maintenance_reason_{{ $car->id }}" class="sr-only">Alasan kerusakan {{ $car->name }}</label>
+                            <input id="maintenance_reason_{{ $car->id }}" name="maintenance_reason" required minlength="5" placeholder="Laporkan kerusakan / kendala unit" class="flex-1 rounded-lg border border-field-line bg-surface-raised p-2">
                             <button type="submit" class="rounded-lg border border-danger-line bg-danger-surface px-3 py-2 font-bold text-danger shrink-0">
                                 Laporkan Kerusakan
                             </button>

@@ -221,7 +221,7 @@
                         </div>
                         <div class="p-2.5 rounded-lg bg-surface-raised border border-line">
                             <span class="text-[10px] text-muted uppercase font-semibold block">Kapasitas</span>
-                            <span class="text-xs font-bold text-ink block mt-0.5">{{ $car->capacity }} Seat</span>
+                            <span class="text-xs font-bold text-ink block mt-0.5">{{ $car->capacity }} Kursi</span>
                         </div>
                     </div>
 
