@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\RentalExtension;
+use App\Models\RentalPayment;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -17,7 +19,7 @@ class DocumentController extends Controller
     {
         // Must be authenticated
         $currentUser = $request->user();
-        if (!$currentUser) {
+        if (! $currentUser) {
             abort(403, 'Akses ditolak.');
         }
 
@@ -25,24 +27,95 @@ class DocumentController extends Controller
         $isOwner = $currentUser->id === $user->id;
         $isAdmin = $currentUser->isAdmin();
 
-        if (!$isAdmin && !$isOwner) {
+        if (! $isAdmin && ! $isOwner) {
             abort(403, 'Akses ditolak. Anda tidak berhak melihat dokumen ini.');
         }
 
         // Validate document type
-        if (!in_array($type, ['ktp', 'sim'], true)) {
+        if (! in_array($type, ['ktp', 'sim'], true)) {
             abort(404, 'Tipe dokumen tidak valid.');
         }
 
         $imageField = $type === 'ktp' ? 'ktp_image' : 'sim_image';
         $path = $user->{$imageField};
 
-        if ((!$path || !Storage::disk('local')->exists($path)) && $isOwner && session("temp_{$type}_image")) {
+        if ((! $path || ! Storage::disk('local')->exists($path)) && $isOwner && session("temp_{$type}_image")) {
             $path = session("temp_{$type}_image");
         }
 
-        if (!$path || !Storage::disk('local')->exists($path)) {
+        if (! $path || ! Storage::disk('local')->exists($path)) {
             abort(404, 'Dokumen identitas tidak ditemukan atau belum diunggah.');
+        }
+
+        $fullPath = Storage::disk('local')->path($path);
+        $mimeType = Storage::disk('local')->mimeType($path) ?? 'image/jpeg';
+
+        $response = response()->file($fullPath, [
+            'Content-Type' => $mimeType,
+            'Pragma' => 'no-cache',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
+
+        $response->headers->set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+
+        return $response;
+    }
+
+    /**
+     * Securely serve a booking payment proof from private local storage (NFR-01).
+     */
+    public function showPaymentProof(Request $request, RentalPayment $payment): BinaryFileResponse|Response
+    {
+        $payment->loadMissing('rental');
+
+        return $this->streamPrivateDocumentForOwnerOrAdmin(
+            $request,
+            (int) $payment->rental?->user_id,
+            $payment->proof_path,
+            'Bukti pembayaran tidak ditemukan.'
+        );
+    }
+
+    /**
+     * Securely serve an extension payment proof from private local storage (NFR-01).
+     */
+    public function showExtensionPaymentProof(Request $request, RentalExtension $extension): BinaryFileResponse|Response
+    {
+        $extension->loadMissing('rental');
+
+        return $this->streamPrivateDocumentForOwnerOrAdmin(
+            $request,
+            (int) $extension->rental?->user_id,
+            $extension->payment_proof,
+            'Bukti pembayaran perpanjangan tidak ditemukan.'
+        );
+    }
+
+    /**
+     * Enforce owner-or-admin authorization and stream a file with no-store cache headers.
+     */
+    private function streamPrivateDocumentForOwnerOrAdmin(
+        Request $request,
+        int $ownerUserId,
+        ?string $path,
+        string $missingMessage
+    ): BinaryFileResponse|Response {
+        $currentUser = $request->user();
+        if (! $currentUser) {
+            abort(403, 'Akses ditolak.');
+        }
+
+        // Hanya pemilik transaksi dan admin berwenang yang diizinkan membaca bukti pembayaran.
+        // Staf lapangan maupun pelanggan lain langsung ditolak dengan HTTP 403.
+        $isOwner = $currentUser->id === $ownerUserId;
+        $isAdmin = $currentUser->isAdmin();
+
+        if (! $isAdmin && ! $isOwner) {
+            abort(403, 'Akses ditolak. Anda tidak berhak melihat dokumen pembayaran ini.');
+        }
+
+        if (! $path || ! Storage::disk('local')->exists($path)) {
+            abort(404, $missingMessage);
         }
 
         $fullPath = Storage::disk('local')->path($path);

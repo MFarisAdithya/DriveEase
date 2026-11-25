@@ -183,6 +183,20 @@ class RentalBookingService
                 $rental->payment_status = Rental::PAYMENT_UNPAID;
                 $rental->saveOrFail();
 
+                $rental->recordHistory(
+                    $createdBy ?? $customer,
+                    'booking_created',
+                    null,
+                    Rental::STATUS_PENDING,
+                    'Pemesanan dibuat melalui kanal '.$rental->channelLabel().'.',
+                    [
+                        'channel' => $rental->booking_channel,
+                        'daily_price' => (float) $rental->daily_price,
+                        'total_amount' => (float) $rental->total_amount,
+                        'payment_deadline_at' => $paymentDeadline->toIso8601String(),
+                    ]
+                );
+
                 return $rental;
             });
         } catch (UniqueConstraintViolationException|QueryException $exception) {
@@ -228,6 +242,7 @@ class RentalBookingService
                 ? trim($reason)
                 : ($actor->isAdmin() ? 'Dibatalkan oleh admin sebelum pembayaran.' : 'Dibatalkan oleh pelanggan sebelum pembayaran.');
 
+            $previousStatus = $lockedRental->rental_status;
             $lockedRental->transitionRentalStatus(
                 Rental::STATUS_CANCELLED,
                 'Pesanan dibatalkan sebelum pembayaran. Jadwal kendaraan kini tersedia kembali.'
@@ -235,6 +250,14 @@ class RentalBookingService
             $lockedRental->cancelled_at = CarbonImmutable::now(RentalScheduleService::TIMEZONE);
             $lockedRental->cancellation_reason = $cancelReason;
             $lockedRental->saveOrFail();
+
+            $lockedRental->recordHistory(
+                $actor,
+                'booking_cancelled_unpaid',
+                $previousStatus,
+                Rental::STATUS_CANCELLED,
+                $cancelReason
+            );
 
             return $lockedRental;
         });

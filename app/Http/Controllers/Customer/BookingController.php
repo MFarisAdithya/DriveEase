@@ -152,7 +152,7 @@ class BookingController extends Controller
         abort_unless($rental->user_id === $request->user()->id, 403, 'Anda tidak berhak mengakses pesanan ini.');
 
         $this->scheduleService->releaseExpiredHolds($rental->car_id);
-        $rental->refresh()->load('car.carType');
+        $rental->refresh()->load(['car.carType', 'payments', 'histories.actor']);
 
         return view('customer.bookings.show', compact('rental'));
     }

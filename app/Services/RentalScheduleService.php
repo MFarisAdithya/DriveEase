@@ -200,8 +200,7 @@ class RentalScheduleService
             $expiredRentals = Rental::query()
                 ->when($carId !== null, fn (Builder $q) => $q->where('car_id', $carId))
                 ->where('rental_status', Rental::STATUS_PENDING)
-                ->where('payment_status', Rental::PAYMENT_UNPAID)
-                ->whereNull('payment_proof')
+                ->whereIn('payment_status', [Rental::PAYMENT_UNPAID, Rental::PAYMENT_REJECTED])
                 ->whereNotNull('payment_deadline_at')
                 ->where('payment_deadline_at', '<=', $cutoff)
                 ->lockForUpdate()
@@ -210,13 +209,21 @@ class RentalScheduleService
             $updatedCount = 0;
 
             foreach ($expiredRentals as $rental) {
+                $previousStatus = $rental->rental_status;
                 $rental->transitionRentalStatus(
                     Rental::STATUS_EXPIRED,
                     'Batas waktu unggah bukti pembayaran terlewati sehingga jadwal kendaraan dilepas otomatis.'
                 );
                 $rental->cancelled_at = $reference;
-                $rental->cancellation_reason = 'Melewati batas waktu pembayaran 2 jam tanpa mengirim bukti transfer.';
+                $rental->cancellation_reason = 'Melewati batas waktu pembayaran tanpa bukti transfer yang valid.';
                 $rental->save();
+                $rental->recordHistory(
+                    null,
+                    'booking_expired',
+                    $previousStatus,
+                    Rental::STATUS_EXPIRED,
+                    $rental->cancellation_reason
+                );
                 $updatedCount++;
             }
 

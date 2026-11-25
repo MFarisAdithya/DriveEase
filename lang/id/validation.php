@@ -53,5 +53,9 @@ return [
         'pickup_at' => 'Waktu pengambilan', 'total_days' => 'Jumlah hari sewa',
         'accept_terms' => 'Persetujuan ketentuan rental', 'customer_id' => 'Pelanggan',
         'car_id' => 'Kendaraan', 'notes' => 'Catatan',
+        'payment_proof' => 'Bukti pembayaran', 'claimed_amount' => 'Nominal transfer',
+        'verified_amount' => 'Nominal terverifikasi', 'received_amount' => 'Nominal dana diterima',
+        'refund_reference' => 'Referensi transfer refund', 'transfer_amount' => 'Nominal refund',
+        'transferred_at' => 'Tanggal transfer refund', 'additional_days' => 'Tambahan hari sewa',
     ],
 ];

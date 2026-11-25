@@ -5,6 +5,11 @@
 
 @section('content')
 <div class="space-y-6">
+    @if (($overdueVerificationCount ?? 0) > 0)
+        <div role="alert" class="rounded-xl border border-warning-line bg-warning-surface p-4 text-xs text-warning">
+            <strong>Peringatan Verifikasi Admin:</strong> Terdapat {{ $overdueVerificationCount }} pembayaran menunggu verifikasi lebih dari 1 jam.
+        </div>
+    @endif
     <div class="bg-surface rounded-xl border border-line p-5 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <form method="GET" action="{{ route('admin.bookings.index') }}" class="flex flex-wrap items-center gap-3 flex-1">
             <input name="search" value="{{ request('search') }}" placeholder="Cari kode, nama pelanggan, atau mobil..." class="min-w-[220px] flex-1 rounded-lg border border-field-line bg-surface-raised px-3 py-2 text-xs">

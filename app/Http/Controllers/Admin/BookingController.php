@@ -59,7 +59,15 @@ class BookingController extends Controller
 
         $bookings = $query->latest()->paginate(12)->withQueryString();
 
-        return view('admin.bookings.index', compact('bookings'));
+        // Hitung pesanan menunggu verifikasi admin yang sudah melewati batas 1 jam (SYS-06).
+        $overdueVerificationCount = Rental::query()
+            ->where('rental_status', Rental::STATUS_PENDING)
+            ->where('payment_status', Rental::PAYMENT_PENDING_APPROVAL)
+            ->whereNotNull('payment_submitted_at')
+            ->where('payment_submitted_at', '<', now('Asia/Jakarta')->subHour()->format('Y-m-d H:i:s'))
+            ->count();
+
+        return view('admin.bookings.index', compact('bookings', 'overdueVerificationCount'));
     }
 
     /**
@@ -183,7 +191,7 @@ class BookingController extends Controller
     public function show(Rental $rental): View
     {
         $this->scheduleService->releaseExpiredHolds($rental->car_id);
-        $rental->refresh()->load(['user', 'car.carType', 'creator']);
+        $rental->refresh()->load(['user', 'car.carType', 'creator', 'payments.verifier', 'histories.actor']);
 
         return view('admin.bookings.show', compact('rental'));
     }

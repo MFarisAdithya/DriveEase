@@ -4,11 +4,13 @@ use App\Http\Controllers\AccountController;
 use App\Http\Controllers\Admin\BookingController as AdminBookingController;
 use App\Http\Controllers\Admin\CarController as AdminCarController;
 use App\Http\Controllers\Admin\CarTypeController as AdminCarTypeController;
+use App\Http\Controllers\Admin\PaymentController as AdminPaymentController;
 use App\Http\Controllers\Admin\RentalSettingsController;
 use App\Http\Controllers\Admin\StaffController;
 use App\Http\Controllers\Admin\VerificationController as AdminVerificationController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\Customer\BookingController as CustomerBookingController;
+use App\Http\Controllers\Customer\PaymentController as CustomerPaymentController;
 use App\Http\Controllers\Customer\VerificationController as CustomerVerificationController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentController;
@@ -68,6 +70,12 @@ Route::post('/logout', [AuthController::class, 'logout'])
 Route::get('/documents/identity/{user}/{type}', [DocumentController::class, 'showIdentity'])
     ->middleware('auth')
     ->name('documents.identity.show');
+Route::get('/documents/payments/{payment}', [DocumentController::class, 'showPaymentProof'])
+    ->middleware('auth')
+    ->name('documents.payment.show');
+Route::get('/documents/extensions/{extension}', [DocumentController::class, 'showExtensionPaymentProof'])
+    ->middleware('auth')
+    ->name('documents.extension-payment.show');
 
 // Admin Routes (Protected by auth and role:admin)
 Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->group(function () {
@@ -96,6 +104,9 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
     Route::post('/bookings/register-customer', [AdminBookingController::class, 'registerWalkInCustomer'])->name('bookings.register-customer');
     Route::get('/bookings/{rental}', [AdminBookingController::class, 'show'])->name('bookings.show');
     Route::patch('/bookings/{rental}/cancel', [AdminBookingController::class, 'cancel'])->name('bookings.cancel');
+    Route::post('/bookings/{rental}/payments', [AdminPaymentController::class, 'storeWalkInProof'])->name('bookings.payments.store');
+    Route::patch('/payments/{payment}/approve', [AdminPaymentController::class, 'approve'])->name('payments.approve');
+    Route::patch('/payments/{payment}/reject', [AdminPaymentController::class, 'reject'])->name('payments.reject');
 });
 
 // Staff Routes (Protected by auth and role:staff)
@@ -115,4 +126,5 @@ Route::middleware(['auth', 'role:customer'])->prefix('customer')->name('customer
     Route::post('/bookings', [CustomerBookingController::class, 'store'])->name('bookings.store');
     Route::get('/bookings/{rental}', [CustomerBookingController::class, 'show'])->name('bookings.show');
     Route::patch('/bookings/{rental}/cancel', [CustomerBookingController::class, 'cancel'])->name('bookings.cancel');
+    Route::post('/bookings/{rental}/payments', [CustomerPaymentController::class, 'store'])->name('bookings.payments.store');
 });

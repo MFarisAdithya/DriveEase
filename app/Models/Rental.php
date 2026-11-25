@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Rental extends Model
 {
@@ -39,6 +40,18 @@ class Rental extends Model
     public const CHANNEL_ONLINE = 'online';
 
     public const CHANNEL_WALK_IN = 'walk_in';
+
+    public const REFUND_NONE = 'none';
+
+    public const REFUND_PENDING = 'pending';
+
+    public const REFUND_PROCESSED = 'processed';
+
+    public const CANCEL_CUSTOMER = 'customer_request';
+
+    public const CANCEL_RENTAL_FAULT = 'rental_fault';
+
+    public const CANCEL_NO_SHOW = 'no_show';
 
     /**
      * Status penyewaan yang menahan jadwal kendaraan agar tidak bentrok dengan pesanan lain.
@@ -97,17 +110,38 @@ class Rental extends Model
         'total_days',
         'daily_price',
         'total_amount',
+        'paid_amount',
         'booking_channel',
         'created_by',
         'terms_accepted_at',
         'payment_bank_name',
         'payment_account_number',
         'payment_account_holder',
+        'payment_submitted_at',
+        'payment_rejected_at',
+        'payment_rejection_reason',
         'cancelled_at',
         'cancellation_reason',
+        'cancellation_type',
+        'cancellation_requested_at',
+        'cancellation_request_reason',
+        'refund_percentage',
+        'refund_amount',
+        'refund_status',
+        'refund_transferred_at',
+        'refund_reference',
+        'refund_notes',
+        'refund_processed_by',
         'status_notice',
         'notes',
         'idempotency_key',
+    ];
+
+    /**
+     * @var list<string>
+     */
+    protected $hidden = [
+        'payment_proof',
     ];
 
     /**
@@ -125,11 +159,18 @@ class Rental extends Model
             'actual_pickup_at' => 'datetime',
             'payment_deadline_at' => 'datetime',
             'payment_verified_at' => 'datetime',
+            'payment_submitted_at' => 'datetime',
+            'payment_rejected_at' => 'datetime',
             'terms_accepted_at' => 'datetime',
             'cancelled_at' => 'datetime',
+            'cancellation_requested_at' => 'datetime',
+            'refund_transferred_at' => 'datetime',
             'total_days' => 'integer',
             'daily_price' => 'decimal:2',
             'total_amount' => 'decimal:2',
+            'paid_amount' => 'decimal:2',
+            'refund_percentage' => 'integer',
+            'refund_amount' => 'decimal:2',
         ];
     }
 
@@ -153,6 +194,31 @@ class Rental extends Model
         return $this->belongsTo(User::class, 'payment_verified_by');
     }
 
+    public function refundProcessor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'refund_processed_by');
+    }
+
+    public function payments(): HasMany
+    {
+        return $this->hasMany(RentalPayment::class)->orderByDesc('id');
+    }
+
+    public function changeRequests(): HasMany
+    {
+        return $this->hasMany(RentalChangeRequest::class)->orderByDesc('id');
+    }
+
+    public function extensions(): HasMany
+    {
+        return $this->hasMany(RentalExtension::class)->orderByDesc('id');
+    }
+
+    public function histories(): HasMany
+    {
+        return $this->hasMany(RentalHistory::class)->orderByDesc('id');
+    }
+
     /**
      * Filter rentals that still hold a vehicle's schedule at the given moment.
      */
@@ -160,14 +226,14 @@ class Rental extends Model
     protected function holdingSchedule(Builder $query, ?CarbonInterface $at = null): void
     {
         // Format waktu WIB dipakai agar perbandingan kolom timestamp PostgreSQL konsisten.
-        // Pesanan pending yang belum mengunggah bukti dan sudah melewati tenggat tidak lagi
-        // menahan jadwal kendaraan, sedangkan bukti yang dikirim tepat waktu tetap ditahan.
+        // Pesanan pending yang belum lunas (unpaid atau rejected) tanpa antrean verifikasi
+        // dan sudah melewati tenggat tidak lagi menahan jadwal kendaraan.
         $cutoff = ($at ? $at->copy()->timezone('Asia/Jakarta') : now('Asia/Jakarta'))->format('Y-m-d H:i:s');
 
         $query->whereIn('rental_status', self::HOLDING_STATUSES)
             ->whereRaw(
-                'NOT (rental_status = ? AND payment_status = ? AND payment_proof IS NULL AND payment_deadline_at IS NOT NULL AND payment_deadline_at <= ?)',
-                [self::STATUS_PENDING, self::PAYMENT_UNPAID, $cutoff]
+                'NOT (rental_status = ? AND payment_status IN (?, ?) AND payment_deadline_at IS NOT NULL AND payment_deadline_at <= ?)',
+                [self::STATUS_PENDING, self::PAYMENT_UNPAID, self::PAYMENT_REJECTED, $cutoff]
             );
     }
 
@@ -232,21 +298,89 @@ class Rental extends Model
     }
 
     /**
-     * Determine whether an unpaid booking has exceeded its upload deadline without proof.
+     * Determine whether an unpaid or rejected booking has exceeded its upload deadline without pending verification.
      */
     public function isPaymentExpired(?CarbonInterface $at = null): bool
     {
-        if ($this->rental_status !== self::STATUS_PENDING || $this->payment_status !== self::PAYMENT_UNPAID) {
+        if ($this->rental_status !== self::STATUS_PENDING || ! in_array($this->payment_status, [self::PAYMENT_UNPAID, self::PAYMENT_REJECTED], true)) {
             return false;
         }
 
-        if ($this->payment_proof !== null || $this->payment_deadline_at === null) {
+        if ($this->payment_deadline_at === null) {
             return false;
         }
 
         $reference = $at ? $at->copy()->timezone('Asia/Jakarta') : now('Asia/Jakarta');
 
         return $this->payment_deadline_at->copy()->timezone('Asia/Jakarta')->lte($reference);
+    }
+
+    /**
+     * Calculate remaining unpaid balance for this rental.
+     */
+    public function remainingBalance(): float
+    {
+        return max(0.0, round((float) $this->total_amount - (float) $this->paid_amount, 2));
+    }
+
+    /**
+     * Determine whether the customer/admin can upload or re-upload a payment proof right now.
+     */
+    public function canUploadPaymentProof(?CarbonInterface $at = null): bool
+    {
+        if ($this->rental_status !== self::STATUS_PENDING) {
+            return false;
+        }
+
+        if (! in_array($this->payment_status, [self::PAYMENT_UNPAID, self::PAYMENT_REJECTED], true)) {
+            return false;
+        }
+
+        return ! $this->isPaymentExpired($at);
+    }
+
+    /**
+     * Check whether pending payment verification has exceeded 1 hour SLA (SYS-06).
+     */
+    public function isAdminVerificationOverdue(?CarbonInterface $at = null): bool
+    {
+        if ($this->rental_status !== self::STATUS_PENDING || $this->payment_status !== self::PAYMENT_PENDING_APPROVAL) {
+            return false;
+        }
+
+        if ($this->payment_submitted_at === null) {
+            return false;
+        }
+
+        $reference = $at ? $at->copy()->timezone('Asia/Jakarta') : now('Asia/Jakarta');
+
+        return $this->payment_submitted_at->copy()->timezone('Asia/Jakarta')->addHour()->lessThan($reference);
+    }
+
+    /**
+     * Record an immutable audit trail entry in rental_histories (SYS-13).
+     *
+     * @param  array<string, mixed>  $metadata
+     */
+    public function recordHistory(
+        ?User $actor,
+        string $action,
+        ?string $fromStatus = null,
+        ?string $toStatus = null,
+        ?string $reason = null,
+        array $metadata = []
+    ): RentalHistory {
+        // create() melalui relasi histories() menyisipkan satu catatan kronologis
+        // berisi pelaku, aksi, status asal/tujuan, alasan, dan metadata terstruktur.
+        return $this->histories()->create([
+            'actor_id' => $actor?->id,
+            'action' => $action,
+            'from_status' => $fromStatus,
+            'to_status' => $toStatus,
+            'reason' => $reason,
+            'metadata' => $metadata !== [] ? $metadata : null,
+            'created_at' => now('Asia/Jakarta'),
+        ]);
     }
 
     /**
