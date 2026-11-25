@@ -118,6 +118,61 @@
         </a>
     </div>
 
+    <!-- Live Transaction & Revenue Summary (All from DB) -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <a href="{{ route('admin.bookings.index', ['filter' => 'active_rentals']) }}" class="bg-surface rounded-xl p-5 border border-line shadow-sm hover:border-action transition-colors block">
+            <span class="text-xs font-semibold uppercase tracking-wider text-muted">Sewa Aktif &amp; Terjadwal</span>
+            <p class="text-2xl font-bold text-ink mt-2">{{ $stats['active_bookings'] ?? 0 }}</p>
+            <p class="text-xs text-muted mt-1">{{ $stats['pending_payments'] ?? 0 }} pembayaran menunggu verifikasi</p>
+        </a>
+        <a href="{{ route('admin.bookings.index') }}" class="bg-surface rounded-xl p-5 border border-line shadow-sm hover:border-warning-line transition-colors block">
+            <span class="text-xs font-semibold uppercase tracking-wider text-warning">Antrean Perubahan &amp; Refund</span>
+            <p class="text-2xl font-bold text-warning mt-2">{{ ($stats['pending_refunds_count'] ?? 0) + ($stats['pending_extensions'] ?? 0) + ($stats['pending_changes'] ?? 0) }}</p>
+            <p class="text-xs text-muted mt-1">{{ $stats['pending_refunds_count'] ?? 0 }} refund &middot; {{ $stats['pending_extensions'] ?? 0 }} perpanjangan &middot; {{ $stats['pending_changes'] ?? 0 }} perubahan</p>
+        </a>
+        <a href="{{ route('admin.reports.index') }}" class="bg-surface rounded-xl p-5 border border-line shadow-sm hover:border-success-line transition-colors block">
+            <span class="text-xs font-semibold uppercase tracking-wider text-success">Penerimaan Kotor Bulan Ini</span>
+            <p class="text-2xl font-bold text-success mt-2">Rp {{ number_format((float) ($stats['month_gross_receipts'] ?? 0), 0, ',', '.') }}</p>
+            <p class="text-xs text-muted mt-1">{{ $stats['month_transactions'] ?? 0 }} transaksi pada periode berjalan</p>
+        </a>
+        <a href="{{ route('admin.reports.index') }}" class="bg-surface rounded-xl p-5 border border-line shadow-sm hover:border-action transition-colors block">
+            <span class="text-xs font-semibold uppercase tracking-wider text-ink">Penerimaan Bersih Bulan Ini</span>
+            <p class="text-2xl font-bold text-ink mt-2">Rp {{ number_format((float) ($stats['month_net_receipts'] ?? 0), 0, ',', '.') }}</p>
+            <p class="text-xs text-muted mt-1">Refund terealisasi Rp {{ number_format((float) ($stats['month_processed_refunds'] ?? 0), 0, ',', '.') }} &rarr; Laporan</p>
+        </a>
+    </div>
+
+    <!-- Actionable Transactions -->
+    <div class="bg-surface rounded-xl border border-line shadow-sm overflow-hidden">
+        <div class="p-6 border-b border-line flex items-center justify-between">
+            <div>
+                <h3 class="text-base font-bold text-ink">Transaksi yang Perlu Ditangani</h3>
+                <p class="text-xs text-muted mt-0.5">Pesanan yang menunggu verifikasi bayar, perubahan, perpanjangan, tagihan akhir, atau realisasi refund.</p>
+            </div>
+            <a href="{{ route('admin.bookings.index') }}" class="text-xs font-semibold text-link hover:underline">
+                Kelola Semua Pemesanan &rarr;
+            </a>
+        </div>
+        <div class="divide-y divide-line">
+            @forelse (($actionableBookings ?? collect()) as $actionRental)
+                <div class="px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                    <div>
+                        <span class="font-mono font-bold text-ink">{{ $actionRental->rental_code }}</span>
+                        <span class="text-muted"> &middot; {{ $actionRental->user?->name ?? '-' }} &middot; {{ $actionRental->car?->name ?? '-' }}</span>
+                        <p class="text-muted mt-0.5">{{ $actionRental->rentalStatusLabel() }} &middot; {{ $actionRental->paymentStatusLabel() }} &middot; Refund: {{ $actionRental->refundStatusLabel() }}</p>
+                    </div>
+                    <a href="{{ route('admin.bookings.show', $actionRental) }}" class="inline-flex items-center justify-center rounded-lg border border-field-line bg-surface-raised hover:bg-surface-hover px-3.5 py-2 font-semibold text-ink shrink-0">
+                        Tinjau Transaksi &rarr;
+                    </a>
+                </div>
+            @empty
+                <div class="px-6 py-8 text-center text-xs text-muted">
+                    Tidak ada transaksi tertunda yang memerlukan tindakan admin saat ini.
+                </div>
+            @endforelse
+        </div>
+    </div>
+
     <!-- Recent Vehicles Table -->
     <div class="bg-surface rounded-xl border border-line shadow-sm overflow-hidden">
         <div class="p-6 border-b border-line flex items-center justify-between">

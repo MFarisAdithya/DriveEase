@@ -79,6 +79,48 @@
             @endif
         </div>
 
+        @if ($rental->payment_status === \App\Models\Rental::PAYMENT_PAID)
+            <div class="rounded-xl border border-success-line bg-success-surface p-5 text-xs space-y-2">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <h2 class="text-sm font-bold text-success">Bukti Transaksi Terkonfirmasi</h2>
+                    <button type="button" onclick="window.print()" class="rounded-lg border border-success-line bg-surface px-3 py-1.5 font-semibold text-ink hover:bg-surface-hover print:hidden">
+                        Cetak Bukti Transaksi
+                    </button>
+                </div>
+                <dl class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <div>
+                        <dt class="text-muted">Nomor Pesanan &amp; Kanal</dt>
+                        <dd class="font-mono font-bold text-ink">{{ $rental->rental_code }} ({{ $rental->channelLabel() }})</dd>
+                    </div>
+                    <div>
+                        <dt class="text-muted">Tanggal Verifikasi Lunas</dt>
+                        <dd class="font-semibold text-ink">{{ $rental->payment_verified_at?->timezone('Asia/Jakarta')->format('d M Y H:i') ?? $rental->created_at?->timezone('Asia/Jakarta')->format('d M Y H:i') }} WIB</dd>
+                    </div>
+                    <div>
+                        <dt class="text-muted">Rekening Pembayaran Tercatat</dt>
+                        <dd class="font-semibold text-ink">{{ $rental->payment_bank_name }} &middot; {{ $rental->payment_account_number }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-muted">Total Sewa &amp; Tagihan Tambahan</dt>
+                        <dd class="font-bold text-ink">Rp {{ number_format((float) $rental->total_amount + (float) $rental->additional_charges_total, 0, ',', '.') }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-muted">Total Dana Dibayar</dt>
+                        <dd class="font-bold text-ink">Rp {{ number_format((float) $rental->paid_amount + (float) $rental->additional_charge_paid_amount, 0, ',', '.') }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-muted">Status Pengembalian Dana (Refund)</dt>
+                        <dd class="font-semibold text-ink">
+                            {{ $rental->refundStatusLabel() }}
+                            @if ((float) $rental->refund_amount > 0)
+                                (Rp {{ number_format((float) $rental->refund_amount, 0, ',', '.') }})
+                            @endif
+                        </dd>
+                    </div>
+                </dl>
+            </div>
+        @endif
+
         @if ($rental->payment_rejection_reason)
             <div class="rounded-xl border border-danger-line bg-danger-surface p-4 text-xs text-danger">
                 <strong class="block font-bold">Bukti Pembayaran Ditolak</strong>

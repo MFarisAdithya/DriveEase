@@ -118,6 +118,47 @@
         </div>
     @endif
 
+    @if (isset($customerSummary))
+        <section class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-surface rounded-xl border border-line p-4 shadow-sm">
+                <span class="text-[11px] font-semibold uppercase tracking-wider text-muted">Pesanan Aktif</span>
+                <p class="text-2xl font-bold text-ink mt-1">{{ $customerSummary['active_count'] }}</p>
+            </div>
+            <div class="bg-surface rounded-xl border border-line p-4 shadow-sm">
+                <span class="text-[11px] font-semibold uppercase tracking-wider text-warning">Butuh Tindakan</span>
+                <p class="text-2xl font-bold text-warning mt-1">{{ $customerSummary['action_needed_count'] }}</p>
+            </div>
+            <div class="bg-surface rounded-xl border border-line p-4 shadow-sm">
+                <span class="text-[11px] font-semibold uppercase tracking-wider text-success">Transaksi Selesai</span>
+                <p class="text-2xl font-bold text-success mt-1">{{ $customerSummary['completed_count'] }}</p>
+            </div>
+            <a href="{{ route('customer.bookings.index') }}" class="bg-surface rounded-xl border border-line p-4 shadow-sm hover:border-action transition-colors block">
+                <span class="text-[11px] font-semibold uppercase tracking-wider text-muted">Total Transaksi</span>
+                <p class="text-2xl font-bold text-ink mt-1">{{ $customerSummary['total_count'] }}</p>
+                <span class="text-[11px] font-semibold text-link">Buka riwayat &rarr;</span>
+            </a>
+        </section>
+
+        @if ($customerSummary['action_items']->isNotEmpty())
+            <section role="alert" class="rounded-xl border border-warning-line bg-warning-surface p-5 space-y-2 text-xs">
+                <h3 class="text-sm font-bold text-warning">Pemberitahuan yang Membutuhkan Tindakan Anda</h3>
+                <ul class="space-y-2">
+                    @foreach ($customerSummary['action_items'] as $item)
+                        <li class="flex flex-wrap items-center justify-between gap-2 border-t border-warning-line/40 pt-2 first:border-t-0 first:pt-0">
+                            <div>
+                                <span class="font-mono font-bold text-ink">{{ $item['rental']->rental_code }}</span>
+                                <span class="text-ink"> &middot; {{ $item['rental']->car?->name ?? 'Kendaraan' }} &mdash; {{ $item['label'] }}</span>
+                            </div>
+                            <a href="{{ route('customer.bookings.show', $item['rental']) }}" class="rounded-lg bg-surface px-3 py-1.5 font-semibold text-ink border border-warning-line hover:bg-surface-hover">
+                                Tindak Lanjuti &rarr;
+                            </a>
+                        </li>
+                    @endforeach
+                </ul>
+            </section>
+        @endif
+    @endif
+
     @if ($recentBookings->isNotEmpty())
         <section class="bg-surface rounded-xl border border-line p-5 shadow-sm space-y-3">
             <div class="flex items-center justify-between">

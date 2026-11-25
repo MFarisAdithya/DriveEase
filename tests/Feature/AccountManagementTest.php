@@ -178,7 +178,7 @@ class AccountManagementTest extends TestCase
             'total_days' => 1,
             'daily_price' => 250000,
             'total_amount' => 250000,
-            'rental_status' => 'returned',
+            'rental_status' => 'completed',
             'payment_status' => 'paid',
         ]);
         $this->delete(route('admin.cars.destroy', $car))->assertRedirect(route('admin.cars.index'));

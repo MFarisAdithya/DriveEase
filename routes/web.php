@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\CarController as AdminCarController;
 use App\Http\Controllers\Admin\CarTypeController as AdminCarTypeController;
 use App\Http\Controllers\Admin\PaymentController as AdminPaymentController;
 use App\Http\Controllers\Admin\RentalSettingsController;
+use App\Http\Controllers\Admin\ReportController as AdminReportController;
 use App\Http\Controllers\Admin\SettlementController as AdminSettlementController;
 use App\Http\Controllers\Admin\StaffController;
 use App\Http\Controllers\Admin\VerificationController as AdminVerificationController;
@@ -141,6 +142,7 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
     Route::patch('/bookings/{rental}/additional-charges/approve', [AdminSettlementController::class, 'approveChargePayment'])->name('bookings.additional-charges.approve');
     Route::patch('/bookings/{rental}/additional-charges/reject', [AdminSettlementController::class, 'rejectChargePayment'])->name('bookings.additional-charges.reject');
     Route::patch('/bookings/{rental}/complete', [AdminSettlementController::class, 'complete'])->name('bookings.complete');
+    Route::get('/reports', [AdminReportController::class, 'index'])->name('reports.index');
 });
 
 // Staff Routes (Protected by auth and role:staff)

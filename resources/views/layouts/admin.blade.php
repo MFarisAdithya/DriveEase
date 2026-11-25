@@ -53,6 +53,13 @@
                 Pemesanan
             </a>
 
+            <a href="{{ route('admin.reports.index') }}"
+               class="flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors {{ request()->routeIs('admin.reports.*') ? 'bg-action-hover text-ink shadow-sm' : 'text-subtle hover:bg-surface-hover hover:text-ink' }}">
+                <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                Laporan rental
+            </a>
             <a href="{{ route('admin.staff.index') }}"
                class="flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors {{ request()->routeIs('admin.staff.*') ? 'bg-action-hover text-ink shadow-sm' : 'text-subtle hover:bg-surface-hover hover:text-ink' }}">
                 <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -126,7 +133,7 @@
             <details class="relative md:hidden">
                 <summary class="cursor-pointer py-3 font-semibold">Menu</summary>
                 <nav aria-label="Navigasi admin" class="absolute left-0 top-full z-40 grid w-56 gap-1 border border-line bg-surface-raised p-3 shadow-lg">
-                    @foreach (['admin.dashboard' => 'Dasbor', 'admin.cars.index' => 'Kelola armada', 'admin.bookings.index' => 'Pemesanan', 'admin.car-types.index' => 'Kategori kendaraan', 'admin.verifications.index' => 'Verifikasi pelanggan', 'admin.staff.index' => 'Kelola staf', 'admin.rental-settings.edit' => 'Pengaturan rental'] as $destination => $label)
+                    @foreach (['admin.dashboard' => 'Dasbor', 'admin.cars.index' => 'Kelola armada', 'admin.bookings.index' => 'Pemesanan', 'admin.car-types.index' => 'Kategori kendaraan', 'admin.verifications.index' => 'Verifikasi pelanggan', 'admin.reports.index' => 'Laporan rental', 'admin.staff.index' => 'Kelola staf', 'admin.rental-settings.edit' => 'Pengaturan rental'] as $destination => $label)
                         <a class="p-2 hover:underline" href="{{ route($destination) }}">{{ $label }}</a>
                     @endforeach
                     <a href="{{ route('account.edit') }}" class="mb-2 flex items-center justify-center rounded-lg border border-field-line px-3 py-2 text-xs font-medium text-subtle hover:bg-surface-hover hover:text-ink transition-colors">Akun Saya</a>

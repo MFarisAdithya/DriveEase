@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\Car;
 use App\Models\Rental;
+use App\Services\RentalExtensionService;
 use App\Services\RentalOperationService;
+use App\Services\RentalReportService;
 use App\Services\RentalScheduleService;
 use App\Services\VerificationQueue;
 use Illuminate\View\View;
@@ -13,9 +15,13 @@ class DashboardController extends Controller
 {
     public function admin(
         RentalScheduleService $scheduleService,
-        RentalOperationService $operationService
+        RentalExtensionService $extensionService,
+        RentalOperationService $operationService,
+        RentalReportService $reportService
     ): View {
         $scheduleService->releaseExpiredHolds();
+        $extensionService->releaseExpiredExtensions();
+
         $verificationCounts = app(VerificationQueue::class)->counts();
         $impactedNextBookings = $operationService->detectImpactedNextBookings();
         $overdueTripsCount = Rental::query()
@@ -23,6 +29,10 @@ class DashboardController extends Controller
             ->where('return_at', '<', now(RentalScheduleService::TIMEZONE)->format('Y-m-d H:i:s'))
             ->count();
 
+        $reportMetrics = $reportService->adminDashboardMetrics();
+        $monthSummary = $reportMetrics['month_summary'];
+
+        // Seluruh statistik dasbor admin dihitung langsung dari database aktual tanpa nilai statis.
         $stats = [
             'total' => Car::activeInventory()->count(),
             'available' => Car::activeInventory()->where('status', 'available')->count(),
@@ -33,11 +43,27 @@ class DashboardController extends Controller
             'active_bookings' => Rental::holdingSchedule()->count(),
             'overdue_trips' => $overdueTripsCount,
             'impacted_bookings' => $impactedNextBookings->count(),
+            'pending_payments' => $reportMetrics['pending_payments'],
+            'pending_refunds_count' => $reportMetrics['pending_refunds_count'],
+            'pending_extensions' => $reportMetrics['pending_extensions'],
+            'pending_changes' => $reportMetrics['pending_changes'],
+            'month_transactions' => $monthSummary['total_transactions'],
+            'month_gross_receipts' => $monthSummary['gross_receipts'],
+            'month_processed_refunds' => $monthSummary['processed_refunds'],
+            'month_pending_refunds' => $monthSummary['pending_refunds'],
+            'month_net_receipts' => $monthSummary['net_receipts'],
         ];
 
         $recentCars = Car::activeInventory()->with('carType')->latest()->take(5)->get();
+        $actionableBookings = $reportMetrics['actionable_bookings'];
 
-        return view('dashboard.admin', compact('stats', 'recentCars', 'impactedNextBookings'));
+        return view('dashboard.admin', compact(
+            'stats',
+            'recentCars',
+            'impactedNextBookings',
+            'actionableBookings',
+            'monthSummary'
+        ));
     }
 
     public function staff(
@@ -87,16 +113,22 @@ class DashboardController extends Controller
         ));
     }
 
-    public function customer(RentalScheduleService $scheduleService): View
-    {
+    public function customer(
+        RentalScheduleService $scheduleService,
+        RentalExtensionService $extensionService,
+        RentalReportService $reportService
+    ): View {
         $scheduleService->releaseExpiredHolds();
+        $extensionService->releaseExpiredExtensions();
+
         $user = auth()->user();
         $availableCars = Car::activeInventory()->with('carType')
             ->where('status', 'available')
             ->orderBy('price_per_day', 'asc')
             ->get();
         $recentBookings = $user->rentals()->with('car.carType')->latest()->take(5)->get();
+        $customerSummary = $reportService->customerDashboardSummary($user);
 
-        return view('dashboard.customer', compact('availableCars', 'user', 'recentBookings'));
+        return view('dashboard.customer', compact('availableCars', 'user', 'recentBookings', 'customerSummary'));
     }
 }

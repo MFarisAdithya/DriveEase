@@ -40,6 +40,25 @@ class BookingController extends Controller
             $query->where('rental_status', (string) $request->query('rental_status'));
         }
 
+        if ($request->filled('payment_status') && in_array($request->query('payment_status'), [
+            Rental::PAYMENT_UNPAID,
+            Rental::PAYMENT_PENDING_APPROVAL,
+            Rental::PAYMENT_PAID,
+            Rental::PAYMENT_REJECTED,
+        ], true)) {
+            $query->where('payment_status', (string) $request->query('payment_status'));
+        }
+
+        if ($request->filled('date_from') && strtotime((string) $request->query('date_from')) !== false) {
+            $fromWib = CarbonImmutable::parse((string) $request->query('date_from'), RentalScheduleService::TIMEZONE)->startOfDay();
+            $query->where('pickup_at', '>=', $fromWib->format('Y-m-d H:i:s'));
+        }
+
+        if ($request->filled('date_to') && strtotime((string) $request->query('date_to')) !== false) {
+            $toWib = CarbonImmutable::parse((string) $request->query('date_to'), RentalScheduleService::TIMEZONE)->endOfDay();
+            $query->where('pickup_at', '<=', $toWib->format('Y-m-d H:i:s'));
+        }
+
         if ($request->filled('booking_channel') && in_array($request->query('booking_channel'), [Rental::CHANNEL_ONLINE, Rental::CHANNEL_WALK_IN], true)) {
             $query->where('booking_channel', (string) $request->query('booking_channel'));
         }
