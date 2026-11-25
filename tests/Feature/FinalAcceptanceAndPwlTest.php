@@ -15,12 +15,15 @@ use Carbon\CarbonImmutable;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
+use PDO;
 use Tests\TestCase;
 
 class FinalAcceptanceAndPwlTest extends TestCase
@@ -92,26 +95,9 @@ class FinalAcceptanceAndPwlTest extends TestCase
         $this->assertSame('pgsql', DB::connection()->getDriverName());
 
         // Cocokkan ERD dengan foreign key aktual pada database PostgreSQL hasil migration (PWL-01).
-        $foreignKeys = DB::table('information_schema.table_constraints as tc')
-            ->join('information_schema.key_column_usage as kcu', function ($join): void {
-                $join->on('tc.constraint_name', '=', 'kcu.constraint_name')
-                    ->on('tc.table_schema', '=', 'kcu.table_schema');
-            })
-            ->join('information_schema.constraint_column_usage as ccu', function ($join): void {
-                $join->on('ccu.constraint_name', '=', 'tc.constraint_name')
-                    ->on('ccu.table_schema', '=', 'tc.table_schema');
-            })
-            ->where('tc.constraint_type', 'FOREIGN KEY')
-            ->where('tc.table_schema', 'public')
-            ->select([
-                'tc.table_name',
-                'kcu.column_name',
-                'ccu.table_name as referenced_table',
-            ])
-            ->get()
-            ->map(fn (object $fk): string => "{$fk->table_name}.{$fk->column_name}->{$fk->referenced_table}")
-            ->all();
+        $foreignKeys = $this->listSchemaForeignKeys('pgsql');
 
+        // Daftar foreign key utama yang wajib ada sesuai rancangan ERD 12 tabel inti.
         $expectedForeignKeys = [
             'users.role_id->roles',
             'cars.car_type_id->car_types',
@@ -123,6 +109,9 @@ class FinalAcceptanceAndPwlTest extends TestCase
             'rental_change_requests.rental_id->rentals',
             'rental_extensions.rental_id->rentals',
             'rental_histories.rental_id->rentals',
+            'rental_cash_flows.rental_id->rentals',
+            'rental_cash_flows.rental_payment_id->rental_payments',
+            'rental_cash_flows.rental_extension_id->rental_extensions',
         ];
 
         foreach ($expectedForeignKeys as $expectedFk) {
@@ -357,6 +346,142 @@ class FinalAcceptanceAndPwlTest extends TestCase
         $this->actingAs($staff)->get(route('staff.schedules.index'))
             ->assertOk()
             ->assertSee('Jadwal Operasional');
+    }
+
+    /**
+     * Memastikan seluruh file migration berjalan bersih pada database PostgreSQL yang benar-benar kosong.
+     */
+    public function test_migrations_run_cleanly_from_empty_postgresql_database(): void
+    {
+        $emptyDbName = 'driveease_empty_check';
+        $postgresPdo = $this->connectPostgresMaintenance();
+        $this->recreateIsolatedDatabase($postgresPdo, $emptyDbName);
+
+        // Salin konfigurasi koneksi pgsql agar target database dapat diarahkan ke database kosong sementara.
+        $baseConfig = config('database.connections.pgsql');
+        $baseConfig['database'] = $emptyDbName;
+        config(['database.connections.empty_check' => $baseConfig]);
+
+        try {
+            // Alihkan koneksi default sementara karena sebagian file migration memanggil DB::statement() tanpa nama koneksi.
+            DB::setDefaultConnection('empty_check');
+            config(['database.default' => 'empty_check']);
+            DB::purge('empty_check');
+
+            $exitCode = Artisan::call('migrate', [
+                '--database' => 'empty_check',
+                '--force' => true,
+            ]);
+
+            $this->assertSame(0, $exitCode, Artisan::output());
+
+            // Pastikan seluruh 12 tabel inti DriveEase dan tabel sistem Laravel terbentuk tanpa error.
+            $expectedTables = [
+                'migrations',
+                'roles',
+                'users',
+                'rental_settings',
+                'car_types',
+                'cars',
+                'rentals',
+                'rental_payments',
+                'rental_change_requests',
+                'rental_extensions',
+                'rental_histories',
+                'inspections',
+                'rental_cash_flows',
+            ];
+
+            foreach ($expectedTables as $tableName) {
+                $this->assertTrue(
+                    Schema::connection('empty_check')->hasTable($tableName),
+                    "Tabel {$tableName} tidak terbentuk saat migration dari database kosong."
+                );
+            }
+
+            // Pastikan relasi foreign key utama langsung aktif pada database hasil migration bersih.
+            $foreignKeys = $this->listSchemaForeignKeys('empty_check');
+
+            foreach ([
+                'users.role_id->roles',
+                'cars.car_type_id->car_types',
+                'rentals.user_id->users',
+                'rentals.car_id->cars',
+                'inspections.rental_id->rentals',
+                'inspections.inspector_id->users',
+                'rental_payments.rental_id->rentals',
+                'rental_change_requests.rental_id->rentals',
+                'rental_extensions.rental_id->rentals',
+                'rental_histories.rental_id->rentals',
+                'rental_cash_flows.rental_id->rentals',
+                'rental_cash_flows.rental_payment_id->rental_payments',
+                'rental_cash_flows.rental_extension_id->rental_extensions',
+            ] as $expectedFk) {
+                $this->assertContains($expectedFk, $foreignKeys, "Foreign key tidak ditemukan pada migration bersih: {$expectedFk}");
+            }
+        } finally {
+            // Selalu kembalikan koneksi utama ke pgsql dan hapus database uji sementara meskipun ada assertion yang gagal.
+            DB::setDefaultConnection('pgsql');
+            config(['database.default' => 'pgsql']);
+            DB::purge('empty_check');
+
+            $this->dropIsolatedDatabase($postgresPdo, $emptyDbName);
+        }
+    }
+
+    /**
+     * Mengambil daftar foreign key skema public pada koneksi PostgreSQL dalam format tabel.kolom->tabel_rujukan.
+     *
+     * @return array<int, string>
+     */
+    private function listSchemaForeignKeys(string $connectionName): array
+    {
+        return DB::connection($connectionName)
+            ->table('information_schema.table_constraints as tc')
+            ->join('information_schema.key_column_usage as kcu', function ($join): void {
+                $join->on('tc.constraint_name', '=', 'kcu.constraint_name')
+                    ->on('tc.table_schema', '=', 'kcu.table_schema');
+            })
+            ->join('information_schema.constraint_column_usage as ccu', function ($join): void {
+                $join->on('ccu.constraint_name', '=', 'tc.constraint_name')
+                    ->on('ccu.table_schema', '=', 'tc.table_schema');
+            })
+            ->where('tc.constraint_type', 'FOREIGN KEY')
+            ->where('tc.table_schema', 'public')
+            ->select([
+                'tc.table_name',
+                'kcu.column_name',
+                'ccu.table_name as referenced_table',
+            ])
+            ->get()
+            ->map(fn (object $fk): string => "{$fk->table_name}.{$fk->column_name}->{$fk->referenced_table}")
+            ->all();
+    }
+
+    private function connectPostgresMaintenance(): PDO
+    {
+        $host = (string) config('database.connections.pgsql.host', '127.0.0.1');
+        $port = (string) config('database.connections.pgsql.port', '5432');
+        $username = (string) config('database.connections.pgsql.username', 'postgres');
+        $password = (string) config('database.connections.pgsql.password', '');
+
+        $pdo = new PDO("pgsql:host={$host};port={$port};dbname=postgres", $username, $password);
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+        return $pdo;
+    }
+
+    private function recreateIsolatedDatabase(PDO $postgresPdo, string $dbName): void
+    {
+        $this->dropIsolatedDatabase($postgresPdo, $dbName);
+        $postgresPdo->exec("CREATE DATABASE \"{$dbName}\"");
+    }
+
+    private function dropIsolatedDatabase(PDO $postgresPdo, string $dbName): void
+    {
+        $stmt = $postgresPdo->prepare('SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = :db AND pid <> pg_backend_pid()');
+        $stmt->execute(['db' => $dbName]);
+        $postgresPdo->exec("DROP DATABASE IF EXISTS \"{$dbName}\"");
     }
 
     private function createUserWithRole(string $roleName): User
