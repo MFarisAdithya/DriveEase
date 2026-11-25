@@ -10,7 +10,7 @@
 
     <div class="rounded-xl border border-line bg-surface p-6 shadow-sm space-y-4">
         <div class="border-b border-line pb-3">
-            <h2 class="text-base font-bold text-ink">Informasi Usaha &amp; Ketentuan (Tampil di Beranda)</h2>
+            <h2 class="text-base font-bold text-ink">Informasi Usaha &amp; Ketentuan</h2>
             <p class="mt-1 text-xs text-muted">Data berikut ditampilkan kepada pengunjung pada halaman beranda DriveEase.</p>
         </div>
         {{-- Key array adalah nama input dan kolom database. Labelnya dibaca admin. --}}
