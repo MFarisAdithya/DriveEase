@@ -147,9 +147,6 @@
             </div>
             <div class="hidden md:flex items-center gap-4 text-xs text-muted">
                 <span>{{ now()->locale('id')->translatedFormat('l, d F Y') }}</span>
-                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-success-surface text-success">
-                    Sistem Aktif
-                </span>
             </div>
         </header>
 
