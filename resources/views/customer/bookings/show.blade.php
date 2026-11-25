@@ -124,9 +124,11 @@
                     <label for="payment_proof" class="block text-xs font-semibold text-ink mb-1">Foto Bukti Transfer (JPG/PNG/WEBP, maks 2 MB)</label>
                     <input id="payment_proof" name="payment_proof" type="file" accept=".jpg,.jpeg,.png,.webp" required class="w-full rounded-lg border border-field-line bg-surface p-2 text-xs">
                 </div>
-                <button type="submit" class="rounded-lg bg-action hover:bg-action-hover px-5 py-2.5 text-xs font-bold text-ink shadow-xs">
-                    Kirim Bukti Pembayaran
-                </button>
+                <div class="flex justify-end">
+                    <button type="submit" class="rounded-lg bg-action hover:bg-action-hover px-5 py-2.5 text-xs font-bold text-ink shadow-xs">
+                        Kirim Bukti Pembayaran
+                    </button>
+                </div>
             </form>
         @endif
 
@@ -276,9 +278,11 @@
                                 <input id="change_reason" name="reason" required placeholder="Contoh: Jadwal perjalanan bergeser" class="w-full rounded-lg border border-field-line bg-surface p-2">
                             </div>
                         </div>
-                        <button type="submit" class="rounded-lg border border-line bg-surface px-4 py-2 font-bold text-ink hover:bg-surface-hover">
-                            Kirim Permohonan Perubahan Jadwal
-                        </button>
+                        <div class="flex justify-end">
+                            <button type="submit" class="rounded-lg border border-line bg-surface px-4 py-2 font-bold text-ink hover:bg-surface-hover">
+                                Kirim Permohonan Perubahan Jadwal
+                            </button>
+                        </div>
                     </form>
                 @endif
             </div>
