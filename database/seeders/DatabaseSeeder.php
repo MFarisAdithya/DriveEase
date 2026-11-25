@@ -2,8 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Models\Car;
-use App\Models\CarType;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Database\Seeder;
@@ -75,101 +73,7 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        // 3. Car Types
-        $mpv = CarType::updateOrCreate(
-            ['name' => 'MPV'],
-            ['description' => 'Multi Purpose Vehicle nyaman untuk keluarga dan rombongan']
-        );
-
-        $suv = CarType::updateOrCreate(
-            ['name' => 'SUV'],
-            ['description' => 'Sport Utility Vehicle tangguh untuk segala medan perkotaan']
-        );
-
-        $sedan = CarType::updateOrCreate(
-            ['name' => 'Sedan'],
-            ['description' => 'Kendaraan elegan dengan kenyamanan berkendara maksimal']
-        );
-
-        $cityCar = CarType::updateOrCreate(
-            ['name' => 'City Car'],
-            ['description' => 'Mobil kompak lincah dan sangat hemat bahan bakar']
-        );
-
-        // 4. Sample Cars
-        Car::updateOrCreate(
-            ['plate_number' => 'B 1234 EAA'],
-            [
-                'car_type_id' => $mpv->id,
-                'name' => 'Toyota Avanza 1.5 G',
-                'brand' => 'Toyota',
-                'model_year' => 2023,
-                'transmission' => 'manual',
-                'capacity' => 7,
-                'price_per_day' => 400000,
-                'status' => 'available',
-                'description' => 'Kondisi prima, AC double blower, irit dan terawat rutin.',
-            ]
-        );
-
-        Car::updateOrCreate(
-            ['plate_number' => 'B 2345 FAB'],
-            [
-                'car_type_id' => $mpv->id,
-                'name' => 'Toyota Innova Zenix 2.0 V',
-                'brand' => 'Toyota',
-                'model_year' => 2024,
-                'transmission' => 'automatic',
-                'capacity' => 7,
-                'price_per_day' => 650000,
-                'status' => 'available',
-                'description' => 'Kabin sangat senyap, suspensi empuk, fitur keselamatan canggih.',
-            ]
-        );
-
-        Car::updateOrCreate(
-            ['plate_number' => 'B 3456 GAC'],
-            [
-                'car_type_id' => $suv->id,
-                'name' => 'Honda HR-V 1.5 SE',
-                'brand' => 'Honda',
-                'model_year' => 2023,
-                'transmission' => 'automatic',
-                'capacity' => 5,
-                'price_per_day' => 550000,
-                'status' => 'rented',
-                'description' => 'Desain sporty dan modern, panoramic roof, audio mantap.',
-            ]
-        );
-
-        Car::updateOrCreate(
-            ['plate_number' => 'B 4567 HAD'],
-            [
-                'car_type_id' => $sedan->id,
-                'name' => 'Honda Civic RS',
-                'brand' => 'Honda',
-                'model_year' => 2024,
-                'transmission' => 'automatic',
-                'capacity' => 5,
-                'price_per_day' => 900000,
-                'status' => 'available',
-                'description' => 'Mesin turbo responsif, interior premium, audio Bose.',
-            ]
-        );
-
-        Car::updateOrCreate(
-            ['plate_number' => 'B 5678 IAE'],
-            [
-                'car_type_id' => $cityCar->id,
-                'name' => 'Daihatsu Ayla 1.2 R',
-                'brand' => 'Daihatsu',
-                'model_year' => 2022,
-                'transmission' => 'manual',
-                'capacity' => 5,
-                'price_per_day' => 300000,
-                'status' => 'maintenance',
-                'description' => 'Sedang dalam pengecekan rem berkala di bengkel resmi.',
-            ]
-        );
+        // 3. Car Types & Reference Fleet (Turo)
+        $this->call(TuroFleetSeeder::class);
     }
 }
