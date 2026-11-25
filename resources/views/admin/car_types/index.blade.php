@@ -8,7 +8,7 @@
     <!-- Top Action Bar -->
     <div class="bg-surface rounded-xl p-5 border border-line shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <!-- Search Form -->
-        <form action="{{ route('admin.car-types.index') }}" method="GET" class="flex items-center gap-2 flex-1 max-w-md">
+        <form action="{{ route('admin.car-types.index') }}" method="GET" class="flex items-center gap-2 flex-1 w-full">
             <div class="relative w-full">
                 <label for="admin_car_type_search" class="sr-only">Cari kategori atau deskripsi kendaraan</label>
                 <input type="text" 
