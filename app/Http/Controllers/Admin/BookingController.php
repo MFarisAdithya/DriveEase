@@ -73,7 +73,8 @@ class BookingController extends Controller
             ->orderBy('name')
             ->get();
 
-        $cars = Car::readyForRental()->with('carType')->orderBy('name')->get();
+        $cars = Car::bookableForSchedule()->with('carType')->orderBy('name')->get();
+        $hasValidPaymentAccount = RentalSetting::current()?->hasValidPaymentAccount() ?? false;
         $selectedCarId = $request->integer('car_id') ?: null;
         $selectedCustomerId = $request->integer('customer_id') ?: null;
         $defaultPickupAt = $request->string('pickup_at')->trim()->toString()
@@ -85,6 +86,7 @@ class BookingController extends Controller
         return view('admin.bookings.create', compact(
             'customers',
             'cars',
+            'hasValidPaymentAccount',
             'selectedCarId',
             'selectedCustomerId',
             'defaultPickupAt',

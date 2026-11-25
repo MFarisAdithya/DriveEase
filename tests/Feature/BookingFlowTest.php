@@ -17,6 +17,24 @@ class BookingFlowTest extends TestCase
 {
     use DatabaseTransactions;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        DB::table('rental_settings')->upsert([
+            'id' => 1,
+            'business_name' => 'DriveEase Uji',
+            'services' => 'Sewa mobil lepas kunci',
+            'address' => 'Jl. Uji No. 1',
+            'contact' => '081234567890',
+            'operating_hours' => '08.00-21.00 WIB',
+            'terms' => 'Ketentuan uji resmi.',
+            'bank_name' => 'Bank Uji DriveEase',
+            'account_number' => '123456789012',
+            'account_holder' => 'PT DriveEase Uji',
+        ], ['id']);
+    }
+
     public function test_verified_customer_can_create_online_booking_and_snapshot_bank_and_tariff(): void
     {
         $admin = $this->createUserWithRole('admin');

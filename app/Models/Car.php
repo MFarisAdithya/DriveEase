@@ -67,9 +67,17 @@ class Car extends Model
     protected function readyForRental(Builder $query): void
     {
         // Operator chaining whereNull()->where() menyaring hanya kendaraan aktif
-        // (archived_at bernilai null) yang berstatus available agar unit perawatan
-        // maupun arsip tidak muncul pada daftar siap disewa.
+        // (archived_at bernilai null) yang berstatus available untuk kesiapan fisik.
         $query->whereNull('archived_at')->where('status', 'available');
+    }
+
+    #[Scope]
+    protected function bookableForSchedule(Builder $query): void
+    {
+        // Kendaraan dapat menerima pemesanan periode mendatang selama belum diarsipkan
+        // dan tidak sedang berstatus maintenance. Unit yang sedang berstatus 'rented'
+        // tetap boleh dipesan untuk jadwal mendatang yang tidak bentrok.
+        $query->whereNull('archived_at')->where('status', '!=', 'maintenance');
     }
 
     /**
@@ -87,6 +95,24 @@ class Car extends Model
     public function isInMaintenance(): bool
     {
         return $this->status === 'maintenance';
+    }
+
+    /**
+     * Determine whether this vehicle can accept future schedule bookings.
+     */
+    public function isBookableForSchedule(): bool
+    {
+        // Unit yang tidak diarsipkan dan tidak dalam perawatan boleh dipesan untuk
+        // periode mendatang selama jadwalnya tidak bentrok (termasuk jeda 1 jam).
+        return ! $this->isArchived() && ! $this->isInMaintenance();
+    }
+
+    /**
+     * Determine whether this vehicle is physically ready for handover right now.
+     */
+    public function isReadyForHandover(): bool
+    {
+        return $this->isReadyForRental();
     }
 
     /**

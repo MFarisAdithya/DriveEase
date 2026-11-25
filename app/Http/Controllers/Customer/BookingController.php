@@ -54,7 +54,8 @@ class BookingController extends Controller
                 ->with('error', 'Identitas KTP dan SIM Anda harus terverifikasi sebelum dapat membuat pemesanan.');
         }
 
-        $cars = Car::readyForRental()->with('carType')->orderBy('name')->get();
+        $cars = Car::bookableForSchedule()->with('carType')->orderBy('name')->get();
+        $hasValidPaymentAccount = RentalSetting::current()?->hasValidPaymentAccount() ?? false;
         $selectedCarId = $request->integer('car_id') ?: null;
         $defaultPickupAt = $request->string('pickup_at')->trim()->toString()
             ?: CarbonImmutable::now(RentalScheduleService::TIMEZONE)->addDay()->setTime(9, 0)->format('Y-m-d\TH:i');
@@ -85,6 +86,7 @@ class BookingController extends Controller
 
         return view('customer.bookings.create', compact(
             'cars',
+            'hasValidPaymentAccount',
             'selectedCarId',
             'defaultPickupAt',
             'defaultDays',

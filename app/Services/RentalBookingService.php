@@ -8,6 +8,8 @@ use App\Models\RentalSetting;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
+use Illuminate\Database\QueryException;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -75,21 +77,119 @@ class RentalBookingService
             ? substr(trim($idempotencyKey), 0, 64)
             : null;
 
-        // DB::transaction() membungkus seluruh pengecekan dan penyimpanan dalam satu transaksi atomik.
-        // lockForUpdate() mengunci baris mobil terpilih sehingga permintaan bersamaan dari web
-        // maupun admin langsung menunggu giliran dan tidak pernah menghasilkan jadwal bentrok.
-        return DB::transaction(function () use (
-            $customer,
-            $carId,
-            $pickupWib,
-            $totalDays,
-            $normalizedChannel,
-            $createdBy,
-            $notes,
-            $normalizedKey,
-            $nowWib
-        ): Rental {
-            if ($normalizedKey !== null) {
+        // Tagihan hanya boleh dibuat apabila admin telah mengatur rekening tujuan pembayaran
+        // yang valid agar pelanggan selalu memiliki tujuan transfer yang sah dan tercatat (A-13).
+        $activeSettings = RentalSetting::current();
+        if ($activeSettings === null || ! $activeSettings->hasValidPaymentAccount()) {
+            throw ValidationException::withMessages([
+                'payment_account' => 'Rekening tujuan pembayaran rental belum dikonfigurasi dengan valid oleh admin. Pemesanan belum dapat dibuat.',
+            ]);
+        }
+
+        try {
+            // DB::transaction() membungkus seluruh pengecekan dan penyimpanan dalam satu transaksi atomik.
+            // lockForUpdate() mengunci baris mobil terpilih sehingga permintaan bersamaan dari web
+            // maupun admin langsung menunggu giliran dan tidak pernah menghasilkan jadwal bentrok.
+            return DB::transaction(function () use (
+                $customer,
+                $carId,
+                $pickupWib,
+                $totalDays,
+                $normalizedChannel,
+                $createdBy,
+                $notes,
+                $normalizedKey,
+                $nowWib
+            ): Rental {
+                $car = Car::query()->lockForUpdate()->findOrFail($carId);
+
+                // Pengecekan idempotency_key dilakukan setelah lockForUpdate() agar permintaan ganda
+                // yang masuk bersamaan pada unit yang sama langsung membaca pesanan yang baru dibuat.
+                if ($normalizedKey !== null) {
+                    $existingRental = Rental::query()
+                        ->where('idempotency_key', $normalizedKey)
+                        ->where('user_id', $customer->id)
+                        ->first();
+
+                    if ($existingRental !== null) {
+                        return $existingRental;
+                    }
+                }
+
+                if ($car->isArchived()) {
+                    throw ValidationException::withMessages([
+                        'car_id' => 'Kendaraan ini telah diarsipkan dan tidak menerima pesanan baru.',
+                    ]);
+                }
+
+                if ($car->isInMaintenance()) {
+                    throw ValidationException::withMessages([
+                        'car_id' => 'Kendaraan sedang dalam perawatan dan belum dapat dipesan.',
+                    ]);
+                }
+
+                if (! $car->isBookableForSchedule()) {
+                    throw ValidationException::withMessages([
+                        'car_id' => 'Kendaraan saat ini belum siap untuk menerima pemesanan.',
+                    ]);
+                }
+
+                // Lepaskan pesanan unpaid yang sudah melewati tenggat pada mobil ini terlebih dahulu
+                // sebelum memeriksa bentrokan jadwal.
+                $this->scheduleService->releaseExpiredHolds($car->id, $nowWib);
+
+                $pricing = $this->scheduleService->calculatePricing($car, $pickupWib, $totalDays);
+
+                if ($this->scheduleService->hasScheduleConflict($car->id, $pricing['pickup_at'], $pricing['return_at'])) {
+                    throw ValidationException::withMessages([
+                        'pickup_at' => 'Kendaraan tidak tersedia pada periode tersebut karena bentrok jadwal atau jeda persiapan 1 jam antarpenyewaan.',
+                    ]);
+                }
+
+                $paymentDeadline = $this->scheduleService->calculatePaymentDeadline($nowWib, $pricing['pickup_at']);
+                $settings = RentalSetting::current();
+                if ($settings === null || ! $settings->hasValidPaymentAccount()) {
+                    throw ValidationException::withMessages([
+                        'payment_account' => 'Rekening tujuan pembayaran rental belum dikonfigurasi dengan valid oleh admin. Pemesanan belum dapat dibuat.',
+                    ]);
+                }
+
+                // Simpan tarif saat pemesanan serta salinan rekening tujuan aktif agar perubahan
+                // harga atau rekening di masa depan tidak mengubah rincian tagihan pesanan ini (SYS-03, A-13).
+                $rental = new Rental([
+                    'rental_code' => $this->generateUniqueRentalCode($nowWib),
+                    'user_id' => $customer->id,
+                    'car_id' => $car->id,
+                    'start_date' => $pricing['start_date'],
+                    'end_date' => $pricing['end_date'],
+                    'pickup_at' => $pricing['pickup_at'],
+                    'return_at' => $pricing['return_at'],
+                    'payment_deadline_at' => $paymentDeadline,
+                    'total_days' => $pricing['total_days'],
+                    'daily_price' => $pricing['daily_price'],
+                    'total_amount' => $pricing['total_amount'],
+                    'booking_channel' => $normalizedChannel,
+                    'created_by' => $createdBy?->id ?? $customer->id,
+                    'terms_accepted_at' => $nowWib,
+                    'payment_bank_name' => $settings->bank_name,
+                    'payment_account_number' => $settings->account_number,
+                    'payment_account_holder' => $settings->account_holder,
+                    'status_notice' => 'Pesanan berhasil dibuat. Unggah bukti transfer maksimal pada '.$paymentDeadline->format('d M Y H:i').' WIB.',
+                    'notes' => is_string($notes) && trim($notes) !== '' ? trim($notes) : null,
+                    'idempotency_key' => $normalizedKey,
+                ]);
+
+                $rental->rental_status = Rental::STATUS_PENDING;
+                $rental->payment_status = Rental::PAYMENT_UNPAID;
+                $rental->saveOrFail();
+
+                return $rental;
+            });
+        } catch (UniqueConstraintViolationException|QueryException $exception) {
+            // Tangani benturan unique constraint (SQLSTATE 23505) pada idempotency_key ketika dua
+            // permintaan identik masuk hampir bersamaan di luar lock mobil yang sama.
+            $sqlState = $exception->errorInfo[0] ?? $exception->getCode();
+            if ($normalizedKey !== null && (string) $sqlState === '23505') {
                 $existingRental = Rental::query()
                     ->where('idempotency_key', $normalizedKey)
                     ->where('user_id', $customer->id)
@@ -98,74 +198,14 @@ class RentalBookingService
                 if ($existingRental !== null) {
                     return $existingRental;
                 }
-            }
 
-            $car = Car::query()->lockForUpdate()->findOrFail($carId);
-
-            if ($car->isArchived()) {
                 throw ValidationException::withMessages([
-                    'car_id' => 'Kendaraan ini telah diarsipkan dan tidak menerima pesanan baru.',
+                    'idempotency_key' => 'Kunci pengiriman tidak valid. Silakan muat ulang halaman dan coba kembali.',
                 ]);
             }
 
-            if ($car->isInMaintenance()) {
-                throw ValidationException::withMessages([
-                    'car_id' => 'Kendaraan sedang dalam perawatan dan belum dapat dipesan.',
-                ]);
-            }
-
-            if (! $car->isReadyForRental()) {
-                throw ValidationException::withMessages([
-                    'car_id' => 'Kendaraan saat ini belum siap untuk menerima pemesanan.',
-                ]);
-            }
-
-            // Lepaskan pesanan unpaid yang sudah melewati tenggat pada mobil ini terlebih dahulu
-            // sebelum memeriksa bentrokan jadwal.
-            $this->scheduleService->releaseExpiredHolds($car->id, $nowWib);
-
-            $pricing = $this->scheduleService->calculatePricing($car, $pickupWib, $totalDays);
-
-            if ($this->scheduleService->hasScheduleConflict($car->id, $pricing['pickup_at'], $pricing['return_at'])) {
-                throw ValidationException::withMessages([
-                    'pickup_at' => 'Kendaraan tidak tersedia pada periode tersebut karena bentrok jadwal atau jeda persiapan 1 jam antarpenyewaan.',
-                ]);
-            }
-
-            $paymentDeadline = $this->scheduleService->calculatePaymentDeadline($nowWib, $pricing['pickup_at']);
-            $settings = RentalSetting::current();
-
-            // Simpan tarif saat pemesanan serta salinan rekening tujuan aktif agar perubahan
-            // harga atau rekening di masa depan tidak mengubah rincian tagihan pesanan ini (SYS-03, A-13).
-            $rental = new Rental([
-                'rental_code' => $this->generateUniqueRentalCode($nowWib),
-                'user_id' => $customer->id,
-                'car_id' => $car->id,
-                'start_date' => $pricing['start_date'],
-                'end_date' => $pricing['end_date'],
-                'pickup_at' => $pricing['pickup_at'],
-                'return_at' => $pricing['return_at'],
-                'payment_deadline_at' => $paymentDeadline,
-                'total_days' => $pricing['total_days'],
-                'daily_price' => $pricing['daily_price'],
-                'total_amount' => $pricing['total_amount'],
-                'booking_channel' => $normalizedChannel,
-                'created_by' => $createdBy?->id ?? $customer->id,
-                'terms_accepted_at' => $nowWib,
-                'payment_bank_name' => $settings?->bank_name,
-                'payment_account_number' => $settings?->account_number,
-                'payment_account_holder' => $settings?->account_holder,
-                'status_notice' => 'Pesanan berhasil dibuat. Unggah bukti transfer maksimal pada '.$paymentDeadline->format('d M Y H:i').' WIB.',
-                'notes' => is_string($notes) && trim($notes) !== '' ? trim($notes) : null,
-                'idempotency_key' => $normalizedKey,
-            ]);
-
-            $rental->rental_status = Rental::STATUS_PENDING;
-            $rental->payment_status = Rental::PAYMENT_UNPAID;
-            $rental->saveOrFail();
-
-            return $rental;
-        });
+            throw $exception;
+        }
     }
 
     /**

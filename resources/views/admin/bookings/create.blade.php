@@ -9,6 +9,12 @@
         <a href="{{ route('admin.bookings.index') }}" class="text-xs font-semibold text-muted hover:text-ink">&larr; Kembali ke Daftar Pemesanan</a>
     </div>
 
+    @if (! ($hasValidPaymentAccount ?? true))
+        <div role="alert" class="rounded-xl border border-warning-line bg-warning-surface p-4 text-xs text-warning">
+            <strong>Rekening tujuan pembayaran belum valid.</strong> Lengkapi rekening di <a href="{{ route('admin.rental-settings.edit') }}" class="underline font-bold">Pengaturan Rental</a> sebelum membuat pesanan.
+        </div>
+    @endif
+
     @if ($errors->any())
         <ul role="alert" class="rounded-xl border border-danger-line bg-danger-surface p-4 text-xs text-danger space-y-1">
             @foreach ($errors->all() as $message)

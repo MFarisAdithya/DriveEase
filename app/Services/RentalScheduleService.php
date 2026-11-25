@@ -121,7 +121,7 @@ class RentalScheduleService
     }
 
     /**
-     * Determine whether a specific vehicle is ready and free for the requested period.
+     * Determine whether a specific vehicle is bookable and free for the requested period.
      */
     public function isCarAvailableForPeriod(
         Car $car,
@@ -129,7 +129,7 @@ class RentalScheduleService
         CarbonInterface $returnAt,
         ?int $ignoreRentalId = null
     ): bool {
-        if (! $car->isReadyForRental()) {
+        if (! $car->isBookableForSchedule()) {
             return false;
         }
 
@@ -155,10 +155,11 @@ class RentalScheduleService
             ->addMinutes(self::BUFFER_MINUTES)
             ->format('Y-m-d H:i:s');
 
-        // readyForRental() menyaring hanya unit aktif (bukan arsip) berstatus available.
+        // bookableForSchedule() mengizinkan unit aktif (termasuk yang sedang disewa sekarang)
+        // untuk dipesan pada periode mendatang, kecuali unit arsip atau dalam perawatan.
         // whereDoesntHave('rentals', ...) menolak mobil yang memiliki pesanan penahan jadwal
         // yang bertumpuk maupun masuk dalam jeda persiapan 60 menit.
-        $query = Car::readyForRental()
+        $query = Car::bookableForSchedule()
             ->with('carType')
             ->whereDoesntHave('rentals', function (Builder $rentalQuery) use ($windowStartWithBuffer, $windowEndWithBuffer): void {
                 $rentalQuery->holdingSchedule()

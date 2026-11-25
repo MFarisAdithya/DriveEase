@@ -12,6 +12,12 @@
         <p class="mt-1 text-xs text-muted">Seluruh jadwal menggunakan Waktu Indonesia Barat (WIB) dengan durasi 24 jam per hari sewa.</p>
     </div>
 
+    @if (! ($hasValidPaymentAccount ?? true))
+        <div role="alert" class="rounded-xl border border-warning-line bg-warning-surface p-4 text-xs text-warning">
+            <strong>Rekening tujuan pembayaran belum siap.</strong> Admin belum mengonfigurasi rekening tujuan pembayaran yang valid sehingga pemesanan baru sementara tidak dapat diproses.
+        </div>
+    @endif
+
     @if ($errors->any())
         <ul role="alert" class="rounded-xl border border-danger-line bg-danger-surface p-4 text-xs text-danger space-y-1">
             @foreach ($errors->all() as $message)

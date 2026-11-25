@@ -55,6 +55,22 @@ class RentalSetting extends Model
     }
 
     /**
+     * Verify that the rental payment bank account has valid bank name, numeric account number, and holder.
+     */
+    public function hasValidPaymentAccount(): bool
+    {
+        // preg_match() memeriksa apakah nomor rekening hanya terdiri dari digit 0-9
+        // setelah trim(), dan memastikan nama bank serta pemilik rekening tidak kosong.
+        $bankName = trim((string) $this->bank_name);
+        $accountNumber = trim((string) $this->account_number);
+        $accountHolder = trim((string) $this->account_holder);
+
+        return $bankName !== ''
+            && preg_match('/^[0-9]+$/', $accountNumber) === 1
+            && $accountHolder !== '';
+    }
+
+    /**
      * Provide fallback public business information when row ID 1 is not yet seeded.
      */
     public static function defaultPublicInfo(): object

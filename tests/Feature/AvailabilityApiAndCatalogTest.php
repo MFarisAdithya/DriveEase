@@ -9,12 +9,31 @@ use App\Models\User;
 use App\Services\RentalBookingService;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
 class AvailabilityApiAndCatalogTest extends TestCase
 {
     use DatabaseTransactions;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        DB::table('rental_settings')->upsert([
+            'id' => 1,
+            'business_name' => 'DriveEase Uji',
+            'services' => 'Sewa mobil lepas kunci',
+            'address' => 'Jl. Uji No. 1',
+            'contact' => '081234567890',
+            'operating_hours' => '08.00-21.00 WIB',
+            'terms' => 'Ketentuan uji resmi.',
+            'bank_name' => 'Bank Uji DriveEase',
+            'account_number' => '123456789012',
+            'account_holder' => 'PT DriveEase Uji',
+        ], ['id']);
+    }
 
     public function test_api_returns_same_available_cars_and_tariffs_as_web_catalog_and_hides_private_data(): void
     {
