@@ -10,9 +10,11 @@
             <a href="{{ route('home') }}" class="inline-flex items-center gap-1.5 text-sm font-semibold text-ink underline hover:text-focus">
                 &larr; Kembali ke dasbor
             </a>
-            <span class="inline-flex items-center rounded-full border border-field-line bg-surface px-3 py-1 text-xs font-semibold text-ink">
-                {{ $account->role?->display_name ?? 'Pengguna' }}
-            </span>
+            @unless ($account->isCustomer())
+                <span class="inline-flex items-center rounded-full border border-field-line bg-surface px-3 py-1 text-xs font-semibold text-ink">
+                    {{ $account->role?->display_name ?? 'Pengguna' }}
+                </span>
+            @endunless
         </div>
 
         <div class="space-y-6 rounded-3xl border border-[#C6DFEE] bg-white/95 p-6 sm:p-8 shadow-[0_24px_60px_rgba(11,40,64,0.09)] backdrop-blur-md">

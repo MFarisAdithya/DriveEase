@@ -16,11 +16,11 @@
                     ])
                     <div>
 
-                        @auth
+                        @if(auth()->check() && ! auth()->user()->isCustomer())
                             <span class="hidden lg:inline-block ml-2 px-2 py-0.5 rounded text-xs font-medium bg-surface-hover text-ink border border-field-line">
                                 {{ auth()->user()->role?->display_name ?? 'Pengguna' }}
                             </span>
-                        @endauth
+                        @endif
                     </div>
                 </a>
 
