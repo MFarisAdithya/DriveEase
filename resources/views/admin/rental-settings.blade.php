@@ -38,7 +38,7 @@
 
     <div class="rounded-xl border border-line bg-surface p-6 shadow-sm space-y-4">
         <div class="border-b border-line pb-3">
-            <h2 class="text-base font-bold text-ink">Rekening Tujuan Pembayaran (Privat Admin &amp; Pembayaran)</h2>
+            <h2 class="text-base font-bold text-ink">Rekening Tujuan Pembayaran</h2>
             <p class="mt-1 text-xs text-muted">Nomor rekening hanya digunakan pada halaman transaksi terautentikasi dan tidak ditampilkan di beranda publik.</p>
         </div>
         @foreach ([
