@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Car;
 use App\Models\Rental;
 use App\Models\RentalPayment;
 use App\Models\User;
@@ -21,7 +22,7 @@ class RentalPaymentService
     ) {}
 
     /**
-     * Store a customer or walk-in transfer proof privately and update payment status without extending deadline (C-06, SYS-06).
+     * Simpan bukti transfer pelanggan atau walk-in secara privat dan perbarui status tanpa memperpanjang tenggat (C-06, SYS-06).
      *
      * @throws ValidationException
      */
@@ -43,11 +44,11 @@ class RentalPaymentService
 
         try {
             return DB::transaction(function () use ($rental, $actor, $claimedAmount, $storedPath, $nowWib): RentalPayment {
-                $lockedRental = Rental::query()->lockForUpdate()->findOrFail($rental->id);
+                // Ikuti hierarki kunci global: Car -> releaseExpiredHolds -> Rental.
+                Car::query()->lockForUpdate()->findOrFail($rental->car_id);
+                $this->scheduleService->releaseExpiredHolds($rental->car_id, $nowWib);
 
-                // Lepaskan pesanan jika tenggat sebenarnya sudah terlewat sebelum unggah masuk.
-                $this->scheduleService->releaseExpiredHolds($lockedRental->car_id, $nowWib);
-                $lockedRental->refresh();
+                $lockedRental = Rental::query()->lockForUpdate()->findOrFail($rental->id);
 
                 if ($lockedRental->rental_status !== Rental::STATUS_PENDING) {
                     throw ValidationException::withMessages([
@@ -127,7 +128,7 @@ class RentalPaymentService
     }
 
     /**
-     * Verify full incoming payment and confirm the booking (A-07, SYS-07, SYS-13).
+     * Verifikasi pelunasan uang masuk dan konfirmasikan pemesanan (A-07, SYS-07, SYS-13).
      *
      * @throws ValidationException
      */
@@ -137,8 +138,10 @@ class RentalPaymentService
         $normalizedAmount = round($verifiedAmount, 2);
 
         return DB::transaction(function () use ($payment, $admin, $normalizedAmount, $nowWib): Rental {
+            $carId = (int) Rental::query()->whereKey($payment->rental_id)->value('car_id');
+            Car::query()->lockForUpdate()->findOrFail($carId);
+            $lockedRental = Rental::query()->lockForUpdate()->findOrFail($payment->rental_id);
             $lockedPayment = RentalPayment::query()->lockForUpdate()->findOrFail($payment->id);
-            $lockedRental = Rental::query()->lockForUpdate()->findOrFail($lockedPayment->rental_id);
 
             if (! $lockedPayment->isPendingApproval()) {
                 throw ValidationException::withMessages([
@@ -199,7 +202,7 @@ class RentalPaymentService
     }
 
     /**
-     * Reject a transfer proof with mandatory reason and optional partial received amount (A-07, SYS-06).
+     * Tolak bukti transfer dengan alasan wajib serta pencatatan dana parsial jika sudah masuk (A-07, SYS-06).
      *
      * @throws ValidationException
      */
@@ -226,8 +229,10 @@ class RentalPaymentService
         $nowWib = CarbonImmutable::now(RentalScheduleService::TIMEZONE);
 
         return DB::transaction(function () use ($payment, $admin, $trimmedReason, $normalizedReceived, $nowWib): Rental {
+            $carId = (int) Rental::query()->whereKey($payment->rental_id)->value('car_id');
+            Car::query()->lockForUpdate()->findOrFail($carId);
+            $lockedRental = Rental::query()->lockForUpdate()->findOrFail($payment->rental_id);
             $lockedPayment = RentalPayment::query()->lockForUpdate()->findOrFail($payment->id);
-            $lockedRental = Rental::query()->lockForUpdate()->findOrFail($lockedPayment->rental_id);
 
             if (! $lockedPayment->isPendingApproval()) {
                 throw ValidationException::withMessages([

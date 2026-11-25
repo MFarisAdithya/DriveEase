@@ -21,6 +21,12 @@ class RentalExtension extends Model
 
     public const STATUS_REJECTED = 'rejected';
 
+    public const REFUND_NONE = Rental::REFUND_NONE;
+
+    public const REFUND_PENDING = Rental::REFUND_PENDING;
+
+    public const REFUND_PROCESSED = Rental::REFUND_PROCESSED;
+
     /**
      * Kolom yang dapat diisi secara massal oleh layanan perpanjangan sewa.
      *
@@ -34,6 +40,8 @@ class RentalExtension extends Model
         'proposed_return_at',
         'daily_price',
         'additional_amount',
+        'paid_amount',
+        'verified_amount',
         'status',
         'approved_by',
         'approved_at',
@@ -44,6 +52,12 @@ class RentalExtension extends Model
         'payment_verified_by',
         'payment_verified_at',
         'payment_rejection_reason',
+        'refund_amount',
+        'refund_status',
+        'refund_transferred_at',
+        'refund_reference',
+        'refund_notes',
+        'refund_processed_by',
         'notes',
     ];
 
@@ -69,10 +83,14 @@ class RentalExtension extends Model
             'proposed_return_at' => 'datetime',
             'daily_price' => 'decimal:2',
             'additional_amount' => 'decimal:2',
+            'paid_amount' => 'decimal:2',
+            'verified_amount' => 'decimal:2',
             'approved_at' => 'datetime',
             'payment_submitted_at' => 'datetime',
             'payment_deadline_at' => 'datetime',
             'payment_verified_at' => 'datetime',
+            'refund_amount' => 'decimal:2',
+            'refund_transferred_at' => 'datetime',
         ];
     }
 
@@ -94,6 +112,19 @@ class RentalExtension extends Model
     public function paymentVerifier(): BelongsTo
     {
         return $this->belongsTo(User::class, 'payment_verified_by');
+    }
+
+    public function refundProcessor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'refund_processed_by');
+    }
+
+    /**
+     * Hitung sisa tagihan biaya tambahan perpanjangan yang masih perlu dilunasi.
+     */
+    public function remainingExtensionBalance(): float
+    {
+        return max(0.0, round((float) $this->additional_amount - (float) $this->paid_amount, 2));
     }
 
     /**
@@ -134,8 +165,20 @@ class RentalExtension extends Model
             self::STATUS_AWAITING_PAYMENT => 'Disetujui — Menunggu Pembayaran Tambahan',
             self::STATUS_PAYMENT_SUBMITTED => 'Bukti Terunggah — Menunggu Verifikasi Admin',
             self::STATUS_COMPLETED => 'Perpanjangan Aktif & Lunas',
-            self::STATUS_REJECTED => 'Perpanjangan Ditolak',
+            self::STATUS_REJECTED => 'Perpanjangan Ditolak / Dibatalkan',
             default => ucfirst((string) $this->status),
+        };
+    }
+
+    /**
+     * Kembalikan label status pengembalian dana perpanjangan berbahasa Indonesia.
+     */
+    public function refundStatusLabel(): string
+    {
+        return match ($this->refund_status) {
+            self::REFUND_PENDING => 'Menunggu Transfer Refund Perpanjangan',
+            self::REFUND_PROCESSED => 'Refund Perpanjangan Sudah Ditransfer',
+            default => 'Tidak Ada Refund',
         };
     }
 }

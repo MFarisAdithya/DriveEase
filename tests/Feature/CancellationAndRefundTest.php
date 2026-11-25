@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Services\RentalBookingService;
 use App\Services\RentalFinancialService;
 use App\Services\RentalPaymentService;
+use App\Services\RentalScheduleService;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\UploadedFile;
@@ -117,17 +118,11 @@ class CancellationAndRefundTest extends TestCase
             'cancellation_reason' => 'Coba staf',
         ])->assertForbidden();
 
-        // Admin tidak boleh menetapkan refund melebihi dana diterima.
+        // Admin memproses pembatalan sesuai kebijakan -> input tambahan refund_amount diabaikan dan hak refund 100% tetap berlaku.
         $this->actingAs($admin)->patch(route('admin.bookings.cancel-with-refund', $rental), [
             'cancellation_type' => Rental::CANCEL_CUSTOMER,
-            'cancellation_reason' => 'Pelanggan membatalkan lebih dari 48 jam sebelumnya.',
-            'refund_amount' => ((float) $rental->paid_amount) + 100000,
-        ])->assertSessionHasErrors('refund_amount');
-
-        // Admin memproses pembatalan sesuai kebijakan -> status cancelled, refund pending.
-        $this->patch(route('admin.bookings.cancel-with-refund', $rental), [
-            'cancellation_type' => Rental::CANCEL_CUSTOMER,
             'cancellation_reason' => 'Disetujui sesuai pengajuan pelanggan >= 48 jam.',
+            'refund_amount' => ((float) $rental->paid_amount) + 100000,
         ])->assertRedirect(route('admin.bookings.show', $rental));
 
         $rental->refresh();
@@ -166,6 +161,105 @@ class CancellationAndRefundTest extends TestCase
             ->assertOk()
             ->assertSee('Refund Sudah Ditransfer')
             ->assertSee('TRF-REF-2026-01');
+    }
+
+    public function test_cancellation_policy_prevents_arbitrary_override_and_enforces_no_show_and_expired_refund_rules(): void
+    {
+        $admin = $this->createUserWithRole('admin');
+        $customer = $this->createVerifiedCustomer();
+        $car = Car::readyForRental()->firstOrFail();
+
+        // Kasus 1: Kebijakan bertingkat tidak boleh disimpangi meskipun admin mengirim input tambahan refund_amount.
+        $pickupSoon = CarbonImmutable::now('Asia/Jakarta')->addHours(10);
+        $rentalTier50 = app(RentalBookingService::class)->createBooking($customer, $car->id, $pickupSoon, 1, true);
+        $payment1 = app(RentalPaymentService::class)->submitProof($rentalTier50, $customer, UploadedFile::fake()->image('tier50.jpg'));
+        app(RentalPaymentService::class)->approvePayment($payment1, $admin, (float) $rentalTier50->total_amount);
+        $rentalTier50->refresh();
+
+        $this->actingAs($admin)->patch(route('admin.bookings.cancel-with-refund', $rentalTier50), [
+            'cancellation_type' => Rental::CANCEL_CUSTOMER,
+            'cancellation_reason' => 'Pembatalan mendadak sekitar 10 jam sebelum ambil.',
+            'refund_amount' => 1000,
+        ])->assertRedirect(route('admin.bookings.show', $rentalTier50));
+
+        $rentalTier50->refresh();
+        $this->assertSame(50, $rentalTier50->refund_percentage);
+        $expectedRefund50 = round(((float) $rentalTier50->paid_amount) * 0.5, 2);
+        $this->assertEquals($expectedRefund50, (float) $rentalTier50->refund_amount);
+
+        // Realisasi yang menyimpang dari hak refund kebijakan harus ditolak meski <= paid_amount.
+        $this->actingAs($admin)->patch(route('admin.bookings.refund', $rentalTier50), [
+            'transfer_amount' => max(1, $expectedRefund50 - 10000),
+            'transferred_at' => now('Asia/Jakarta')->format('Y-m-d\TH:i'),
+            'refund_reference' => 'TRX-DEV',
+        ])->assertSessionHasErrors('transfer_amount');
+
+        // Kasus 2: No-show ditolak sebelum +1 jam dari jadwal ambil atau bila admin belum menghubungi pelanggan.
+        $pickupNoShow = CarbonImmutable::now('Asia/Jakarta')->addMinutes(30);
+        $rentalNoShow = app(RentalBookingService::class)->createBooking($customer, $car->id, $pickupNoShow, 1, true);
+        $payment2 = app(RentalPaymentService::class)->submitProof($rentalNoShow, $customer, UploadedFile::fake()->image('noshow.jpg'));
+        app(RentalPaymentService::class)->approvePayment($payment2, $admin, (float) $rentalNoShow->total_amount);
+
+        $this->actingAs($admin)->patch(route('admin.bookings.cancel-with-refund', $rentalNoShow), [
+            'cancellation_type' => Rental::CANCEL_NO_SHOW,
+            'cancellation_reason' => 'Mencoba no-show sebelum jadwal lewat 1 jam.',
+            'contact_attempted' => 1,
+        ])->assertSessionHasErrors('cancellation_type');
+
+        $this->travel(95)->minutes();
+
+        try {
+            // Waktu sudah > 1 jam lewat jadwal ambil, namun contact_attempted belum dicentang -> ditolak.
+            $this->actingAs($admin)->patch(route('admin.bookings.cancel-with-refund', $rentalNoShow), [
+                'cancellation_type' => Rental::CANCEL_NO_SHOW,
+                'cancellation_reason' => 'Pelanggan tidak datang 95 menit.',
+            ])->assertSessionHasErrors('contact_attempted');
+
+            // Setelah memenuhi syarat > 1 jam DAN admin telah menghubungi pelanggan -> no-show berhasil (refund 0%).
+            $this->actingAs($admin)->patch(route('admin.bookings.cancel-with-refund', $rentalNoShow), [
+                'cancellation_type' => Rental::CANCEL_NO_SHOW,
+                'cancellation_reason' => 'Sudah dihubungi berulang kali setelah 1 jam, pelanggan tidak hadir.',
+                'contact_attempted' => 1,
+            ])->assertRedirect(route('admin.bookings.show', $rentalNoShow));
+
+            $rentalNoShow->refresh();
+            $this->assertSame(Rental::STATUS_CANCELLED, $rentalNoShow->rental_status);
+            $this->assertSame(0, $rentalNoShow->refund_percentage);
+            $this->assertEquals(0.0, (float) $rentalNoShow->refund_amount);
+            $this->assertSame(Rental::REFUND_NONE, $rentalNoShow->refund_status);
+        } finally {
+            $this->travelBack();
+        }
+
+        // Kasus 3: Dana parsial pada pesanan kedaluwarsa otomatis menjadi hak refund 100% dan dapat direalisasikan (A1).
+        $pickupExpired = CarbonImmutable::now('Asia/Jakarta')->addDays(2)->setTime(10, 0);
+        $rentalExpired = app(RentalBookingService::class)->createBooking($customer, $car->id, $pickupExpired, 1, true);
+        $partialPayment = app(RentalPaymentService::class)->submitProof($rentalExpired, $customer, UploadedFile::fake()->image('parsial.jpg'));
+        app(RentalPaymentService::class)->rejectPayment($partialPayment, $admin, 'Transfer masih kurang Rp 200.000.', 150000);
+
+        $rentalExpired->refresh();
+        $this->assertEquals(150000.0, (float) $rentalExpired->paid_amount);
+
+        app(RentalScheduleService::class)->releaseExpiredHolds(
+            $car->id,
+            CarbonImmutable::instance($rentalExpired->payment_deadline_at)->addMinutes(5)
+        );
+
+        $rentalExpired->refresh();
+        $this->assertSame(Rental::STATUS_EXPIRED, $rentalExpired->rental_status);
+        $this->assertSame(100, $rentalExpired->refund_percentage);
+        $this->assertEquals(150000.0, (float) $rentalExpired->refund_amount);
+        $this->assertSame(Rental::REFUND_PENDING, $rentalExpired->refund_status);
+
+        $this->actingAs($admin)->patch(route('admin.bookings.refund', $rentalExpired), [
+            'transfer_amount' => 150000,
+            'transferred_at' => now('Asia/Jakarta')->format('Y-m-d\TH:i'),
+            'refund_reference' => 'TRX-EXP-150',
+        ])->assertRedirect(route('admin.bookings.show', $rentalExpired));
+
+        $rentalExpired->refresh();
+        $this->assertSame(Rental::REFUND_PROCESSED, $rentalExpired->refund_status);
+        $this->assertSame('TRX-EXP-150', $rentalExpired->refund_reference);
     }
 
     private function createUserWithRole(string $roleName): User

@@ -276,12 +276,25 @@
                         <p class="text-muted">
                             Kembali awal: {{ $extension->previous_return_at?->timezone('Asia/Jakarta')->format('d M Y H:i') }} WIB
                             &rarr; Usulan kembali baru: <strong class="text-ink">{{ $extension->proposed_return_at?->timezone('Asia/Jakarta')->format('d M Y H:i') }} WIB</strong>
+                            @if ($extension->paid_amount > 0)
+                                &middot; Dana masuk perpanjangan: <strong class="text-ink">Rp {{ number_format((float) $extension->paid_amount, 0, ',', '.') }}</strong>
+                            @endif
                         </p>
                         @if ($extension->rejection_reason)
                             <p class="text-danger">Alasan penolakan: {{ $extension->rejection_reason }}</p>
                         @endif
                         @if ($extension->payment_rejection_reason)
-                            <p class="text-danger">Alasan penolakan bukti bayar: {{ $extension->payment_rejection_reason }}</p>
+                            <p class="text-danger">Alasan penolakan / pembatalan bayar: {{ $extension->payment_rejection_reason }}</p>
+                        @endif
+                        @if ($extension->refund_status !== \App\Models\RentalExtension::REFUND_NONE || $extension->refund_amount > 0)
+                            <p class="text-ink">
+                                Status Refund Perpanjangan: <strong>{{ $extension->refundStatusLabel() }}</strong>
+                                (Rp {{ number_format((float) $extension->refund_amount, 0, ',', '.') }})
+                                @if ($extension->refund_transferred_at)
+                                    &middot; Ditransfer {{ $extension->refund_transferred_at->timezone('Asia/Jakarta')->format('d M Y H:i') }} WIB
+                                    (Ref: <strong class="font-mono">{{ $extension->refund_reference }}</strong>)
+                                @endif
+                            </p>
                         @endif
                         @if ($extension->payment_proof)
                             <p>

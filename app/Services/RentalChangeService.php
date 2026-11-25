@@ -59,6 +59,8 @@ class RentalChangeService
         // DB::transaction() memastikan penguncian baris pesanan, pengecekan jadwal, dan penyimpanan
         // permohonan perubahan berjalan atomik tanpa kondisi balapan (NFR-04).
         return DB::transaction(function () use ($rental, $customer, $pickupAt, $totalDays, $reason, $nowWib): RentalChangeRequest {
+            // Ikuti urutan kunci global: Car -> Rental.
+            $car = Car::query()->lockForUpdate()->findOrFail($rental->car_id);
             $lockedRental = Rental::query()->lockForUpdate()->findOrFail($rental->id);
 
             if (! in_array($lockedRental->rental_status, [Rental::STATUS_PENDING, Rental::STATUS_CONFIRMED], true)) {
@@ -73,7 +75,6 @@ class RentalChangeService
                 ]);
             }
 
-            $car = Car::query()->lockForUpdate()->findOrFail($lockedRental->car_id);
             $this->scheduleService->releaseExpiredHolds($car->id, $nowWib);
 
             $pricing = $this->scheduleService->calculatePricing($car, $pickupAt, $totalDays);
@@ -168,6 +169,21 @@ class RentalChangeService
         }
 
         return DB::transaction(function () use ($rental, $admin, $payload, $requestType, $reason, $waiveDifference, $nowWib): RentalChangeRequest {
+            $targetCarId = $requestType === RentalChangeRequest::TYPE_CAR_REPLACEMENT
+                ? (int) ($payload['proposed_car_id'] ?? 0)
+                : (int) $rental->car_id;
+
+            if ($targetCarId <= 0) {
+                throw ValidationException::withMessages([
+                    'proposed_car_id' => 'Kendaraan pengganti harus dipilih.',
+                ]);
+            }
+
+            // Kunci seluruh mobil terkait berurutan naik sebelum mengunci baris Rental agar terhindar dari deadlock.
+            $carIdsToLock = array_values(array_unique([$rental->car_id, $targetCarId]));
+            sort($carIdsToLock);
+            Car::query()->whereIn('id', $carIdsToLock)->orderBy('id')->lockForUpdate()->get();
+
             $lockedRental = Rental::query()->lockForUpdate()->findOrFail($rental->id);
 
             if (! in_array($lockedRental->rental_status, [Rental::STATUS_PENDING, Rental::STATUS_CONFIRMED], true)) {
@@ -181,21 +197,6 @@ class RentalChangeService
                     'rental_id' => 'Masih ada usulan perubahan yang belum ditanggapi pada pesanan ini.',
                 ]);
             }
-
-            $targetCarId = $requestType === RentalChangeRequest::TYPE_CAR_REPLACEMENT
-                ? (int) ($payload['proposed_car_id'] ?? 0)
-                : (int) $lockedRental->car_id;
-
-            if ($targetCarId <= 0) {
-                throw ValidationException::withMessages([
-                    'proposed_car_id' => 'Kendaraan pengganti harus dipilih.',
-                ]);
-            }
-
-            // Kunci mobil asal dan mobil tujuan dalam urutan ID menaik untuk mencegah deadlock lintas transaksi.
-            $carIdsToLock = array_values(array_unique([$lockedRental->car_id, $targetCarId]));
-            sort($carIdsToLock);
-            Car::query()->whereIn('id', $carIdsToLock)->orderBy('id')->lockForUpdate()->get();
 
             $targetCar = Car::query()->find($targetCarId);
             if (! $targetCar instanceof Car || ! $targetCar->isBookableForSchedule()) {
@@ -321,8 +322,20 @@ class RentalChangeService
         $nowWib = CarbonImmutable::now(RentalScheduleService::TIMEZONE);
 
         return DB::transaction(function () use ($changeRequest, $actor, $decision, $trimmedNotes, $nowWib): RentalChangeRequest {
+            // Muat car_id awal terlebih dahulu lalu kunci Car (urutan ID menaik) -> Rental -> RentalChangeRequest
+            // agar urutan penguncian database konsisten di seluruh layanan transaksi (bebas deadlock).
+            $initialRental = Rental::query()->findOrFail($changeRequest->rental_id);
+            $carIdsToLock = array_values(array_unique(array_filter([
+                $initialRental->car_id,
+                $changeRequest->proposed_car_id,
+            ])));
+            sort($carIdsToLock);
+            if ($carIdsToLock !== []) {
+                Car::query()->whereIn('id', $carIdsToLock)->orderBy('id')->lockForUpdate()->get();
+            }
+
+            $lockedRental = Rental::query()->lockForUpdate()->findOrFail($changeRequest->rental_id);
             $lockedRequest = RentalChangeRequest::query()->lockForUpdate()->findOrFail($changeRequest->id);
-            $lockedRental = Rental::query()->lockForUpdate()->findOrFail($lockedRequest->rental_id);
 
             if ($lockedRequest->status === RentalChangeRequest::STATUS_PENDING_ADMIN) {
                 if (! $actor->isAdmin()) {
@@ -376,9 +389,9 @@ class RentalChangeService
             }
 
             $targetCarId = (int) ($lockedRequest->proposed_car_id ?: $lockedRental->car_id);
-            $carIdsToLock = array_values(array_unique([$lockedRental->car_id, $targetCarId]));
-            sort($carIdsToLock);
-            Car::query()->whereIn('id', $carIdsToLock)->orderBy('id')->lockForUpdate()->get();
+            if (! in_array($targetCarId, $carIdsToLock, true)) {
+                Car::query()->whereKey($targetCarId)->lockForUpdate()->get();
+            }
 
             $targetCar = Car::query()->find($targetCarId);
             if (! $targetCar instanceof Car || ! $targetCar->isBookableForSchedule()) {

@@ -194,15 +194,37 @@ class RentalScheduleService
         $reference = $at ? CarbonImmutable::instance($at)->timezone(self::TIMEZONE) : CarbonImmutable::now(self::TIMEZONE);
         $cutoff = $reference->format('Y-m-d H:i:s');
 
-        // DB::transaction() bersama lockForUpdate() membuat proses kedaluwarsa bersifat
-        // idempoten: eksekusi berulang hanya mengubah pesanan yang masih pending dan unpaid.
+        // DB::transaction() mengikuti hierarki penguncian global (cars ASC -> rentals ASC)
+        // untuk mencegah deadlock, sekaligus menjaga kedaluwarsa bersifat idempoten.
         return DB::transaction(function () use ($carId, $cutoff, $reference): int {
+            if ($carId !== null) {
+                Car::query()->where('id', $carId)->lockForUpdate()->get();
+            } else {
+                $targetCarIds = Rental::query()
+                    ->where('rental_status', Rental::STATUS_PENDING)
+                    ->whereIn('payment_status', [Rental::PAYMENT_UNPAID, Rental::PAYMENT_REJECTED])
+                    ->whereNotNull('payment_deadline_at')
+                    ->where('payment_deadline_at', '<=', $cutoff)
+                    ->orderBy('car_id')
+                    ->pluck('car_id')
+                    ->unique()
+                    ->values()
+                    ->all();
+
+                if ($targetCarIds === []) {
+                    return 0;
+                }
+
+                Car::query()->whereIn('id', $targetCarIds)->orderBy('id')->lockForUpdate()->get();
+            }
+
             $expiredRentals = Rental::query()
                 ->when($carId !== null, fn (Builder $q) => $q->where('car_id', $carId))
                 ->where('rental_status', Rental::STATUS_PENDING)
                 ->whereIn('payment_status', [Rental::PAYMENT_UNPAID, Rental::PAYMENT_REJECTED])
                 ->whereNotNull('payment_deadline_at')
                 ->where('payment_deadline_at', '<=', $cutoff)
+                ->orderBy('id')
                 ->lockForUpdate()
                 ->get();
 
@@ -210,10 +232,20 @@ class RentalScheduleService
 
             foreach ($expiredRentals as $rental) {
                 $previousStatus = $rental->rental_status;
-                $rental->transitionRentalStatus(
-                    Rental::STATUS_EXPIRED,
-                    'Batas waktu unggah bukti pembayaran terlewati sehingga jadwal kendaraan dilepas otomatis.'
-                );
+                $paidAmount = max(0.0, round((float) $rental->paid_amount, 2));
+
+                // Apabila pesanan sempat menerima dana parsial sebelum tenggat perbaikan habis,
+                // sistem menetapkan hak refund 100% atas dana masuk agar dapat direkonsiliasi admin.
+                $notice = 'Batas waktu unggah bukti pembayaran terlewati sehingga jadwal kendaraan dilepas otomatis.';
+                if ($paidAmount > 0) {
+                    $rental->refund_percentage = 100;
+                    $rental->refund_amount = $paidAmount;
+                    $rental->refund_status = Rental::REFUND_PENDING;
+                    $notice = 'Pesanan kedaluwarsa. Dana terverifikasi masuk sebesar Rp '.number_format($paidAmount, 0, ',', '.')
+                        .' ditetapkan sebagai refund 100% menunggu realisasi admin.';
+                }
+
+                $rental->transitionRentalStatus(Rental::STATUS_EXPIRED, $notice);
                 $rental->cancelled_at = $reference;
                 $rental->cancellation_reason = 'Melewati batas waktu pembayaran tanpa bukti transfer yang valid.';
                 $rental->save();
@@ -222,7 +254,12 @@ class RentalScheduleService
                     'booking_expired',
                     $previousStatus,
                     Rental::STATUS_EXPIRED,
-                    $rental->cancellation_reason
+                    $rental->cancellation_reason,
+                    $paidAmount > 0 ? [
+                        'refund_percentage' => 100,
+                        'refund_amount' => $paidAmount,
+                        'refund_status' => Rental::REFUND_PENDING,
+                    ] : []
                 );
                 $updatedCount++;
             }

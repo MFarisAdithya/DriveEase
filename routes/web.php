@@ -119,6 +119,7 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
     Route::patch('/extensions/{extension}/reject', [AdminBookingChangeController::class, 'rejectExtension'])->name('extensions.reject');
     Route::patch('/extensions/{extension}/payment/approve', [AdminBookingChangeController::class, 'approveExtensionPayment'])->name('extensions.payment.approve');
     Route::patch('/extensions/{extension}/payment/reject', [AdminBookingChangeController::class, 'rejectExtensionPayment'])->name('extensions.payment.reject');
+    Route::patch('/extensions/{extension}/refund', [AdminBookingChangeController::class, 'realizeExtensionRefund'])->name('extensions.refund');
 });
 
 // Staff Routes (Protected by auth and role:staff)

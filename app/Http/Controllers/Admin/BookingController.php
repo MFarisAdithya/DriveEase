@@ -261,7 +261,7 @@ class BookingController extends Controller
         $validated = $request->validate([
             'cancellation_type' => ['required', 'in:customer_request,rental_fault,no_show'],
             'cancellation_reason' => ['required', 'string', 'min:5', 'max:1000'],
-            'refund_amount' => ['nullable', 'numeric', 'min:0'],
+            'contact_attempted' => ['nullable', 'boolean'],
         ]);
 
         $financialService->cancelWithRefund(
@@ -269,13 +269,11 @@ class BookingController extends Controller
             admin: $request->user(),
             cancellationType: (string) $validated['cancellation_type'],
             reason: (string) $validated['cancellation_reason'],
-            overrideRefundAmount: isset($validated['refund_amount']) && $validated['refund_amount'] !== ''
-                ? (float) $validated['refund_amount']
-                : null,
+            contactAttempted: (bool) ($validated['contact_attempted'] ?? false),
         );
 
         return redirect()->route('admin.bookings.show', $rental)
-            ->with('success', 'Pesanan dibatalkan dan perhitungan pengembalian dana telah dicatat.');
+            ->with('success', 'Pesanan dibatalkan dan hak pengembalian dana telah ditetapkan persis sesuai kebijakan.');
     }
 
     /**

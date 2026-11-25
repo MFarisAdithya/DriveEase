@@ -8,6 +8,7 @@ use App\Models\RentalChangeRequest;
 use App\Models\RentalExtension;
 use App\Services\RentalChangeService;
 use App\Services\RentalExtensionService;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
@@ -98,11 +99,19 @@ class BookingChangeController extends Controller
     }
 
     /**
-     * Verifikasi pelunasan perpanjangan sewa dan aktifkan batas kembali baru setelah cek ulang jadwal (A-08, SYS-09).
+     * Verifikasi pelunasan perpanjangan sewa berdasarkan nominal aktual diterima dan aktifkan batas kembali baru (A-08, SYS-09).
      */
     public function approveExtensionPayment(Request $request, RentalExtension $extension): RedirectResponse
     {
-        $this->extensionService->approveExtensionPayment($extension, $request->user());
+        $validated = $request->validate([
+            'verified_amount' => ['required', 'numeric', 'min:1'],
+        ]);
+
+        $this->extensionService->approveExtensionPayment(
+            $extension,
+            $request->user(),
+            (float) $validated['verified_amount']
+        );
 
         return redirect()
             ->route('admin.bookings.show', $extension->rental_id)
@@ -110,18 +119,58 @@ class BookingChangeController extends Controller
     }
 
     /**
-     * Tolak bukti pembayaran perpanjangan sewa dengan alasan wajib agar pelanggan dapat memperbaiki (A-08).
+     * Tolak bukti pembayaran perpanjangan atau batalkan perpanjangan dengan pencatatan refund dana masuk (A-08, A2).
      */
     public function rejectExtensionPayment(Request $request, RentalExtension $extension): RedirectResponse
     {
         $validated = $request->validate([
             'rejection_reason' => ['required', 'string', 'max:500'],
+            'received_amount' => ['nullable', 'numeric', 'min:0'],
+            'cancel_extension' => ['nullable', 'boolean'],
         ]);
 
-        $this->extensionService->rejectExtensionPayment($extension, $request->user(), $validated['rejection_reason']);
+        $cancelExtension = (bool) ($validated['cancel_extension'] ?? false);
+
+        $this->extensionService->rejectExtensionPayment(
+            $extension,
+            $request->user(),
+            $validated['rejection_reason'],
+            isset($validated['received_amount']) && $validated['received_amount'] !== '' ? (float) $validated['received_amount'] : 0.0,
+            $cancelExtension
+        );
+
+        $message = $cancelExtension
+            ? 'Perpanjangan dibatalkan dan rekonsiliasi dana masuk telah dicatat.'
+            : 'Bukti pembayaran perpanjangan ditolak dengan alasan tercatat.';
 
         return redirect()
             ->route('admin.bookings.show', $extension->rental_id)
-            ->with('success', 'Bukti pembayaran perpanjangan ditolak dengan alasan tercatat.');
+            ->with('success', $message);
+    }
+
+    /**
+     * Catat realisasi pengembalian dana perpanjangan yang batal diaktifkan setelah transfer diterima (A2, SYS-12).
+     */
+    public function realizeExtensionRefund(Request $request, RentalExtension $extension): RedirectResponse
+    {
+        $validated = $request->validate([
+            'transfer_amount' => ['required', 'numeric', 'min:1'],
+            'transferred_at' => ['required', 'date'],
+            'refund_reference' => ['required', 'string', 'max:100'],
+            'refund_notes' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $this->extensionService->realizeExtensionRefund(
+            $extension,
+            $request->user(),
+            (float) $validated['transfer_amount'],
+            CarbonImmutable::parse((string) $validated['transferred_at'], 'Asia/Jakarta'),
+            (string) $validated['refund_reference'],
+            $validated['refund_notes'] ?? null,
+        );
+
+        return redirect()
+            ->route('admin.bookings.show', $extension->rental_id)
+            ->with('success', 'Realisasi pengembalian dana perpanjangan berhasil dicatat.');
     }
 }

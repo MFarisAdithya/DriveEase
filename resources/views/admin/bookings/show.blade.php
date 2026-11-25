@@ -152,13 +152,13 @@
                     <p>Direalisasikan pada {{ $rental->refund_transferred_at->timezone('Asia/Jakarta')->format('d M Y H:i') }} WIB &middot; Referensi: <strong class="font-mono">{{ $rental->refund_reference }}</strong></p>
                 @endif
 
-                @if ($rental->rental_status === \App\Models\Rental::STATUS_CANCELLED && $rental->refund_status === \App\Models\Rental::REFUND_PENDING)
+                @if (in_array($rental->rental_status, [\App\Models\Rental::STATUS_CANCELLED, \App\Models\Rental::STATUS_EXPIRED], true) && $rental->refund_status === \App\Models\Rental::REFUND_PENDING)
                     <form method="POST" action="{{ route('admin.bookings.refund', $rental) }}" class="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-3 border-t border-line items-end">
                         @csrf
                         @method('PATCH')
                         <div>
                             <label for="transfer_amount" class="block font-semibold mb-1">Nominal Transfer (Rp)</label>
-                            <input id="transfer_amount" name="transfer_amount" type="number" min="1" max="{{ (int) $rental->paid_amount }}" value="{{ (int) $rental->refund_amount }}" required class="w-full rounded-lg border border-field-line bg-surface p-2">
+                            <input id="transfer_amount" name="transfer_amount" type="number" step="0.01" min="1" max="{{ (float) $rental->paid_amount }}" value="{{ number_format((float) $rental->refund_amount, 2, '.', '') }}" required class="w-full rounded-lg border border-field-line bg-surface p-2">
                         </div>
                         <div>
                             <label for="transferred_at" class="block font-semibold mb-1">Tanggal Transfer (WIB)</label>
@@ -179,25 +179,27 @@
                 @csrf
                 @method('PATCH')
                 <h3 class="text-sm font-bold text-danger">Batalkan Pesanan &amp; Tetapkan Refund</h3>
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                         <label for="cancellation_type" class="block font-semibold text-ink mb-1">Kategori Pembatalan</label>
                         <select id="cancellation_type" name="cancellation_type" class="w-full rounded-lg border border-field-line bg-surface p-2">
                             <option value="customer_request">Permintaan Pelanggan (Kebijakan Bertingkat)</option>
                             <option value="rental_fault">Kesalahan / Kendala Rental (100%)</option>
-                            <option value="no_show">Pelanggan Tidak Hadir (0%)</option>
+                            <option value="no_show">Pelanggan Tidak Hadir &ge; 1 Jam (0%)</option>
                         </select>
-                    </div>
-                    <div>
-                        <label for="refund_amount_override" class="block font-semibold text-ink mb-1">Nominal Refund (Opsional, maks Rp {{ number_format((float) $rental->paid_amount, 0, ',', '.') }})</label>
-                        <input id="refund_amount_override" name="refund_amount" type="number" min="0" max="{{ (int) $rental->paid_amount }}" placeholder="Otomatis sesuai kebijakan" class="w-full rounded-lg border border-field-line bg-surface p-2">
                     </div>
                     <div>
                         <label for="admin_cancel_reason" class="block font-semibold text-ink mb-1">Alasan Pembatalan</label>
                         <input id="admin_cancel_reason" name="cancellation_reason" required minlength="5" placeholder="Alasan pembatalan resmi" class="w-full rounded-lg border border-field-line bg-surface p-2">
                     </div>
                 </div>
-                <button type="submit" class="rounded-lg bg-danger-action px-4 py-2 font-bold text-white">Proses Pembatalan &amp; Refund</button>
+                <label class="inline-flex items-center gap-2 text-ink">
+                    <input type="checkbox" name="contact_attempted" value="1" class="rounded border-field-line">
+                    <span>Admin telah mencoba menghubungi pelanggan (wajib sebelum menetapkan tidak hadir / no-show)</span>
+                </label>
+                <div>
+                    <button type="submit" class="rounded-lg bg-danger-action px-4 py-2 font-bold text-white">Proses Pembatalan &amp; Refund</button>
+                </div>
             </form>
         @endif
 
@@ -352,23 +354,65 @@
                                 </form>
                             </div>
                         @elseif ($extension->status === \App\Models\RentalExtension::STATUS_PAYMENT_SUBMITTED)
-                            <div class="pt-2 flex flex-col sm:flex-row gap-3">
-                                <form method="POST" action="{{ route('admin.extensions.payment.approve', $extension) }}">
+                            <div class="pt-2 space-y-3 border-t border-line">
+                                <p class="text-muted">
+                                    Dana terverifikasi masuk perpanjangan: <strong class="text-ink">Rp {{ number_format((float) $extension->paid_amount, 0, ',', '.') }}</strong>
+                                    &middot; Sisa tagihan: <strong class="text-ink">Rp {{ number_format($extension->remainingExtensionBalance(), 0, ',', '.') }}</strong>
+                                </p>
+                                <form method="POST" action="{{ route('admin.extensions.payment.approve', $extension) }}" class="flex flex-col sm:flex-row gap-2 items-stretch sm:items-end">
                                     @csrf
                                     @method('PATCH')
-                                    <button type="submit" class="rounded-lg bg-action hover:bg-action-hover px-4 py-2 font-bold text-ink">
+                                    <div class="sm:w-56">
+                                        <label for="ext_verified_amount_{{ $extension->id }}" class="block font-semibold text-ink mb-1">Nominal Aktual Diterima (Rp)</label>
+                                        <input id="ext_verified_amount_{{ $extension->id }}" name="verified_amount" type="number" step="0.01" min="1" value="{{ number_format($extension->remainingExtensionBalance(), 2, '.', '') }}" required class="w-full rounded-lg border border-field-line bg-surface p-2">
+                                    </div>
+                                    <button type="submit" class="rounded-lg bg-action hover:bg-action-hover px-4 py-2 font-bold text-ink shrink-0">
                                         Verifikasi Lunas &amp; Aktifkan Jadwal Baru
                                     </button>
                                 </form>
-                                <form method="POST" action="{{ route('admin.extensions.payment.reject', $extension) }}" class="flex-1 flex flex-col sm:flex-row gap-2">
+                                <form method="POST" action="{{ route('admin.extensions.payment.reject', $extension) }}" class="space-y-2 border-t border-line pt-2">
                                     @csrf
                                     @method('PATCH')
-                                    <input name="rejection_reason" required placeholder="Alasan penolakan bukti perpanjangan" class="flex-1 rounded-lg border border-field-line bg-surface p-2">
-                                    <button type="submit" class="rounded-lg border border-danger-line bg-danger-surface px-4 py-2 font-bold text-danger shrink-0">
-                                        Tolak Bukti Perpanjangan
-                                    </button>
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                        <input name="rejection_reason" required placeholder="Alasan penolakan / pembatalan perpanjangan" class="rounded-lg border border-field-line bg-surface p-2">
+                                        <input name="received_amount" type="number" step="0.01" min="0" placeholder="Dana masuk (opsional, Rp)" class="rounded-lg border border-field-line bg-surface p-2">
+                                    </div>
+                                    <div class="flex flex-wrap items-center justify-between gap-2">
+                                        <label class="inline-flex items-center gap-2 text-ink">
+                                            <input type="checkbox" name="cancel_extension" value="1" class="rounded border-field-line">
+                                            <span>Batalkan perpanjangan (jadwal bentrok/batal) &amp; tetapkan refund 100% atas dana masuk</span>
+                                        </label>
+                                        <button type="submit" class="rounded-lg border border-danger-line bg-danger-surface px-4 py-2 font-bold text-danger shrink-0">
+                                            Tolak / Batalkan Pembayaran Perpanjangan
+                                        </button>
+                                    </div>
                                 </form>
                             </div>
+                        @elseif ($extension->status === \App\Models\RentalExtension::STATUS_REJECTED && $extension->refund_status === \App\Models\RentalExtension::REFUND_PENDING)
+                            <form method="POST" action="{{ route('admin.extensions.refund', $extension) }}" class="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-3 border-t border-line items-end">
+                                @csrf
+                                @method('PATCH')
+                                <div>
+                                    <label for="ext_refund_amount_{{ $extension->id }}" class="block font-semibold mb-1">Nominal Refund Perpanjangan</label>
+                                    <input id="ext_refund_amount_{{ $extension->id }}" name="transfer_amount" type="number" step="0.01" min="1" value="{{ number_format((float) $extension->refund_amount, 2, '.', '') }}" required class="w-full rounded-lg border border-field-line bg-surface p-2">
+                                </div>
+                                <div>
+                                    <label for="ext_refund_at_{{ $extension->id }}" class="block font-semibold mb-1">Tanggal Transfer (WIB)</label>
+                                    <input id="ext_refund_at_{{ $extension->id }}" name="transferred_at" type="datetime-local" value="{{ now('Asia/Jakarta')->format('Y-m-d\TH:i') }}" required class="w-full rounded-lg border border-field-line bg-surface p-2">
+                                </div>
+                                <div>
+                                    <label for="ext_refund_ref_{{ $extension->id }}" class="block font-semibold mb-1">Nomor Referensi</label>
+                                    <input id="ext_refund_ref_{{ $extension->id }}" name="refund_reference" required placeholder="REF-EXT-001" class="w-full rounded-lg border border-field-line bg-surface p-2">
+                                </div>
+                                <button type="submit" class="rounded-lg bg-action hover:bg-action-hover px-4 py-2 font-bold text-ink">Catat Transfer Refund</button>
+                            </form>
+                        @endif
+                        @if ($extension->refund_status === \App\Models\RentalExtension::REFUND_PROCESSED)
+                            <p class="text-ink">
+                                Refund Perpanjangan Selesai: <strong>Rp {{ number_format((float) $extension->refund_amount, 0, ',', '.') }}</strong>
+                                pada {{ $extension->refund_transferred_at?->timezone('Asia/Jakarta')->format('d M Y H:i') }} WIB
+                                (Ref: <strong class="font-mono">{{ $extension->refund_reference }}</strong>)
+                            </p>
                         @endif
                     </div>
                 @endforeach

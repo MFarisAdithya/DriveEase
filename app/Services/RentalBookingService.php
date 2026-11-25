@@ -230,11 +230,13 @@ class RentalBookingService
     public function cancelUnpaidBooking(Rental $rental, User $actor, ?string $reason = null): Rental
     {
         return DB::transaction(function () use ($rental, $actor, $reason): Rental {
+            // Ikuti urutan penguncian global: kunci Car lebih dulu sebelum Rental agar bebas deadlock.
+            Car::query()->lockForUpdate()->findOrFail($rental->car_id);
             $lockedRental = Rental::query()->lockForUpdate()->findOrFail($rental->id);
 
-            if (! $lockedRental->canBeCancelledUnpaid()) {
+            if (! $lockedRental->canBeCancelledUnpaid() || (float) $lockedRental->paid_amount > 0) {
                 throw ValidationException::withMessages([
-                    'rental_status' => 'Hanya pesanan berstatus menunggu dan belum dibayar yang dapat dibatalkan langsung pada tahap ini.',
+                    'rental_status' => 'Hanya pesanan berstatus menunggu dan belum menerima pembayaran yang dapat dibatalkan langsung tanpa rekonsiliasi refund.',
                 ]);
             }
 

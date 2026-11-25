@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Car;
 use App\Models\Rental;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -12,7 +13,7 @@ use Illuminate\Validation\ValidationException;
 class RentalFinancialService
 {
     /**
-     * Calculate refund percentage and capped refund amount according to SKPL cancellation policy (SYS-11).
+     * Hitung persentase dan nominal hak refund pelanggan secara ketat sesuai kebijakan pembatalan SKPL (SYS-11).
      *
      * @return array{percentage: int, amount: float, paid_amount: float, reason_label: string}
      */
@@ -65,7 +66,63 @@ class RentalFinancialService
     }
 
     /**
-     * Calculate combined additional charges from late penalty, fuel shortage, and damage fee (SYS-11).
+     * Hitung denda keterlambatan pengembalian sesuai kebijakan SKPL dan keputusan toleransi 30 menit awal (SYS-10, A3).
+     *
+     * @return array{late_minutes: int, billable_hours: int, full_days: int, late_fee_amount: float, reason: ?string}
+     */
+    public function calculateLatePenalty(Rental $rental, CarbonInterface $actualReturnAt): array
+    {
+        $agreedReturnWib = CarbonImmutable::instance($rental->return_at)->timezone(RentalScheduleService::TIMEZONE);
+        $actualReturnWib = CarbonImmutable::instance($actualReturnAt)->timezone(RentalScheduleService::TIMEZONE);
+        $dailyPrice = max(0.0, round((float) $rental->daily_price, 2));
+
+        // Hitung keterlambatan aktual dalam detik agar pembulatan jam ke atas tepat walau lewat 1 detik.
+        $lateSeconds = $agreedReturnWib->diffInSeconds($actualReturnWib, false);
+        if ($lateSeconds <= 30 * 60) {
+            return [
+                'late_minutes' => max(0, (int) intdiv(max(0, $lateSeconds), 60)),
+                'billable_hours' => 0,
+                'full_days' => 0,
+                'late_fee_amount' => 0.0,
+                'reason' => null,
+            ];
+        }
+
+        $lateMinutes = (int) ceil($lateSeconds / 60);
+        $secondsPerDay = RentalScheduleService::HOURS_PER_DAY * 3600;
+        $fullDays = (int) intdiv($lateSeconds, $secondsPerDay);
+        $remainingSeconds = $lateSeconds % $secondsPerDay;
+
+        $billableHours = 0;
+        $totalFee = $fullDays * $dailyPrice;
+
+        // Untuk > 24 jam, toleransi 30 menit hanya berlaku satu kali di awal:
+        // sisa detik di atas kelipatan 24 jam langsung dihitung 10%/jam (ceil), dan > 5 jam = 1 hari penuh.
+        if ($remainingSeconds > 0) {
+            $remainingHoursCeil = (int) ceil($remainingSeconds / 3600);
+            if ($remainingSeconds > 5 * 3600) {
+                $fullDays++;
+                $totalFee += $dailyPrice;
+            } else {
+                $billableHours = $remainingHoursCeil;
+                $totalFee += round($remainingHoursCeil * 0.10 * $dailyPrice, 2);
+            }
+        }
+
+        $totalFee = round($totalFee, 2);
+
+        return [
+            'late_minutes' => $lateMinutes,
+            'billable_hours' => $billableHours,
+            'full_days' => $fullDays,
+            'late_fee_amount' => $totalFee,
+            'reason' => 'Terlambat '.$lateMinutes.' menit dari batas kembali '.$agreedReturnWib->format('d M Y H:i').' WIB'
+                ." ({$fullDays} hari penuh, {$billableHours} jam x 10% tarif harian).",
+        ];
+    }
+
+    /**
+     * Hitung total biaya tambahan gabungan dari denda telat, kekurangan BBM, dan kerusakan (SYS-11).
      *
      * @throws ValidationException
      */
@@ -81,7 +138,7 @@ class RentalFinancialService
     }
 
     /**
-     * Record a customer's cancellation request after payment proof submission or confirmation (C-08).
+     * Catat pengajuan pembatalan pesanan oleh pelanggan setelah bukti transfer dikirim atau lunas (C-08).
      *
      * @throws ValidationException
      */
@@ -97,6 +154,8 @@ class RentalFinancialService
         $nowWib = CarbonImmutable::now(RentalScheduleService::TIMEZONE);
 
         return DB::transaction(function () use ($rental, $customer, $trimmedReason, $nowWib): Rental {
+            // Ikuti urutan kunci global: Car -> Rental.
+            Car::query()->lockForUpdate()->findOrFail($rental->car_id);
             $lockedRental = Rental::query()->lockForUpdate()->findOrFail($rental->id);
 
             if (! in_array($lockedRental->rental_status, [Rental::STATUS_PENDING, Rental::STATUS_CONFIRMED], true)) {
@@ -105,7 +164,7 @@ class RentalFinancialService
                 ]);
             }
 
-            if ($lockedRental->canBeCancelledUnpaid()) {
+            if ($lockedRental->canBeCancelledUnpaid() && (float) $lockedRental->paid_amount <= 0) {
                 throw ValidationException::withMessages([
                     'rental_status' => 'Pesanan belum dibayar dapat dibatalkan langsung tanpa persetujuan admin.',
                 ]);
@@ -144,7 +203,7 @@ class RentalFinancialService
     }
 
     /**
-     * Cancel a booking as admin and compute refund entitlement capped at paid_amount (A-06, A-10, SYS-11).
+     * Batalkan pesanan oleh admin dan tetapkan hak refund persis sesuai kebijakan SKPL tanpa penyimpangan (A-06, A-10, SYS-11).
      *
      * @throws ValidationException
      */
@@ -153,7 +212,7 @@ class RentalFinancialService
         User $admin,
         string $cancellationType,
         string $reason,
-        ?float $overrideRefundAmount = null
+        bool $contactAttempted = false
     ): Rental {
         if (! in_array($cancellationType, [Rental::CANCEL_CUSTOMER, Rental::CANCEL_RENTAL_FAULT, Rental::CANCEL_NO_SHOW], true)) {
             throw ValidationException::withMessages([
@@ -170,7 +229,9 @@ class RentalFinancialService
 
         $nowWib = CarbonImmutable::now(RentalScheduleService::TIMEZONE);
 
-        return DB::transaction(function () use ($rental, $admin, $cancellationType, $trimmedReason, $overrideRefundAmount, $nowWib): Rental {
+        return DB::transaction(function () use ($rental, $admin, $cancellationType, $trimmedReason, $contactAttempted, $nowWib): Rental {
+            // Ikuti urutan kunci global: Car -> Rental.
+            Car::query()->lockForUpdate()->findOrFail($rental->car_id);
             $lockedRental = Rental::query()->lockForUpdate()->findOrFail($rental->id);
 
             if (! in_array($lockedRental->rental_status, [Rental::STATUS_PENDING, Rental::STATUS_CONFIRMED], true)) {
@@ -179,20 +240,37 @@ class RentalFinancialService
                 ]);
             }
 
+            if ($cancellationType === Rental::CANCEL_NO_SHOW) {
+                $pickupWib = CarbonImmutable::instance($lockedRental->pickup_at)->timezone(RentalScheduleService::TIMEZONE);
+
+                // SKPL mensyaratkan pelanggan sudah melewati +1 jam dari jadwal ambil pada pesanan terkonfirmasi,
+                // belum melakukan pengambilan, dan admin sudah mencoba menghubungi pelanggan lebih dahulu.
+                if ($lockedRental->rental_status !== Rental::STATUS_CONFIRMED || $lockedRental->actual_pickup_at !== null) {
+                    throw ValidationException::withMessages([
+                        'cancellation_type' => 'Status tidak hadir (no-show) hanya berlaku pada pesanan terkonfirmasi yang belum diambil.',
+                    ]);
+                }
+
+                if ($nowWib->lessThan($pickupWib->addHour())) {
+                    throw ValidationException::withMessages([
+                        'cancellation_type' => 'Pembatalan tidak hadir (no-show) baru dapat ditetapkan minimal 1 jam setelah jadwal pengambilan ('.$pickupWib->addHour()->format('d M Y H:i').' WIB).',
+                    ]);
+                }
+
+                if (! $contactAttempted) {
+                    throw ValidationException::withMessages([
+                        'contact_attempted' => 'Admin wajib menghubungi pelanggan terlebih dahulu sebelum menetapkan pembatalan tidak hadir (no-show).',
+                    ]);
+                }
+            }
+
             $policyReference = $cancellationType === Rental::CANCEL_CUSTOMER && $lockedRental->cancellation_requested_at !== null
                 ? $lockedRental->cancellation_requested_at
                 : $nowWib;
 
+            // Hak pengembalian dana selalu ditetapkan tepat sesuai rumus kebijakan SKPL tanpa override sepihak.
             $policy = $this->calculateRefundPolicy($lockedRental, $cancellationType, $policyReference);
-            $paidAmount = $policy['paid_amount'];
-            $refundAmount = $overrideRefundAmount !== null ? round($overrideRefundAmount, 2) : $policy['amount'];
-
-            // Refund tidak pernah boleh negatif maupun melebihi dana yang sudah diterima (A-10, SYS-11).
-            if ($refundAmount < 0 || $refundAmount > $paidAmount) {
-                throw ValidationException::withMessages([
-                    'refund_amount' => 'Nominal pengembalian dana tidak boleh melebihi dana yang diterima (Rp '.number_format($paidAmount, 0, ',', '.').').',
-                ]);
-            }
+            $refundAmount = $policy['amount'];
 
             $previousStatus = $lockedRental->rental_status;
             $refundStatus = $refundAmount > 0 ? Rental::REFUND_PENDING : Rental::REFUND_NONE;
@@ -219,6 +297,7 @@ class RentalFinancialService
                 $trimmedReason,
                 [
                     'cancellation_type' => $cancellationType,
+                    'contact_attempted' => $cancellationType === Rental::CANCEL_NO_SHOW ? true : null,
                     'refund_percentage' => $policy['percentage'],
                     'refund_amount' => $refundAmount,
                     'refund_status' => $refundStatus,
@@ -230,7 +309,7 @@ class RentalFinancialService
     }
 
     /**
-     * Record the actual refund transfer, date, and reference number (A-10, SYS-13).
+     * Catat realisasi transfer pengembalian dana pada pesanan dibatalkan atau kedaluwarsa yang memiliki dana masuk (A-10, A1, SYS-13).
      *
      * @throws ValidationException
      */
@@ -252,11 +331,13 @@ class RentalFinancialService
         $normalizedAmount = round($transferAmount, 2);
 
         return DB::transaction(function () use ($rental, $admin, $normalizedAmount, $transferredAt, $trimmedReference, $notes): Rental {
+            // Ikuti urutan kunci global: Car -> Rental.
+            Car::query()->lockForUpdate()->findOrFail($rental->car_id);
             $lockedRental = Rental::query()->lockForUpdate()->findOrFail($rental->id);
 
-            if ($lockedRental->rental_status !== Rental::STATUS_CANCELLED) {
+            if (! in_array($lockedRental->rental_status, [Rental::STATUS_CANCELLED, Rental::STATUS_EXPIRED], true)) {
                 throw ValidationException::withMessages([
-                    'refund' => 'Realisasi pengembalian dana hanya dapat dicatat pada pesanan yang sudah dibatalkan.',
+                    'refund' => 'Realisasi pengembalian dana hanya dapat dicatat pada pesanan yang dibatalkan atau kedaluwarsa.',
                 ]);
             }
 
@@ -267,9 +348,14 @@ class RentalFinancialService
             }
 
             $paidAmount = max(0.0, round((float) $lockedRental->paid_amount, 2));
-            if ($normalizedAmount <= 0 || $normalizedAmount > $paidAmount) {
+            $entitledRefund = max(0.0, round((float) $lockedRental->refund_amount, 2));
+
+            if ($normalizedAmount <= 0 || $normalizedAmount > $paidAmount || $normalizedAmount !== $entitledRefund) {
                 throw ValidationException::withMessages([
-                    'transfer_amount' => 'Nominal transfer refund harus lebih dari 0 dan tidak melebihi dana diterima (Rp '.number_format($paidAmount, 0, ',', '.').').',
+                    'transfer_amount' => 'Nominal transfer refund harus sama persis dengan hak refund sesuai kebijakan (Rp '
+                        .number_format($entitledRefund, 0, ',', '.')
+                        .') dan tidak melebihi dana diterima (Rp '
+                        .number_format($paidAmount, 0, ',', '.').').',
                 ]);
             }
 

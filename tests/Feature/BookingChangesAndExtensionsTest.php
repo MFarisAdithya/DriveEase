@@ -235,9 +235,15 @@ class BookingChangesAndExtensionsTest extends TestCase
         $this->actingAs($staff)->get($proofUrl)->assertForbidden();
         $this->actingAs($otherCustomer)->get($proofUrl)->assertForbidden();
 
-        // Admin memverifikasi bukti pembayaran -> return_at, total_days, total_amount, paid_amount diperbarui.
-        $this->actingAs($admin)->patch(route('admin.extensions.payment.approve', $extension))
-            ->assertRedirect(route('admin.bookings.show', $rental));
+        // Verifikasi dengan nominal aktual kurang dari tagihan perpanjangan harus ditolak.
+        $this->actingAs($admin)->patch(route('admin.extensions.payment.approve', $extension), [
+            'verified_amount' => 500000,
+        ])->assertSessionHasErrors('verified_amount');
+
+        // Admin memverifikasi bukti pembayaran dengan nominal aktual penuh -> return_at, total_days, total_amount, paid_amount diperbarui.
+        $this->actingAs($admin)->patch(route('admin.extensions.payment.approve', $extension), [
+            'verified_amount' => 1000000,
+        ])->assertRedirect(route('admin.bookings.show', $rental));
 
         $rental->refresh();
         $extension->refresh();
@@ -245,6 +251,7 @@ class BookingChangesAndExtensionsTest extends TestCase
         $this->assertSame(4, $rental->total_days);
         $this->assertEquals(2000000.0, (float) $rental->total_amount);
         $this->assertEquals(2000000.0, (float) $rental->paid_amount);
+        $this->assertEquals(1000000.0, (float) $extension->verified_amount);
         $this->assertTrue($rental->return_at->timezone('Asia/Jakarta')->equalTo($originalReturnAt->addDays(2)));
         $this->assertDatabaseHas('rental_histories', [
             'rental_id' => $rental->id,
@@ -288,8 +295,9 @@ class BookingChangesAndExtensionsTest extends TestCase
         $bookingService->createBooking($otherCustomer, $car->id, $nextPickup, 1, true);
 
         // Pemeriksaan ulang tahap 2 (SYS-09) harus menolak aktivasi jadwal perpanjangan karena kini bentrok!
-        $this->actingAs($admin)->patch(route('admin.extensions.payment.approve', $extension))
-            ->assertSessionHasErrors('extension_id');
+        $this->actingAs($admin)->patch(route('admin.extensions.payment.approve', $extension), [
+            'verified_amount' => 800000,
+        ])->assertSessionHasErrors('extension_id');
 
         $rental->refresh();
         $this->assertSame(2, $rental->total_days);
@@ -330,6 +338,37 @@ class BookingChangesAndExtensionsTest extends TestCase
 
         $existingFilesAfter = Storage::disk('local')->allFiles('payments/extensions');
         $this->assertCount(count($existingFilesBefore), $existingFilesAfter);
+
+        // Jika perpanjangan batal diaktifkan setelah uang perpanjangan terverifikasi masuk, admin membatalkan
+        // dan menetapkan refund 100% lalu merealisasikan pengembalian dana dengan referensi transfer (A2).
+        $this->actingAs($admin)->patch(route('admin.extensions.payment.reject', $extension), [
+            'rejection_reason' => 'Jadwal tambahan sudah ditempati pesanan berikutnya; dana perpanjangan dikembalikan penuh.',
+            'received_amount' => 800000,
+            'cancel_extension' => 1,
+        ])->assertRedirect(route('admin.bookings.show', $rental));
+
+        $extension->refresh();
+        $this->assertSame(RentalExtension::STATUS_REJECTED, $extension->status);
+        $this->assertEquals(800000.0, (float) $extension->paid_amount);
+        $this->assertEquals(800000.0, (float) $extension->refund_amount);
+        $this->assertSame(RentalExtension::REFUND_PENDING, $extension->refund_status);
+
+        // Nominal refund menyimpang dari dana diterima ditolak.
+        $this->actingAs($admin)->patch(route('admin.extensions.refund', $extension), [
+            'transfer_amount' => 500000,
+            'transferred_at' => now('Asia/Jakarta')->format('Y-m-d\TH:i'),
+            'refund_reference' => 'REF-EXT-BAD',
+        ])->assertSessionHasErrors('transfer_amount');
+
+        $this->actingAs($admin)->patch(route('admin.extensions.refund', $extension), [
+            'transfer_amount' => 800000,
+            'transferred_at' => now('Asia/Jakarta')->format('Y-m-d\TH:i'),
+            'refund_reference' => 'REF-EXT-800',
+        ])->assertRedirect(route('admin.bookings.show', $rental));
+
+        $extension->refresh();
+        $this->assertSame(RentalExtension::REFUND_PROCESSED, $extension->refund_status);
+        $this->assertSame('REF-EXT-800', $extension->refund_reference);
     }
 
     public function test_extension_rejection_and_admin_booking_filters_work_correctly(): void
