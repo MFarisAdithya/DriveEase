@@ -414,6 +414,17 @@
                 </div>
             </div>
 
+            @if ($rentalInfo)
+                <section class="mt-10 space-y-3 text-sm text-[#B6DFED]">
+                    <h2 class="text-lg font-bold text-white">{{ $rentalInfo->business_name }}</h2>
+                    <p class="whitespace-pre-line">{{ $rentalInfo->services }}</p>
+                    <p>{{ $rentalInfo->address }}</p>
+                    <p>{{ $rentalInfo->contact }}</p>
+                    <p>Jam operasional {{ $rentalInfo->operating_hours }} WIB</p>
+                    <h3 class="font-semibold text-white">Ketentuan rental</h3>
+                    <p class="whitespace-pre-line">{{ $rentalInfo->terms }}</p>
+                </section>
+            @endif
             <div class="mt-12 pt-8 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#9ADAF6]">
                 <div class="flex items-center gap-3">
                     <span class="font-bold text-white text-sm tracking-tight">DriveEase</span>

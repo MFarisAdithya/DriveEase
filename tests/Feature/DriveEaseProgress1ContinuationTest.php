@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Car;
 use App\Models\CarType;
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Hash;
@@ -203,6 +204,7 @@ class DriveEaseProgress1ContinuationTest extends TestCase
         $response = $this->post(route('register'), [
             'name' => 'Pelanggan Baru DriveEase',
             'email' => $uniqueEmail,
+            'role_id' => Role::where('name', 'admin')->firstOrFail()->id,
             'phone' => '089876543210',
             'password' => 'secret1234',
             'password_confirmation' => 'secret1234',

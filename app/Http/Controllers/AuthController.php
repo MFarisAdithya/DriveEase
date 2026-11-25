@@ -45,7 +45,7 @@ class AuthController extends Controller
         }
         $remember = $request->boolean('remember');
 
-        if (Auth::attempt($credentials, $remember)) {
+        if (Auth::attempt($credentials + ['deactivated_at' => null], $remember)) {
             RateLimiter::clear($key);
             $request->session()->regenerate();
 

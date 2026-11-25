@@ -45,6 +45,8 @@
                 Kendaraan
             </a>
 
+            <a href="{{ route('admin.staff.index') }}" class="block rounded-lg px-3.5 py-2.5 text-sm hover:bg-surface-hover">Kelola staf</a>
+            <a href="{{ route('admin.rental-settings.edit') }}" class="block rounded-lg px-3.5 py-2.5 text-sm hover:bg-surface-hover">Pengaturan rental</a>
             <a href="{{ route('admin.car-types.index') }}"
                class="flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors {{ request()->routeIs('admin.car-types.*') ? 'bg-action-hover text-ink shadow-sm' : 'text-subtle hover:bg-surface-hover hover:text-ink' }}">
                 <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -80,6 +82,7 @@
                     <p class="text-xs text-link capitalize">{{ auth()->user()->role?->display_name ?? 'Admin' }}</p>
                 </div>
             </div>
+            <a href="{{ route('account.edit') }}" class="text-sm underline">Akun Saya</a>
             <form action="{{ route('logout') }}" method="POST">
                 @csrf
                 <button type="submit" class="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-subtle bg-surface-hover hover:bg-danger-surface/60 hover:text-danger rounded-lg transition-colors border border-field-line">
@@ -102,9 +105,10 @@
             <details class="relative md:hidden">
                 <summary class="cursor-pointer py-3 font-semibold">Menu</summary>
                 <nav aria-label="Navigasi admin" class="absolute left-0 top-full z-40 grid w-56 gap-1 border border-line bg-surface-raised p-3 shadow-lg">
-                    @foreach (['admin.dashboard' => 'Dasbor', 'admin.cars.index' => 'Kelola armada', 'admin.car-types.index' => 'Kategori kendaraan', 'admin.verifications.index' => 'Verifikasi pelanggan'] as $destination => $label)
+                    @foreach (['admin.dashboard' => 'Dasbor', 'admin.cars.index' => 'Kelola armada', 'admin.car-types.index' => 'Kategori kendaraan', 'admin.verifications.index' => 'Verifikasi pelanggan', 'admin.staff.index' => 'Kelola staf', 'admin.rental-settings.edit' => 'Pengaturan rental'] as $destination => $label)
                         <a class="p-2 hover:underline" href="{{ route($destination) }}">{{ $label }}</a>
                     @endforeach
+                    <a href="{{ route('account.edit') }}" class="text-sm underline">Akun Saya</a>
                     <form method="POST" action="{{ route('logout') }}">@csrf<button class="p-2">Keluar</button></form>
                 </nav>
             </details>

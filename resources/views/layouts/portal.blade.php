@@ -74,6 +74,7 @@
                         <p class="text-xs font-semibold text-ink">{{ auth()->user()->name }}</p>
                         <p class="text-[11px] text-muted">{{ auth()->user()->email }}</p>
                     </div>
+                    <a href="{{ route('account.edit') }}" class="text-sm underline">Akun Saya</a>
                     <form action="{{ route('logout') }}" method="POST">
                         @csrf
                         <button type="submit" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-subtle bg-surface-hover hover:bg-danger-surface/60 hover:text-ink rounded-lg transition-colors border border-field-line">
