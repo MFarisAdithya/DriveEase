@@ -20,7 +20,6 @@
         <!-- Login Card -->
         <div class="bg-white/95 backdrop-blur-md rounded-3xl shadow-[0_24px_60px_rgba(11,40,64,0.09)] border border-[#C6DFEE] p-8">
             <h2 class="text-lg font-bold text-ink mb-6">Masuk ke Akun Anda</h2>
-            <a href="{{ route('password.request') }}" class="text-sm text-ink underline">Lupa kata sandi?</a>
 
             @if (session('success'))
                 <div class="mb-5 p-3 rounded-lg bg-success-surface border border-success-line text-xs text-success">
@@ -71,12 +70,13 @@
                     @enderror
                 </div>
 
-                <!-- Remember Me -->
+                <!-- Remember Me & Password Reset -->
                 <div class="flex items-center justify-between text-xs pt-1">
                     <label class="flex items-center gap-2 cursor-pointer text-muted select-none">
                         <input type="checkbox" name="remember" class="rounded border-field-line text-link focus:ring-focus">
                         <span>Ingat saya di perangkat ini</span>
                     </label>
+                    <a href="{{ route('password.request') }}" class="font-semibold text-link underline hover:text-focus">Lupa kata sandi?</a>
                 </div>
 
                 <!-- Submit Button -->

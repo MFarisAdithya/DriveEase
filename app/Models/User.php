@@ -61,9 +61,14 @@ class User extends Authenticatable
      */
     protected function casts(): array
     {
+        // Method casts() memberitahu Eloquent cara mengonversi tipe kolom saat dibaca
+        // atau disimpan ke database. 'datetime' mengubah timestamp menjadi objek Carbon,
+        // 'hashed' otomatis meng-hash kata sandi saat diisi, dan 'encrypted' mengenkripsi
+        // nomor identitas sebelum masuk ke database serta mendekripsinya saat dibaca model.
         return [
             'email_verified_at' => 'datetime',
             'verified_at' => 'datetime',
+            'deactivated_at' => 'datetime',
             'password' => 'hashed',
             'nik_ktp' => 'encrypted',
             'sim_number' => 'encrypted',
@@ -93,6 +98,17 @@ class User extends Authenticatable
     public function isCustomer(): bool
     {
         return $this->role?->name === 'customer';
+    }
+
+    /**
+     * Check whether this account has been deactivated by an administrator.
+     */
+    public function isDeactivated(): bool
+    {
+        // Operator !== membandingkan nilai dan tipe secara ketat dengan null.
+        // Jika kolom deactivated_at sudah terisi waktu penonaktifan, method ini
+        // mengembalikan true agar login, sesi lama, dan reset password ditolak.
+        return $this->deactivated_at !== null;
     }
 
     public function hasRole(string|array $roles): bool

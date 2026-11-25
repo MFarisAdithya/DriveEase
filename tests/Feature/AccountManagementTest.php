@@ -10,7 +10,9 @@ use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Password;
 use Tests\TestCase;
 
 class AccountManagementTest extends TestCase
@@ -22,14 +24,17 @@ class AccountManagementTest extends TestCase
         foreach (['admin', 'staff', 'customer'] as $role) {
             $account = User::factory()->create([
                 'role_id' => Role::where('name', $role)->firstOrFail()->id,
+                'verification_status' => 'pending',
             ]);
 
-            $this->actingAs($account)->get(route('account.edit'))->assertOk();
+            $this->actingAs($account)->get(route('account.edit'))->assertOk()->assertSee('Keluar Sekarang');
             $profile = [
                 'name' => 'Nama Diperbarui',
                 'email' => strtoupper($account->email),
                 'phone' => null,
+                'address' => 'Jl. Pengujian No. 88',
                 'role_id' => 999,
+                'verification_status' => 'verified',
             ];
             if ($role === 'customer') {
                 $this->patch(route('account.profile'), $profile)->assertSessionHasErrors('phone');
@@ -37,16 +42,19 @@ class AccountManagementTest extends TestCase
             }
             $this->patch(route('account.profile'), $profile)->assertSessionHasNoErrors();
 
-            $this->assertSame('Nama Diperbarui', $account->fresh()->name);
-            $this->assertSame($profile['phone'], $account->fresh()->phone);
-            $this->assertSame($role, $account->fresh()->role->name);
+            $freshAccount = $account->fresh();
+            $this->assertSame('Nama Diperbarui', $freshAccount->name);
+            $this->assertSame($profile['phone'], $freshAccount->phone);
+            $this->assertSame('Jl. Pengujian No. 88', $freshAccount->address);
+            $this->assertSame($role, $freshAccount->role->name);
+            $this->assertSame('pending', $freshAccount->verification_status);
 
             $password = [
                 'password' => 'sandi-baru-123',
                 'password_confirmation' => 'sandi-baru-123',
             ];
             $this->patch(route('account.password'), $password + ['current_password' => 'salah'])
-                ->assertSessionHasErrors('current_password');
+                ->assertSessionHasErrors(['current_password' => 'Kata sandi saat ini tidak sesuai.']);
             $this->patch(route('account.password'), $password + ['current_password' => 'password'])
                 ->assertSessionHasNoErrors();
             $this->assertTrue(Hash::check($password['password'], $account->fresh()->password));
@@ -56,9 +64,38 @@ class AccountManagementTest extends TestCase
         }
     }
 
+    public function test_login_regenerates_session_id_and_logout_invalidates_session(): void
+    {
+        $customer = User::factory()->create([
+            'role_id' => Role::where('name', 'customer')->firstOrFail()->id,
+            'password' => 'password123',
+        ]);
+
+        $this->get(route('login'))->assertOk();
+        $beforeLoginSessionId = session()->getId();
+
+        $this->post(route('login'), [
+            'email' => $customer->email,
+            'password' => 'password123',
+        ])->assertRedirect(route('customer.dashboard'));
+
+        $afterLoginSessionId = session()->getId();
+        $this->assertNotSame($beforeLoginSessionId, $afterLoginSessionId);
+        $this->assertAuthenticatedAs($customer);
+
+        $this->post(route('logout'))->assertRedirect(route('login'));
+        $this->assertGuest();
+        $this->assertNotSame($afterLoginSessionId, session()->getId());
+    }
+
     public function test_admin_can_manage_staff_and_deactivation_blocks_old_sessions(): void
     {
         $admin = User::factory()->create(['role_id' => Role::where('name', 'admin')->firstOrFail()->id]);
+        $customer = User::factory()->create(['role_id' => Role::where('name', 'customer')->firstOrFail()->id]);
+
+        $this->actingAs($customer)->get(route('admin.staff.index'))->assertForbidden();
+        $this->post(route('admin.staff.store'), ['name' => 'Ilegal'])->assertForbidden();
+
         $this->actingAs($admin)->get(route('admin.staff.index'))->assertOk();
         $profile = ['name' => 'Staf Baru', 'email' => 'staf-baru@example.com', 'phone' => '081234567890'];
         $this->post(route('admin.staff.store'), $profile + [
@@ -68,13 +105,35 @@ class AccountManagementTest extends TestCase
 
         $staff = User::where('email', $profile['email'])->firstOrFail();
         $this->assertTrue($staff->isStaff());
-        $this->get(route('admin.staff.edit', $staff))->assertOk();
+        $this->actingAs($staff)->get(route('admin.staff.index'))->assertForbidden();
+
+        $this->actingAs($admin)->get(route('admin.staff.edit', $staff))->assertOk();
         $this->patch(route('admin.staff.update', $staff), array_replace($profile, ['name' => 'Staf Diubah']))
             ->assertSessionHasNoErrors();
         $this->assertSame('Staf Diubah', $staff->fresh()->name);
 
+        $this->get(route('admin.staff.edit', $customer))->assertNotFound();
         $this->patch(route('admin.staff.deactivate', $admin))->assertNotFound();
-        $this->patch(route('admin.staff.deactivate', $staff))->assertRedirect(route('admin.staff.index'));
+        $this->patch(route('admin.staff.deactivate', $customer))->assertNotFound();
+
+        DB::table('sessions')->insert([
+            'id' => 'sess_'.$staff->id.'_'.uniqid(),
+            'user_id' => $staff->id,
+            'ip_address' => '127.0.0.1',
+            'user_agent' => 'PHPUnit',
+            'payload' => 'test',
+            'last_activity' => time(),
+        ]);
+
+        $originalSessionDriver = config('session.driver');
+        config(['session.driver' => 'database']);
+        try {
+            $this->patch(route('admin.staff.deactivate', $staff))->assertRedirect(route('admin.staff.index'));
+        } finally {
+            config(['session.driver' => $originalSessionDriver]);
+        }
+        $this->assertTrue($staff->fresh()->isDeactivated());
+        $this->assertDatabaseMissing('sessions', ['user_id' => $staff->id]);
 
         // Instance model yang baru mencerminkan status basis data yang akan dibaca
         // guard dari ID sesi lama ketika staf membuat permintaan berikutnya.
@@ -220,5 +279,41 @@ class AccountManagementTest extends TestCase
 
         $this->post(route('login'), ['email' => $account->email, 'password' => $payload['password']])
             ->assertRedirect(route('customer.dashboard'));
+    }
+
+    public function test_password_reset_renders_indonesian_email_and_blocks_deactivated_staff(): void
+    {
+        $staff = User::factory()->create([
+            'role_id' => Role::where('name', 'staff')->firstOrFail()->id,
+        ]);
+
+        // Pastikan email reset benar-benar dirender melalui mailer array berbahasa Indonesia.
+        $this->post(route('password.email'), ['email' => $staff->email])
+            ->assertSessionHas('success');
+
+        $sentMessages = Mail::mailer('array')->getSymfonyTransport()->messages();
+        $this->assertCount(1, $sentMessages);
+        $rawEmail = $sentMessages->first()->toString();
+        $this->assertStringContainsString('Tautan Pemulihan Kata Sandi - DriveEase', $rawEmail);
+        $this->assertStringContainsString('Buat Kata Sandi Baru', $rawEmail);
+        $this->assertStringContainsString('reset-password/', $rawEmail);
+
+        // Nonaktifkan staf setelah token lama terbit, lalu pastikan permintaan baru
+        // maupun pemakaian token lama ditolak.
+        $preDeactivationToken = Password::broker()->createToken($staff);
+        $staff->deactivated_at = now();
+        $staff->save();
+
+        Notification::fake();
+        $this->post(route('password.email'), ['email' => $staff->email])
+            ->assertSessionHas('success');
+        Notification::assertNothingSentTo($staff);
+
+        $this->post(route('password.update'), [
+            'token' => $preDeactivationToken,
+            'email' => $staff->email,
+            'password' => 'sandi-ilegal-123',
+            'password_confirmation' => 'sandi-ilegal-123',
+        ])->assertSessionHasErrors('email');
     }
 }

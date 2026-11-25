@@ -45,8 +45,21 @@
                 Kendaraan
             </a>
 
-            <a href="{{ route('admin.staff.index') }}" class="block rounded-lg px-3.5 py-2.5 text-sm hover:bg-surface-hover">Kelola staf</a>
-            <a href="{{ route('admin.rental-settings.edit') }}" class="block rounded-lg px-3.5 py-2.5 text-sm hover:bg-surface-hover">Pengaturan rental</a>
+            <a href="{{ route('admin.staff.index') }}"
+               class="flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors {{ request()->routeIs('admin.staff.*') ? 'bg-action-hover text-ink shadow-sm' : 'text-subtle hover:bg-surface-hover hover:text-ink' }}">
+                <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+                </svg>
+                Kelola staf
+            </a>
+            <a href="{{ route('admin.rental-settings.edit') }}"
+               class="flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors {{ request()->routeIs('admin.rental-settings.*') ? 'bg-action-hover text-ink shadow-sm' : 'text-subtle hover:bg-surface-hover hover:text-ink' }}">
+                <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                </svg>
+                Pengaturan rental
+            </a>
             <a href="{{ route('admin.car-types.index') }}"
                class="flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors {{ request()->routeIs('admin.car-types.*') ? 'bg-action-hover text-ink shadow-sm' : 'text-subtle hover:bg-surface-hover hover:text-ink' }}">
                 <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -82,7 +95,7 @@
                     <p class="text-xs text-link capitalize">{{ auth()->user()->role?->display_name ?? 'Admin' }}</p>
                 </div>
             </div>
-            <a href="{{ route('account.edit') }}" class="text-sm underline">Akun Saya</a>
+            <a href="{{ route('account.edit') }}" class="mb-2 flex items-center justify-center rounded-lg border border-field-line px-3 py-2 text-xs font-medium text-subtle hover:bg-surface-hover hover:text-ink transition-colors">Akun Saya</a>
             <form action="{{ route('logout') }}" method="POST">
                 @csrf
                 <button type="submit" class="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-subtle bg-surface-hover hover:bg-danger-surface/60 hover:text-danger rounded-lg transition-colors border border-field-line">
@@ -108,7 +121,7 @@
                     @foreach (['admin.dashboard' => 'Dasbor', 'admin.cars.index' => 'Kelola armada', 'admin.car-types.index' => 'Kategori kendaraan', 'admin.verifications.index' => 'Verifikasi pelanggan', 'admin.staff.index' => 'Kelola staf', 'admin.rental-settings.edit' => 'Pengaturan rental'] as $destination => $label)
                         <a class="p-2 hover:underline" href="{{ route($destination) }}">{{ $label }}</a>
                     @endforeach
-                    <a href="{{ route('account.edit') }}" class="text-sm underline">Akun Saya</a>
+                    <a href="{{ route('account.edit') }}" class="mb-2 flex items-center justify-center rounded-lg border border-field-line px-3 py-2 text-xs font-medium text-subtle hover:bg-surface-hover hover:text-ink transition-colors">Akun Saya</a>
                     <form method="POST" action="{{ route('logout') }}">@csrf<button class="p-2">Keluar</button></form>
                 </nav>
             </details>

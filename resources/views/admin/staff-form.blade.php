@@ -1,11 +1,12 @@
 @extends('layouts.admin')
 
 @section('title', 'Ubah Profil Staf - DriveEase')
+@section('page_title', 'Ubah Profil Staf')
 
 @section('content')
-<div class="space-y-4">
-    <a class="underline" href="{{ route('admin.staff.index') }}">Kembali ke daftar staf</a>
-    <h1 class="text-xl font-bold">Ubah Profil Staf</h1>
+<div class="max-w-3xl space-y-4">
+    <a class="inline-flex items-center gap-1.5 text-xs font-semibold text-muted hover:text-ink underline" href="{{ route('admin.staff.index') }}">&larr; Kembali ke daftar staf</a>
+    <h2 class="text-xl font-bold text-ink">Ubah Profil Staf</h2>
     @include('admin.staff-fields')
 </div>
 @endsection
