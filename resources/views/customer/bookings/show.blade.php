@@ -38,7 +38,7 @@
             </div>
         </div>
 
-        <dl class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
+        <dl class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
             <div class="rounded-lg border border-line bg-surface-raised p-4">
                 <dt class="text-muted font-semibold uppercase">Jadwal Pengambilan (WIB)</dt>
                 <dd class="mt-1 text-sm font-bold text-ink">{{ $rental->pickup_at?->timezone('Asia/Jakarta')->format('d M Y H:i') }} WIB</dd>
@@ -48,23 +48,8 @@
                 <dd class="mt-1 text-sm font-bold text-ink">{{ $rental->return_at?->timezone('Asia/Jakarta')->format('d M Y H:i') }} WIB</dd>
             </div>
             <div class="rounded-lg border border-line bg-surface-raised p-4">
-                <dt class="text-muted font-semibold uppercase">Durasi &amp; Tarif</dt>
-                <dd class="mt-1 text-sm font-bold text-ink">{{ $rental->total_days }} hari &times; Rp {{ number_format((float) $rental->daily_price, 0, ',', '.') }}</dd>
-            </div>
-            <div class="rounded-lg border border-line bg-surface-raised p-4">
                 <dt class="text-muted font-semibold uppercase">Total Biaya Sewa</dt>
                 <dd class="mt-1 text-base font-extrabold text-ink">Rp {{ number_format((float) $rental->total_amount, 0, ',', '.') }}</dd>
-            </div>
-            <div class="rounded-lg border border-line bg-surface-raised p-4">
-                <dt class="text-muted font-semibold uppercase">Sudah Dibayar / Sisa Tagihan</dt>
-                <dd class="mt-1 text-sm font-bold text-ink">
-                    Rp {{ number_format((float) $rental->paid_amount, 0, ',', '.') }}
-                    / <span class="text-danger">Rp {{ number_format($rental->remainingBalance(), 0, ',', '.') }}</span>
-                </dd>
-            </div>
-            <div class="rounded-lg border border-line bg-surface-raised p-4">
-                <dt class="text-muted font-semibold uppercase">Batas Unggah Pembayaran</dt>
-                <dd class="mt-1 text-sm font-bold text-ink">{{ $rental->payment_deadline_at?->timezone('Asia/Jakarta')->format('d M Y H:i') ?? '-' }} WIB</dd>
             </div>
         </dl>
 
@@ -135,15 +120,9 @@
                 <h2 class="text-sm font-bold text-ink">
                     {{ $rental->payment_status === \App\Models\Rental::PAYMENT_REJECTED ? 'Perbaiki Bukti / Lengkapi Kekurangan Pembayaran' : 'Unggah Bukti Transfer Pembayaran' }}
                 </h2>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                        <label for="payment_proof" class="block text-xs font-semibold text-ink mb-1">Foto Bukti Transfer (JPG/PNG/WEBP, maks 2 MB)</label>
-                        <input id="payment_proof" name="payment_proof" type="file" accept=".jpg,.jpeg,.png,.webp" required class="w-full rounded-lg border border-field-line bg-surface p-2 text-xs">
-                    </div>
-                    <div>
-                        <label for="claimed_amount" class="block text-xs font-semibold text-ink mb-1">Nominal yang Ditransfer (Rp)</label>
-                        <input id="claimed_amount" name="claimed_amount" type="number" min="1" value="{{ old('claimed_amount', (int) $rental->remainingBalance()) }}" required class="w-full rounded-lg border border-field-line bg-surface p-2 text-sm">
-                    </div>
+                <div>
+                    <label for="payment_proof" class="block text-xs font-semibold text-ink mb-1">Foto Bukti Transfer (JPG/PNG/WEBP, maks 2 MB)</label>
+                    <input id="payment_proof" name="payment_proof" type="file" accept=".jpg,.jpeg,.png,.webp" required class="w-full rounded-lg border border-field-line bg-surface p-2 text-xs">
                 </div>
                 <button type="submit" class="rounded-lg bg-action hover:bg-action-hover px-5 py-2.5 text-xs font-bold text-ink shadow-xs">
                     Kirim Bukti Pembayaran
