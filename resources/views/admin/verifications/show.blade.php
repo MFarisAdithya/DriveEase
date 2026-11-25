@@ -279,4 +279,15 @@
         </div>
     </div>
 </div>
+<section class="mt-6 rounded-xl border bg-white p-5">
+    <h2 class="mb-3 text-sm font-bold">Riwayat Rental Pelanggan</h2>
+    <ul class="space-y-2 text-sm">
+        @forelse ($rentals as $rental)
+            <li>{{ $rental->rental_code }} · {{ $rental->car_name }} · {{ $rental->start_date }} sampai {{ $rental->end_date }}</li>
+        @empty
+            <li>Belum ada riwayat rental.</li>
+        @endforelse
+    </ul>
+    {{ $rentals->links() }}
+</section>
 @endsection

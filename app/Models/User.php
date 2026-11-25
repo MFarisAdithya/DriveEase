@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Crypt;
 
 class User extends Authenticatable
 {
@@ -46,6 +47,11 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+        'ktp_number',
+        'nik_ktp',
+        'sim_number',
+        'ktp_image',
+        'sim_image',
     ];
 
     /**
@@ -59,6 +65,8 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'verified_at' => 'datetime',
             'password' => 'hashed',
+            'nik_ktp' => 'encrypted',
+            'sim_number' => 'encrypted',
         ];
     }
 
@@ -135,12 +143,14 @@ class User extends Authenticatable
     protected function ktpNumber(): Attribute
     {
         return Attribute::make(
-            get: fn ($value) => $value ?: $this->attributes['nik_ktp'] ?? null,
-            set: function ($value) {
-                $this->attributes['nik_ktp'] = $value;
+            // Accessor menerima ciphertext dari kolom utama. Jika kosong,
+            // accessor membaca nomor melalui cast encrypted pada kolom lama.
+            get: fn (?string $value): ?string => $value === null ? $this->nik_ktp : Crypt::decryptString($value),
+            set: function (?string $value): array {
+                $encryptedNumber = $value === null ? null : Crypt::encryptString($value);
 
-                return $value;
-            }
+                return ['ktp_number' => $encryptedNumber, 'nik_ktp' => $encryptedNumber];
+            },
         );
     }
 }

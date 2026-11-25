@@ -36,7 +36,16 @@ class VerificationController extends Controller
 
         $user->load(['verifier', 'role']);
 
-        return view('admin.verifications.show', compact('user'));
+        // join() memperoleh nama kendaraan untuk setiap pesanan.
+        // where() membatasi riwayat pada pelanggan yang sedang ditinjau.
+        $rentals = DB::table('rentals')
+            ->join('cars', 'cars.id', '=', 'rentals.car_id')
+            ->where('rentals.user_id', $user->id)
+            ->select('rentals.rental_code', 'rentals.start_date', 'rentals.end_date', 'cars.name as car_name')
+            ->orderByDesc('rentals.id')
+            ->paginate(10);
+
+        return view('admin.verifications.show', compact('user', 'rentals'));
     }
 
     /**
