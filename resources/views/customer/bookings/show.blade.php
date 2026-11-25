@@ -177,6 +177,161 @@
             </form>
         @endif
 
+        @php
+            $hasOpenChangeRequest = $rental->changeRequests->contains(
+                fn ($cr) => in_array($cr->status, [\App\Models\RentalChangeRequest::STATUS_PENDING_ADMIN, \App\Models\RentalChangeRequest::STATUS_PENDING_CUSTOMER], true)
+            );
+            $hasOpenExtension = $rental->extensions->contains(fn ($ext) => $ext->isOpen());
+        @endphp
+
+        @if ($rental->changeRequests->isNotEmpty() || in_array($rental->rental_status, [\App\Models\Rental::STATUS_PENDING, \App\Models\Rental::STATUS_CONFIRMED], true))
+            <div class="space-y-4 border-t border-line pt-4">
+                <h2 class="text-sm font-bold text-ink">Perubahan Jadwal &amp; Penggantian Unit</h2>
+
+                @foreach ($rental->changeRequests as $changeRequest)
+                    <div class="rounded-xl border border-line bg-surface-raised p-4 text-xs space-y-2">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <span class="font-bold text-ink">{{ $changeRequest->typeLabel() }}</span>
+                            <span class="rounded-full bg-surface border border-line px-2.5 py-0.5 font-semibold text-ink">{{ $changeRequest->statusLabel() }}</span>
+                        </div>
+                        <p class="text-muted">
+                            Jadwal usulan: <strong class="text-ink">{{ $changeRequest->proposed_pickup_at?->timezone('Asia/Jakarta')->format('d M Y H:i') }} WIB</strong>
+                            s.d. <strong class="text-ink">{{ $changeRequest->proposed_return_at?->timezone('Asia/Jakarta')->format('d M Y H:i') }} WIB</strong>
+                            ({{ $changeRequest->proposed_total_days }} hari)
+                            @if ($changeRequest->proposedCar)
+                                &middot; Unit: <strong class="text-ink">{{ $changeRequest->proposedCar->name }} ({{ $changeRequest->proposedCar->plate_number }})</strong>
+                            @endif
+                        </p>
+                        <p class="text-muted">
+                            Total tagihan usulan: <strong class="text-ink">Rp {{ number_format((float) $changeRequest->proposed_total_amount, 0, ',', '.') }}</strong>
+                            @if ($changeRequest->waive_price_difference)
+                                <span class="text-info font-semibold">(Selisih biaya dibebaskan admin)</span>
+                            @endif
+                        </p>
+                        <p>Alasan: {{ $changeRequest->reason }}</p>
+                        @if ($changeRequest->response_notes)
+                            <p class="text-muted">Catatan tanggapan: {{ $changeRequest->response_notes }}</p>
+                        @endif
+
+                        @if ($changeRequest->status === \App\Models\RentalChangeRequest::STATUS_PENDING_CUSTOMER)
+                            <div class="pt-2 flex flex-col sm:flex-row gap-3">
+                                <form method="POST" action="{{ route('customer.change-requests.respond', $changeRequest) }}">
+                                    @csrf
+                                    @method('PATCH')
+                                    <input type="hidden" name="decision" value="approve">
+                                    <button type="submit" class="rounded-lg bg-action hover:bg-action-hover px-4 py-2 text-xs font-bold text-ink">
+                                        Setujui Usulan Admin
+                                    </button>
+                                </form>
+                                <form method="POST" action="{{ route('customer.change-requests.respond', $changeRequest) }}" class="flex-1 flex flex-col sm:flex-row gap-2">
+                                    @csrf
+                                    @method('PATCH')
+                                    <input type="hidden" name="decision" value="reject">
+                                    <input name="response_notes" required placeholder="Alasan menolak usulan admin" class="flex-1 rounded-lg border border-field-line bg-surface p-2 text-xs">
+                                    <button type="submit" class="rounded-lg border border-danger-line bg-danger-surface px-4 py-2 text-xs font-bold text-danger shrink-0">
+                                        Tolak Usulan
+                                    </button>
+                                </form>
+                            </div>
+                        @endif
+                    </div>
+                @endforeach
+
+                @if (in_array($rental->rental_status, [\App\Models\Rental::STATUS_PENDING, \App\Models\Rental::STATUS_CONFIRMED], true) && ! $hasOpenChangeRequest)
+                    <form method="POST" action="{{ route('customer.bookings.change-requests.store', $rental) }}" class="rounded-xl border border-line bg-surface-raised p-4 space-y-3 text-xs">
+                        @csrf
+                        <h3 class="font-bold text-ink">Ajukan Perubahan Jadwal</h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div>
+                                <label for="proposed_pickup_at" class="block font-semibold text-ink mb-1">Waktu Ambil Baru (WIB)</label>
+                                <input id="proposed_pickup_at" name="proposed_pickup_at" type="datetime-local" required value="{{ old('proposed_pickup_at', $rental->pickup_at?->timezone('Asia/Jakarta')->format('Y-m-d\TH:i')) }}" class="w-full rounded-lg border border-field-line bg-surface p-2">
+                            </div>
+                            <div>
+                                <label for="proposed_total_days" class="block font-semibold text-ink mb-1">Jumlah Hari</label>
+                                <input id="proposed_total_days" name="proposed_total_days" type="number" min="1" max="365" required value="{{ old('proposed_total_days', $rental->total_days) }}" class="w-full rounded-lg border border-field-line bg-surface p-2">
+                            </div>
+                            <div>
+                                <label for="change_reason" class="block font-semibold text-ink mb-1">Alasan Perubahan</label>
+                                <input id="change_reason" name="reason" required placeholder="Contoh: Jadwal perjalanan bergeser" class="w-full rounded-lg border border-field-line bg-surface p-2">
+                            </div>
+                        </div>
+                        <button type="submit" class="rounded-lg border border-line bg-surface px-4 py-2 font-bold text-ink hover:bg-surface-hover">
+                            Kirim Permohonan Perubahan Jadwal
+                        </button>
+                    </form>
+                @endif
+            </div>
+        @endif
+
+        @if ($rental->extensions->isNotEmpty() || (in_array($rental->rental_status, [\App\Models\Rental::STATUS_CONFIRMED, \App\Models\Rental::STATUS_PICKED_UP], true) && $rental->payment_status === \App\Models\Rental::PAYMENT_PAID))
+            <div class="space-y-4 border-t border-line pt-4">
+                <h2 class="text-sm font-bold text-ink">Perpanjangan Masa Sewa</h2>
+
+                @foreach ($rental->extensions as $extension)
+                    <div class="rounded-xl border border-line bg-surface-raised p-4 text-xs space-y-2">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <span class="font-bold text-ink">Tambahan {{ $extension->additional_days }} Hari &middot; Rp {{ number_format((float) $extension->additional_amount, 0, ',', '.') }}</span>
+                            <span class="rounded-full bg-surface border border-line px-2.5 py-0.5 font-semibold text-ink">{{ $extension->statusLabel() }}</span>
+                        </div>
+                        <p class="text-muted">
+                            Kembali awal: {{ $extension->previous_return_at?->timezone('Asia/Jakarta')->format('d M Y H:i') }} WIB
+                            &rarr; Usulan kembali baru: <strong class="text-ink">{{ $extension->proposed_return_at?->timezone('Asia/Jakarta')->format('d M Y H:i') }} WIB</strong>
+                        </p>
+                        @if ($extension->rejection_reason)
+                            <p class="text-danger">Alasan penolakan: {{ $extension->rejection_reason }}</p>
+                        @endif
+                        @if ($extension->payment_rejection_reason)
+                            <p class="text-danger">Alasan penolakan bukti bayar: {{ $extension->payment_rejection_reason }}</p>
+                        @endif
+                        @if ($extension->payment_proof)
+                            <p>
+                                <a href="{{ route('documents.extension-payment.show', $extension) }}" target="_blank" class="font-semibold text-link hover:underline">
+                                    Lihat Bukti Pembayaran Perpanjangan (Privat)
+                                </a>
+                            </p>
+                        @endif
+
+                        @if ($extension->status === \App\Models\RentalExtension::STATUS_AWAITING_PAYMENT && ! $extension->isPaymentExpired())
+                            <form method="POST" action="{{ route('customer.extensions.payment.store', $extension) }}" enctype="multipart/form-data" class="pt-2 space-y-2 border-t border-line">
+                                @csrf
+                                <p class="text-muted">
+                                    Tenggat pembayaran perpanjangan: <strong class="text-ink">{{ $extension->payment_deadline_at?->timezone('Asia/Jakarta')->format('d M Y H:i') }} WIB</strong>.
+                                    Jadwal baru aktif setelah admin memverifikasi pembayaran tambahan Anda.
+                                </p>
+                                <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                                    <input name="payment_proof" type="file" required accept=".jpg,.jpeg,.png,.pdf" class="flex-1 rounded-lg border border-field-line bg-surface p-2 text-xs">
+                                    <button type="submit" class="rounded-lg bg-action hover:bg-action-hover px-4 py-2 text-xs font-bold text-ink shrink-0">
+                                        Unggah Bukti Perpanjangan
+                                    </button>
+                                </div>
+                            </form>
+                        @endif
+                    </div>
+                @endforeach
+
+                @if (in_array($rental->rental_status, [\App\Models\Rental::STATUS_CONFIRMED, \App\Models\Rental::STATUS_PICKED_UP], true) && $rental->payment_status === \App\Models\Rental::PAYMENT_PAID && ! $hasOpenExtension)
+                    <form method="POST" action="{{ route('customer.bookings.extensions.store', $rental) }}" class="rounded-xl border border-line bg-surface-raised p-4 space-y-3 text-xs">
+                        @csrf
+                        <h3 class="font-bold text-ink">Ajukan Perpanjangan Hari Sewa</h3>
+                        <p class="text-muted">Tarif harian berlaku: <strong>Rp {{ number_format((float) $rental->daily_price, 0, ',', '.') }}/hari</strong>. Perpanjangan memerlukan persetujuan admin dan pelunasan tambahan sebelum jadwal baru aktif.</p>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label for="additional_days" class="block font-semibold text-ink mb-1">Tambahan Hari (1–30)</label>
+                                <input id="additional_days" name="additional_days" type="number" min="1" max="30" required value="{{ old('additional_days', 1) }}" class="w-full rounded-lg border border-field-line bg-surface p-2">
+                            </div>
+                            <div>
+                                <label for="extension_notes" class="block font-semibold text-ink mb-1">Catatan (Opsional)</label>
+                                <input id="extension_notes" name="notes" placeholder="Alasan atau catatan perpanjangan" class="w-full rounded-lg border border-field-line bg-surface p-2">
+                            </div>
+                        </div>
+                        <button type="submit" class="rounded-lg bg-action hover:bg-action-hover px-4 py-2 font-bold text-ink">
+                            Ajukan Perpanjangan Sewa
+                        </button>
+                    </form>
+                @endif
+            </div>
+        @endif
+
         @if ($rental->histories->isNotEmpty())
             <div class="space-y-2 border-t border-line pt-4">
                 <h2 class="text-sm font-bold text-ink">Jejak Aktivitas Pesanan</h2>

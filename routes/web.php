@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AccountController;
+use App\Http\Controllers\Admin\BookingChangeController as AdminBookingChangeController;
 use App\Http\Controllers\Admin\BookingController as AdminBookingController;
 use App\Http\Controllers\Admin\CarController as AdminCarController;
 use App\Http\Controllers\Admin\CarTypeController as AdminCarTypeController;
@@ -9,6 +10,7 @@ use App\Http\Controllers\Admin\RentalSettingsController;
 use App\Http\Controllers\Admin\StaffController;
 use App\Http\Controllers\Admin\VerificationController as AdminVerificationController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\Customer\BookingChangeController as CustomerBookingChangeController;
 use App\Http\Controllers\Customer\BookingController as CustomerBookingController;
 use App\Http\Controllers\Customer\PaymentController as CustomerPaymentController;
 use App\Http\Controllers\Customer\VerificationController as CustomerVerificationController;
@@ -109,6 +111,14 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
     Route::post('/bookings/{rental}/payments', [AdminPaymentController::class, 'storeWalkInProof'])->name('bookings.payments.store');
     Route::patch('/payments/{payment}/approve', [AdminPaymentController::class, 'approve'])->name('payments.approve');
     Route::patch('/payments/{payment}/reject', [AdminPaymentController::class, 'reject'])->name('payments.reject');
+
+    // Admin Booking Change Proposals, Customer Reschedule Reviews & Extensions (A-06, A-08, SYS-09)
+    Route::post('/bookings/{rental}/change-requests', [AdminBookingChangeController::class, 'proposeChange'])->name('bookings.change-requests.propose');
+    Route::patch('/change-requests/{changeRequest}/respond', [AdminBookingChangeController::class, 'respondToRequest'])->name('change-requests.respond');
+    Route::patch('/extensions/{extension}/approve', [AdminBookingChangeController::class, 'approveExtension'])->name('extensions.approve');
+    Route::patch('/extensions/{extension}/reject', [AdminBookingChangeController::class, 'rejectExtension'])->name('extensions.reject');
+    Route::patch('/extensions/{extension}/payment/approve', [AdminBookingChangeController::class, 'approveExtensionPayment'])->name('extensions.payment.approve');
+    Route::patch('/extensions/{extension}/payment/reject', [AdminBookingChangeController::class, 'rejectExtensionPayment'])->name('extensions.payment.reject');
 });
 
 // Staff Routes (Protected by auth and role:staff)
@@ -122,7 +132,7 @@ Route::middleware(['auth', 'role:customer'])->prefix('customer')->name('customer
     Route::get('/verification', [CustomerVerificationController::class, 'create'])->name('verification.create');
     Route::post('/verification', [CustomerVerificationController::class, 'store'])->name('verification.store');
 
-    // Customer Online Vehicle Booking (C-05, C-07, C-08)
+    // Customer Online Vehicle Booking (C-05, C-07, C-08, C-09)
     Route::get('/bookings', [CustomerBookingController::class, 'index'])->name('bookings.index');
     Route::get('/bookings/create', [CustomerBookingController::class, 'create'])->name('bookings.create');
     Route::post('/bookings', [CustomerBookingController::class, 'store'])->name('bookings.store');
@@ -130,4 +140,8 @@ Route::middleware(['auth', 'role:customer'])->prefix('customer')->name('customer
     Route::patch('/bookings/{rental}/cancel', [CustomerBookingController::class, 'cancel'])->name('bookings.cancel');
     Route::post('/bookings/{rental}/request-cancellation', [CustomerBookingController::class, 'requestCancellation'])->name('bookings.request-cancellation');
     Route::post('/bookings/{rental}/payments', [CustomerPaymentController::class, 'store'])->name('bookings.payments.store');
+    Route::post('/bookings/{rental}/change-requests', [CustomerBookingChangeController::class, 'storeChangeRequest'])->name('bookings.change-requests.store');
+    Route::patch('/change-requests/{changeRequest}/respond', [CustomerBookingChangeController::class, 'respondToProposal'])->name('change-requests.respond');
+    Route::post('/bookings/{rental}/extensions', [CustomerBookingChangeController::class, 'requestExtension'])->name('bookings.extensions.store');
+    Route::post('/extensions/{extension}/payment', [CustomerBookingChangeController::class, 'submitExtensionPayment'])->name('extensions.payment.store');
 });

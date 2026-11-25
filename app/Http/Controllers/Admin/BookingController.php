@@ -43,6 +43,31 @@ class BookingController extends Controller
             $query->where('booking_channel', (string) $request->query('booking_channel'));
         }
 
+        // Filter operasional cepat membantu admin menemukan sewa aktif, pembayaran lewat 1 jam SLA,
+        // permohonan perubahan jadwal/unit, dan pengajuan perpanjangan yang menunggu tindakan (A-06, SYS-06).
+        $activeFilter = (string) $request->query('filter', '');
+        if ($activeFilter === 'active_rentals') {
+            $query->whereIn('rental_status', [Rental::STATUS_CONFIRMED, Rental::STATUS_PICKED_UP]);
+        } elseif ($activeFilter === 'overdue_verification') {
+            $query->where('rental_status', Rental::STATUS_PENDING)
+                ->where('payment_status', Rental::PAYMENT_PENDING_APPROVAL)
+                ->whereNotNull('payment_submitted_at')
+                ->where('payment_submitted_at', '<', now('Asia/Jakarta')->subHour()->format('Y-m-d H:i:s'));
+        } elseif ($activeFilter === 'pending_changes') {
+            $query->whereHas('changeRequests', function ($cq): void {
+                $cq->whereIn('status', ['pending_admin', 'pending_customer']);
+            });
+        } elseif ($activeFilter === 'pending_extensions') {
+            $query->whereHas('extensions', function ($eq): void {
+                $eq->whereIn('status', ['pending_approval', 'awaiting_payment', 'payment_submitted']);
+            });
+        } elseif ($activeFilter === 'affected_bookings') {
+            $query->where(function ($aq): void {
+                $aq->whereNotNull('cancellation_requested_at')
+                    ->orWhereHas('changeRequests', fn ($cq) => $cq->whereIn('status', ['pending_admin', 'pending_customer']));
+            });
+        }
+
         if ($request->filled('search')) {
             $search = trim((string) $request->query('search'));
             $query->where(function ($q) use ($search): void {
@@ -192,9 +217,18 @@ class BookingController extends Controller
     public function show(Rental $rental): View
     {
         $this->scheduleService->releaseExpiredHolds($rental->car_id);
-        $rental->refresh()->load(['user', 'car.carType', 'creator', 'payments.verifier', 'histories.actor']);
+        $rental->refresh()->load([
+            'user',
+            'car.carType',
+            'creator',
+            'payments.verifier',
+            'changeRequests.proposedCar',
+            'extensions.approver',
+            'histories.actor',
+        ]);
+        $availableReplacementCars = Car::bookableForSchedule()->with('carType')->orderBy('name')->get();
 
-        return view('admin.bookings.show', compact('rental'));
+        return view('admin.bookings.show', compact('rental', 'availableReplacementCars'));
     }
 
     /**

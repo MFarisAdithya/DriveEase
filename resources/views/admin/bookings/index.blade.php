@@ -24,8 +24,16 @@
                     <option value="{{ $key }}" @selected(request('rental_status') === $key)>{{ $label }}</option>
                 @endforeach
             </select>
+            <select name="filter" class="rounded-lg border border-field-line bg-surface-raised px-3 py-2 text-xs">
+                <option value="">Filter Khusus</option>
+                <option value="active_rentals" @selected(request('filter') === 'active_rentals')>Sewa Aktif</option>
+                <option value="overdue_verification" @selected(request('filter') === 'overdue_verification')>Verifikasi &gt; 1 Jam</option>
+                <option value="pending_changes" @selected(request('filter') === 'pending_changes')>Usulan Perubahan</option>
+                <option value="pending_extensions" @selected(request('filter') === 'pending_extensions')>Pengajuan Perpanjangan</option>
+                <option value="affected_bookings" @selected(request('filter') === 'affected_bookings')>Pesanan Terdampak</option>
+            </select>
             <button type="submit" class="rounded-lg bg-surface-hover px-4 py-2 text-xs font-semibold text-ink">Filter</button>
-            @if (request()->anyFilled(['search', 'booking_channel', 'rental_status']))
+            @if (request()->anyFilled(['search', 'booking_channel', 'rental_status', 'filter']))
                 <a href="{{ route('admin.bookings.index') }}" class="text-xs font-semibold text-danger hover:underline">Reset</a>
             @endif
         </form>
