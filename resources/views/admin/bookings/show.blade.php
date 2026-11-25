@@ -453,6 +453,137 @@
             </div>
         @endif
 
+        @if (in_array($rental->rental_status, [\App\Models\Rental::STATUS_RETURNED, \App\Models\Rental::STATUS_COMPLETED], true))
+            <div class="space-y-4 border-t border-line pt-4">
+                <h3 class="text-sm font-bold text-ink">Biaya Tambahan &amp; Penyelesaian Transaksi (A-09, SYS-12)</h3>
+
+                <div class="rounded-xl border border-line bg-surface-raised p-4 text-xs space-y-2">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <span class="font-bold text-ink">Total Tagihan Tambahan: Rp {{ number_format((float) $rental->additional_charges_total, 0, ',', '.') }}</span>
+                        <span class="rounded-full bg-surface border border-line px-2.5 py-0.5 font-semibold text-ink">{{ $rental->additionalChargeStatusLabel() }}</span>
+                    </div>
+                    <p class="text-muted">
+                        Denda telat ({{ $rental->late_minutes }} menit): <strong class="text-ink">Rp {{ number_format((float) $rental->late_fee_amount, 0, ',', '.') }}</strong>
+                        &middot; BBM: <strong class="text-ink">Rp {{ number_format((float) $rental->fuel_fee_amount, 0, ',', '.') }}</strong>
+                        &middot; Kerusakan: <strong class="text-ink">Rp {{ number_format((float) $rental->damage_fee_amount, 0, ',', '.') }}</strong>
+                    </p>
+                    <p class="text-muted">
+                        Sudah dibayar: <strong class="text-ink">Rp {{ number_format((float) $rental->additional_charge_paid_amount, 0, ',', '.') }}</strong>
+                        &middot; Sisa tagihan tambahan: <strong class="text-ink">Rp {{ number_format($rental->remainingAdditionalChargeBalance(), 0, ',', '.') }}</strong>
+                    </p>
+                    @if ($rental->fuel_fee_reason)
+                        <p>Alasan BBM: {{ $rental->fuel_fee_reason }}</p>
+                    @endif
+                    @if ($rental->damage_fee_reason)
+                        <p>Alasan Kerusakan: {{ $rental->damage_fee_reason }}</p>
+                    @endif
+                    @if ($rental->damage_evidence_path)
+                        <p><a href="{{ route('documents.damage-evidence.show', $rental) }}" target="_blank" class="font-semibold text-link hover:underline">Buka Bukti Kerusakan (Privat)</a></p>
+                    @endif
+                    @if ($rental->additional_charge_proof)
+                        <p><a href="{{ route('documents.additional-charge-proof.show', $rental) }}" target="_blank" class="font-semibold text-link hover:underline">Buka Bukti Bayar Tagihan Tambahan (Privat)</a></p>
+                    @endif
+                    @if ($rental->additional_charge_payment_reference)
+                        <p class="text-ink">Referensi Pelunasan Tambahan: <strong class="font-mono">{{ $rental->additional_charge_payment_reference }}</strong></p>
+                    @endif
+                    @if ($rental->additional_charge_rejection_reason)
+                        <p class="text-danger">Alasan penolakan bukti terakhir: {{ $rental->additional_charge_rejection_reason }}</p>
+                    @endif
+                    @if ($rental->completed_at)
+                        <p class="text-success font-semibold">Transaksi ditutup selesai pada {{ $rental->completed_at->timezone('Asia/Jakarta')->format('d M Y H:i') }} WIB.</p>
+                    @endif
+                </div>
+
+                @if ($rental->rental_status === \App\Models\Rental::STATUS_RETURNED && ! in_array($rental->additional_charge_status, [\App\Models\Rental::ADDITIONAL_CHARGE_PAID, \App\Models\Rental::ADDITIONAL_CHARGE_PENDING_APPROVAL], true))
+                    <form method="POST" action="{{ route('admin.bookings.additional-charges.assess', $rental) }}" enctype="multipart/form-data" class="rounded-xl border border-line bg-surface-raised p-4 space-y-3 text-xs">
+                        @csrf
+                        <h4 class="font-bold text-ink">Tetapkan / Konfirmasi Biaya Tambahan Pascapengembalian (A-09)</h4>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label for="fuel_fee_amount" class="block font-semibold text-ink mb-1">Biaya Kekurangan BBM (Rp)</label>
+                                <input id="fuel_fee_amount" name="fuel_fee_amount" type="number" min="0" step="1000" required value="{{ old('fuel_fee_amount', (int) $rental->fuel_fee_amount) }}" class="w-full rounded-lg border border-field-line bg-surface p-2">
+                            </div>
+                            <div>
+                                <label for="fuel_fee_reason" class="block font-semibold text-ink mb-1">Alasan Biaya BBM</label>
+                                <input id="fuel_fee_reason" name="fuel_fee_reason" value="{{ old('fuel_fee_reason', $rental->fuel_fee_reason) }}" placeholder="Wajib jika biaya BBM > 0" class="w-full rounded-lg border border-field-line bg-surface p-2">
+                            </div>
+                            <div>
+                                <label for="damage_fee_amount" class="block font-semibold text-ink mb-1">Biaya Kerusakan (Rp)</label>
+                                <input id="damage_fee_amount" name="damage_fee_amount" type="number" min="0" step="1000" required value="{{ old('damage_fee_amount', (int) $rental->damage_fee_amount) }}" class="w-full rounded-lg border border-field-line bg-surface p-2">
+                            </div>
+                            <div>
+                                <label for="damage_fee_reason" class="block font-semibold text-ink mb-1">Alasan Biaya Kerusakan</label>
+                                <input id="damage_fee_reason" name="damage_fee_reason" value="{{ old('damage_fee_reason', $rental->damage_fee_reason) }}" placeholder="Wajib jika biaya kerusakan > 0" class="w-full rounded-lg border border-field-line bg-surface p-2">
+                            </div>
+                        </div>
+                        <div>
+                            <label for="damage_evidence" class="block font-semibold text-ink mb-1">Foto Bukti Kerusakan Tambahan (Opsional jika foto inspeksi akhir sudah ada)</label>
+                            <input id="damage_evidence" name="damage_evidence" type="file" accept=".jpg,.jpeg,.png,.webp" class="w-full rounded-lg border border-field-line bg-surface p-2">
+                        </div>
+                        <button type="submit" class="rounded-lg bg-action hover:bg-action-hover px-4 py-2 font-bold text-ink">
+                            Simpan Pemeriksaan Biaya Tambahan
+                        </button>
+                    </form>
+                @endif
+
+                @if ($rental->rental_status === \App\Models\Rental::STATUS_RETURNED && in_array($rental->additional_charge_status, [\App\Models\Rental::ADDITIONAL_CHARGE_UNPAID, \App\Models\Rental::ADDITIONAL_CHARGE_REJECTED], true))
+                    <form method="POST" action="{{ route('admin.bookings.additional-charges.proof', $rental) }}" enctype="multipart/form-data" class="rounded-xl border border-line bg-surface-raised p-4 flex flex-col sm:flex-row items-stretch sm:items-end gap-3 text-xs">
+                        @csrf
+                        <div class="flex-1">
+                            <label for="admin_add_charge_proof" class="block font-semibold text-ink mb-1">Unggah Bukti Bayar Tagihan Tambahan (Walk-In / Dibantu Admin)</label>
+                            <input id="admin_add_charge_proof" name="additional_charge_proof" type="file" required accept=".jpg,.jpeg,.png,.webp" class="w-full rounded-lg border border-field-line bg-surface p-2">
+                        </div>
+                        <button type="submit" class="rounded-lg border border-line bg-surface px-4 py-2 font-bold text-ink shrink-0">Kirim Bukti Tambahan</button>
+                    </form>
+                @endif
+
+                @if ($rental->rental_status === \App\Models\Rental::STATUS_RETURNED && $rental->additional_charge_status === \App\Models\Rental::ADDITIONAL_CHARGE_PENDING_APPROVAL)
+                    <div class="rounded-xl border border-line bg-surface-raised p-4 space-y-3 text-xs">
+                        <form method="POST" action="{{ route('admin.bookings.additional-charges.approve', $rental) }}" class="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                            @csrf
+                            @method('PATCH')
+                            <div>
+                                <label for="add_verified_amount" class="block font-semibold mb-1">Nominal Diterima (Rp)</label>
+                                <input id="add_verified_amount" name="verified_amount" type="number" step="0.01" min="1" value="{{ number_format($rental->remainingAdditionalChargeBalance(), 2, '.', '') }}" required class="w-full rounded-lg border border-field-line bg-surface p-2">
+                            </div>
+                            <div>
+                                <label for="add_payment_ref" class="block font-semibold mb-1">Referensi Pembayaran</label>
+                                <input id="add_payment_ref" name="payment_reference" required placeholder="TRF-ADD-001" class="w-full rounded-lg border border-field-line bg-surface p-2">
+                            </div>
+                            <button type="submit" class="rounded-lg bg-action hover:bg-action-hover px-4 py-2 font-bold text-ink">Verifikasi Pelunasan Tambahan</button>
+                        </form>
+                        <form method="POST" action="{{ route('admin.bookings.additional-charges.reject', $rental) }}" class="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end border-t border-line pt-3">
+                            @csrf
+                            @method('PATCH')
+                            <div>
+                                <label for="add_reject_reason" class="block font-semibold mb-1">Alasan Penolakan</label>
+                                <input id="add_reject_reason" name="rejection_reason" required minlength="5" placeholder="Nominal transfer kurang atau bukti buram" class="w-full rounded-lg border border-field-line bg-surface p-2">
+                            </div>
+                            <div>
+                                <label for="add_received_amount" class="block font-semibold mb-1">Dana Masuk Parsial (Opsional)</label>
+                                <input id="add_received_amount" name="received_amount" type="number" step="0.01" min="0" placeholder="0" class="w-full rounded-lg border border-field-line bg-surface p-2">
+                            </div>
+                            <button type="submit" class="rounded-lg border border-danger-line bg-danger-surface px-4 py-2 font-bold text-danger">Tolak Bukti Tambahan</button>
+                        </form>
+                    </div>
+                @endif
+
+                @if ($rental->rental_status === \App\Models\Rental::STATUS_RETURNED)
+                    <form method="POST" action="{{ route('admin.bookings.complete', $rental) }}" class="rounded-xl border border-line bg-surface-raised p-4 flex flex-col sm:flex-row items-stretch sm:items-end gap-3 text-xs">
+                        @csrf
+                        @method('PATCH')
+                        <div class="flex-1">
+                            <label for="completion_notes" class="block font-semibold text-ink mb-1">Catatan Penyelesaian Transaksi (SYS-12)</label>
+                            <input id="completion_notes" name="completion_notes" placeholder="Catatan penutupan transaksi (status kesiapan mobil tetap dicatat terpisah)" class="w-full rounded-lg border border-field-line bg-surface p-2">
+                        </div>
+                        <button type="submit" class="rounded-lg bg-action hover:bg-action-hover px-5 py-2 font-bold text-ink shrink-0">
+                            Tutup &amp; Selesaikan Transaksi
+                        </button>
+                    </form>
+                @endif
+            </div>
+        @endif
+
         @if ($rental->histories->isNotEmpty())
             <div class="space-y-2 border-t border-line pt-4">
                 <h3 class="text-sm font-bold text-ink">Jejak Audit Transaksi</h3>

@@ -7,9 +7,11 @@ use App\Http\Controllers\Admin\CarController as AdminCarController;
 use App\Http\Controllers\Admin\CarTypeController as AdminCarTypeController;
 use App\Http\Controllers\Admin\PaymentController as AdminPaymentController;
 use App\Http\Controllers\Admin\RentalSettingsController;
+use App\Http\Controllers\Admin\SettlementController as AdminSettlementController;
 use App\Http\Controllers\Admin\StaffController;
 use App\Http\Controllers\Admin\VerificationController as AdminVerificationController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\Customer\AdditionalChargeController as CustomerAdditionalChargeController;
 use App\Http\Controllers\Customer\BookingChangeController as CustomerBookingChangeController;
 use App\Http\Controllers\Customer\BookingController as CustomerBookingController;
 use App\Http\Controllers\Customer\PaymentController as CustomerPaymentController;
@@ -132,6 +134,13 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
     Route::patch('/extensions/{extension}/payment/approve', [AdminBookingChangeController::class, 'approveExtensionPayment'])->name('extensions.payment.approve');
     Route::patch('/extensions/{extension}/payment/reject', [AdminBookingChangeController::class, 'rejectExtensionPayment'])->name('extensions.payment.reject');
     Route::patch('/extensions/{extension}/refund', [AdminBookingChangeController::class, 'realizeExtensionRefund'])->name('extensions.refund');
+
+    // Admin Additional Charges & Transaction Completion (A-09, SYS-11, SYS-12)
+    Route::post('/bookings/{rental}/additional-charges', [AdminSettlementController::class, 'assessCharges'])->name('bookings.additional-charges.assess');
+    Route::post('/bookings/{rental}/additional-charges/proof', [AdminSettlementController::class, 'storeChargeProof'])->name('bookings.additional-charges.proof');
+    Route::patch('/bookings/{rental}/additional-charges/approve', [AdminSettlementController::class, 'approveChargePayment'])->name('bookings.additional-charges.approve');
+    Route::patch('/bookings/{rental}/additional-charges/reject', [AdminSettlementController::class, 'rejectChargePayment'])->name('bookings.additional-charges.reject');
+    Route::patch('/bookings/{rental}/complete', [AdminSettlementController::class, 'complete'])->name('bookings.complete');
 });
 
 // Staff Routes (Protected by auth and role:staff)
@@ -152,7 +161,7 @@ Route::middleware(['auth', 'role:customer'])->prefix('customer')->name('customer
     Route::get('/verification', [CustomerVerificationController::class, 'create'])->name('verification.create');
     Route::post('/verification', [CustomerVerificationController::class, 'store'])->name('verification.store');
 
-    // Customer Online Vehicle Booking (C-05, C-07, C-08, C-09)
+    // Customer Online Vehicle Booking (C-05, C-07, C-08, C-09, C-10)
     Route::get('/bookings', [CustomerBookingController::class, 'index'])->name('bookings.index');
     Route::get('/bookings/create', [CustomerBookingController::class, 'create'])->name('bookings.create');
     Route::post('/bookings', [CustomerBookingController::class, 'store'])->name('bookings.store');
@@ -164,4 +173,5 @@ Route::middleware(['auth', 'role:customer'])->prefix('customer')->name('customer
     Route::patch('/change-requests/{changeRequest}/respond', [CustomerBookingChangeController::class, 'respondToProposal'])->name('change-requests.respond');
     Route::post('/bookings/{rental}/extensions', [CustomerBookingChangeController::class, 'requestExtension'])->name('bookings.extensions.store');
     Route::post('/extensions/{extension}/payment', [CustomerBookingChangeController::class, 'submitExtensionPayment'])->name('extensions.payment.store');
+    Route::post('/bookings/{rental}/additional-charges/proof', [CustomerAdditionalChargeController::class, 'storeProof'])->name('bookings.additional-charges.proof');
 });
