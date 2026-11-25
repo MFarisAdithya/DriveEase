@@ -419,6 +419,40 @@
             </div>
         @endif
 
+        @if (($impactedNextBookings ?? collect())->isNotEmpty())
+            <div role="alert" class="rounded-xl border border-danger-line bg-danger-surface p-4 text-xs text-danger space-y-1">
+                <strong class="block">Peringatan Dampak pada Pesanan Berikutnya (SYS-10)</strong>
+                @foreach ($impactedNextBookings as $impact)
+                    <p><strong class="font-mono">{{ $impact['rental']->rental_code }}</strong> &mdash; {{ $impact['reason'] }}</p>
+                @endforeach
+            </div>
+        @endif
+
+        @if ($rental->inspections->isNotEmpty())
+            <div class="space-y-3 border-t border-line pt-4">
+                <h3 class="text-sm font-bold text-ink">Hasil Inspeksi Pengambilan &amp; Pengembalian (S-03, S-04)</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                    @foreach ($rental->inspections as $inspection)
+                        <div class="rounded-xl border border-line bg-surface-raised p-4 space-y-1.5">
+                            <p class="font-bold text-ink">{{ $inspection->typeLabel() }}</p>
+                            <p class="text-muted">Pemeriksa: <strong class="text-ink">{{ $inspection->inspector?->name }}</strong> &middot; {{ $inspection->inspected_at?->timezone('Asia/Jakarta')->format('d M Y H:i') }} WIB</p>
+                            <p>Kilometer: <strong>{{ number_format($inspection->odometer_km, 0, ',', '.') }} km</strong> &middot; BBM: <strong>{{ $inspection->fuelLevelLabel() }}</strong></p>
+                            <p class="text-muted">{{ $inspection->condition_notes }}</p>
+                            @if ($inspection->has_damage && $inspection->damage_description)
+                                <p class="text-danger"><strong>Kerusakan:</strong> {{ $inspection->damage_description }}</p>
+                            @endif
+                            @if ($inspection->penalty_fee > 0)
+                                <p class="text-warning"><strong>Denda Keterlambatan:</strong> Rp {{ number_format((float) $inspection->penalty_fee, 0, ',', '.') }}</p>
+                            @endif
+                            @if ($inspection->condition_photo)
+                                <p><a href="{{ route('documents.inspection-photo.show', $inspection) }}" target="_blank" class="font-semibold text-link hover:underline">Buka Foto Kondisi (Privat)</a></p>
+                            @endif
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+        @endif
+
         @if ($rental->histories->isNotEmpty())
             <div class="space-y-2 border-t border-line pt-4">
                 <h3 class="text-sm font-bold text-ink">Jejak Audit Transaksi</h3>

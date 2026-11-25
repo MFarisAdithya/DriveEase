@@ -18,6 +18,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\PublicCarController;
+use App\Http\Controllers\Staff\OperationController as StaffOperationController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
@@ -78,6 +79,15 @@ Route::get('/documents/payments/{payment}', [DocumentController::class, 'showPay
 Route::get('/documents/extensions/{extension}', [DocumentController::class, 'showExtensionPaymentProof'])
     ->middleware('auth')
     ->name('documents.extension-payment.show');
+Route::get('/documents/inspections/{inspection}', [DocumentController::class, 'showInspectionPhoto'])
+    ->middleware('auth')
+    ->name('documents.inspection-photo.show');
+Route::get('/documents/rentals/{rental}/damage-evidence', [DocumentController::class, 'showDamageEvidence'])
+    ->middleware('auth')
+    ->name('documents.damage-evidence.show');
+Route::get('/documents/rentals/{rental}/additional-charge-proof', [DocumentController::class, 'showAdditionalChargeProof'])
+    ->middleware('auth')
+    ->name('documents.additional-charge-proof.show');
 
 // Admin Routes (Protected by auth and role:admin)
 Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->group(function () {
@@ -91,6 +101,8 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
     Route::patch('/staff/{member}/deactivate', [StaffController::class, 'deactivate'])->name('staff.deactivate');
 
     Route::resource('cars', AdminCarController::class);
+    Route::patch('/cars/{car}/report-damage', [AdminCarController::class, 'reportDamage'])->name('cars.report-damage');
+    Route::patch('/cars/{car}/mark-ready', [AdminCarController::class, 'markReady'])->name('cars.mark-ready');
     Route::resource('car-types', AdminCarTypeController::class)->except(['show']);
 
     // Customer Identity Verification Management
@@ -125,6 +137,13 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
 // Staff Routes (Protected by auth and role:staff)
 Route::middleware(['auth', 'role:staff'])->prefix('staff')->name('staff.')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'staff'])->name('dashboard');
+    Route::get('/schedules', [StaffOperationController::class, 'index'])->name('schedules.index');
+    Route::get('/schedules/{rental}', [StaffOperationController::class, 'show'])->name('schedules.show');
+    Route::post('/schedules/{rental}/pickup', [StaffOperationController::class, 'storePickup'])->name('schedules.pickup');
+    Route::post('/schedules/{rental}/return', [StaffOperationController::class, 'storeReturn'])->name('schedules.return');
+    Route::get('/readiness', [StaffOperationController::class, 'readinessIndex'])->name('readiness.index');
+    Route::patch('/cars/{car}/report-damage', [StaffOperationController::class, 'reportDamage'])->name('cars.report-damage');
+    Route::patch('/cars/{car}/mark-ready', [StaffOperationController::class, 'markReady'])->name('cars.mark-ready');
 });
 
 // Customer Routes (Protected by auth and role:customer)

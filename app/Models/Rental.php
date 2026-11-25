@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Rental extends Model
 {
@@ -52,6 +53,16 @@ class Rental extends Model
     public const CANCEL_RENTAL_FAULT = 'rental_fault';
 
     public const CANCEL_NO_SHOW = 'no_show';
+
+    public const ADDITIONAL_CHARGE_NONE = 'none';
+
+    public const ADDITIONAL_CHARGE_UNPAID = 'unpaid';
+
+    public const ADDITIONAL_CHARGE_PENDING_APPROVAL = 'pending_approval';
+
+    public const ADDITIONAL_CHARGE_PAID = 'paid';
+
+    public const ADDITIONAL_CHARGE_REJECTED = 'rejected';
 
     /**
      * Status penyewaan yang menahan jadwal kendaraan agar tidak bentrok dengan pesanan lain.
@@ -135,13 +146,38 @@ class Rental extends Model
         'status_notice',
         'notes',
         'idempotency_key',
+        'actual_return_at',
+        'late_minutes',
+        'late_fee_amount',
+        'fuel_fee_amount',
+        'fuel_fee_reason',
+        'damage_fee_amount',
+        'damage_fee_reason',
+        'damage_evidence_path',
+        'additional_charges_total',
+        'additional_charges_assessed_at',
+        'additional_charges_assessed_by',
+        'additional_charge_status',
+        'additional_charge_paid_amount',
+        'additional_charge_proof',
+        'additional_charge_submitted_at',
+        'additional_charge_verified_by',
+        'additional_charge_verified_at',
+        'additional_charge_payment_reference',
+        'additional_charge_rejection_reason',
+        'completed_at',
+        'completed_by',
     ];
 
     /**
+     * Sembunyikan path dokumen pembayaran dan bukti kerusakan agar tidak bocor di serialisasi JSON (NFR-01).
+     *
      * @var list<string>
      */
     protected $hidden = [
         'payment_proof',
+        'damage_evidence_path',
+        'additional_charge_proof',
     ];
 
     /**
@@ -157,6 +193,7 @@ class Rental extends Model
             'pickup_at' => 'datetime',
             'return_at' => 'datetime',
             'actual_pickup_at' => 'datetime',
+            'actual_return_at' => 'datetime',
             'payment_deadline_at' => 'datetime',
             'payment_verified_at' => 'datetime',
             'payment_submitted_at' => 'datetime',
@@ -165,12 +202,22 @@ class Rental extends Model
             'cancelled_at' => 'datetime',
             'cancellation_requested_at' => 'datetime',
             'refund_transferred_at' => 'datetime',
+            'additional_charges_assessed_at' => 'datetime',
+            'additional_charge_submitted_at' => 'datetime',
+            'additional_charge_verified_at' => 'datetime',
+            'completed_at' => 'datetime',
             'total_days' => 'integer',
+            'late_minutes' => 'integer',
             'daily_price' => 'decimal:2',
             'total_amount' => 'decimal:2',
             'paid_amount' => 'decimal:2',
             'refund_percentage' => 'integer',
             'refund_amount' => 'decimal:2',
+            'late_fee_amount' => 'decimal:2',
+            'fuel_fee_amount' => 'decimal:2',
+            'damage_fee_amount' => 'decimal:2',
+            'additional_charges_total' => 'decimal:2',
+            'additional_charge_paid_amount' => 'decimal:2',
         ];
     }
 
@@ -197,6 +244,36 @@ class Rental extends Model
     public function refundProcessor(): BelongsTo
     {
         return $this->belongsTo(User::class, 'refund_processed_by');
+    }
+
+    public function additionalChargeAssessor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'additional_charges_assessed_by');
+    }
+
+    public function additionalChargeVerifier(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'additional_charge_verified_by');
+    }
+
+    public function completer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'completed_by');
+    }
+
+    public function inspections(): HasMany
+    {
+        return $this->hasMany(Inspection::class)->orderBy('inspected_at');
+    }
+
+    public function pickupInspection(): HasOne
+    {
+        return $this->hasOne(Inspection::class)->where('inspection_type', Inspection::TYPE_PICKUP);
+    }
+
+    public function returnInspection(): HasOne
+    {
+        return $this->hasOne(Inspection::class)->where('inspection_type', Inspection::TYPE_RETURN);
     }
 
     public function payments(): HasMany
@@ -450,6 +527,42 @@ class Rental extends Model
             self::REFUND_PENDING => 'Menunggu Transfer Refund',
             self::REFUND_PROCESSED => 'Refund Sudah Ditransfer',
             default => 'Tidak Ada Refund',
+        };
+    }
+
+    /**
+     * Hitung sisa tagihan biaya tambahan (denda telat, BBM, kerusakan) yang masih harus dibayar.
+     */
+    public function remainingAdditionalChargeBalance(): float
+    {
+        return max(0.0, round((float) $this->additional_charges_total - (float) $this->additional_charge_paid_amount, 2));
+    }
+
+    /**
+     * Periksa apakah transaksi yang sedang berjalan telah melewati batas waktu pengembalian yang disepakati.
+     */
+    public function isReturnOverdue(?CarbonInterface $at = null): bool
+    {
+        if ($this->rental_status !== self::STATUS_PICKED_UP || $this->return_at === null) {
+            return false;
+        }
+
+        $reference = $at ? $at->copy()->timezone('Asia/Jakarta') : now('Asia/Jakarta');
+
+        return $this->return_at->copy()->timezone('Asia/Jakarta')->lessThan($reference);
+    }
+
+    /**
+     * Kembalikan label status pembayaran biaya tambahan berbahasa Indonesia.
+     */
+    public function additionalChargeStatusLabel(): string
+    {
+        return match ($this->additional_charge_status) {
+            self::ADDITIONAL_CHARGE_UNPAID => 'Menunggu Pembayaran Tagihan Tambahan',
+            self::ADDITIONAL_CHARGE_PENDING_APPROVAL => 'Bukti Terunggah — Menunggu Verifikasi Admin',
+            self::ADDITIONAL_CHARGE_PAID => 'Tagihan Tambahan Lunas',
+            self::ADDITIONAL_CHARGE_REJECTED => 'Bukti Tagihan Tambahan Ditolak',
+            default => 'Tidak Ada Tagihan Tambahan',
         };
     }
 

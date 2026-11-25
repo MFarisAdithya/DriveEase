@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Inspection;
+use App\Models\Rental;
 use App\Models\RentalExtension;
 use App\Models\RentalPayment;
 use App\Models\User;
@@ -47,18 +49,7 @@ class DocumentController extends Controller
             abort(404, 'Dokumen identitas tidak ditemukan atau belum diunggah.');
         }
 
-        $fullPath = Storage::disk('local')->path($path);
-        $mimeType = Storage::disk('local')->mimeType($path) ?? 'image/jpeg';
-
-        $response = response()->file($fullPath, [
-            'Content-Type' => $mimeType,
-            'Pragma' => 'no-cache',
-            'X-Content-Type-Options' => 'nosniff',
-        ]);
-
-        $response->headers->set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
-
-        return $response;
+        return $this->streamPrivateFile($path);
     }
 
     /**
@@ -92,6 +83,47 @@ class DocumentController extends Controller
     }
 
     /**
+     * Sajikan foto bukti pembayaran tagihan tambahan secara privat hanya untuk pemilik atau admin (NFR-01, C-10, A-09).
+     */
+    public function showAdditionalChargeProof(Request $request, Rental $rental): BinaryFileResponse|Response
+    {
+        return $this->streamPrivateDocumentForOwnerOrAdmin(
+            $request,
+            (int) $rental->user_id,
+            $rental->additional_charge_proof,
+            'Bukti pembayaran tagihan tambahan tidak ditemukan.'
+        );
+    }
+
+    /**
+     * Sajikan foto kondisi inspeksi awal/akhir secara privat untuk admin, staf operasional, atau pemilik transaksi (NFR-01, S-03, S-04).
+     */
+    public function showInspectionPhoto(Request $request, Inspection $inspection): BinaryFileResponse|Response
+    {
+        $inspection->loadMissing('rental');
+
+        return $this->streamPrivateDocumentForOwnerOrStaffOrAdmin(
+            $request,
+            (int) $inspection->rental?->user_id,
+            $inspection->condition_photo,
+            'Foto kondisi inspeksi kendaraan tidak ditemukan.'
+        );
+    }
+
+    /**
+     * Sajikan bukti pendukung kerusakan kendaraan secara privat untuk admin, staf operasional, atau pemilik transaksi (NFR-01, A-09).
+     */
+    public function showDamageEvidence(Request $request, Rental $rental): BinaryFileResponse|Response
+    {
+        return $this->streamPrivateDocumentForOwnerOrStaffOrAdmin(
+            $request,
+            (int) $rental->user_id,
+            $rental->damage_evidence_path,
+            'Foto bukti kerusakan kendaraan tidak ditemukan.'
+        );
+    }
+
+    /**
      * Enforce owner-or-admin authorization and stream a file with no-store cache headers.
      */
     private function streamPrivateDocumentForOwnerOrAdmin(
@@ -118,6 +150,43 @@ class DocumentController extends Controller
             abort(404, $missingMessage);
         }
 
+        return $this->streamPrivateFile($path);
+    }
+
+    /**
+     * Terapkan otorisasi foto fisik operasional untuk pemilik pesanan, staf lapangan, dan admin.
+     */
+    private function streamPrivateDocumentForOwnerOrStaffOrAdmin(
+        Request $request,
+        int $ownerUserId,
+        ?string $path,
+        string $missingMessage
+    ): BinaryFileResponse|Response {
+        $currentUser = $request->user();
+        if (! $currentUser) {
+            abort(403, 'Akses ditolak.');
+        }
+
+        $authorized = $currentUser->isAdmin()
+            || $currentUser->isStaff()
+            || $currentUser->id === $ownerUserId;
+
+        if (! $authorized) {
+            abort(403, 'Akses ditolak. Anda tidak berhak melihat dokumen inspeksi ini.');
+        }
+
+        if (! $path || ! Storage::disk('local')->exists($path)) {
+            abort(404, $missingMessage);
+        }
+
+        return $this->streamPrivateFile($path);
+    }
+
+    /**
+     * Alirkan berkas privat dengan header no-store agar peramban tidak menyimpan salinan cache.
+     */
+    private function streamPrivateFile(string $path): BinaryFileResponse|Response
+    {
         $fullPath = Storage::disk('local')->path($path);
         $mimeType = Storage::disk('local')->mimeType($path) ?? 'image/jpeg';
 

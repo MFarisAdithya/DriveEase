@@ -31,6 +31,17 @@
     </div>
 
     <!-- Statistics Grid (All from DB) -->
+    @if (($impactedNextBookings ?? collect())->isNotEmpty() || ($stats['overdue_trips'] ?? 0) > 0)
+        <div role="alert" class="rounded-xl border border-danger-line bg-danger-surface p-4 text-xs text-danger flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+                <strong class="block text-sm">Peringatan Operasional: {{ $stats['overdue_trips'] ?? 0 }} Pengembalian Terlambat &middot; {{ ($impactedNextBookings ?? collect())->count() }} Pesanan Berikutnya Terdampak</strong>
+                <p class="mt-0.5">Segera tangani pesanan terdampak dengan kendaraan pengganti tanpa biaya tambahan, penjadwalan ulang, atau refund penuh.</p>
+            </div>
+            <a href="{{ route('admin.bookings.index', ['filter' => 'affected_bookings']) }}" class="rounded-lg bg-danger-action px-4 py-2 font-bold text-white shrink-0">
+                Lihat Pesanan Terdampak
+            </a>
+        </div>
+    @endif
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
         <!-- Total Vehicles -->
         <div class="bg-surface rounded-xl p-5 border border-line shadow-sm">

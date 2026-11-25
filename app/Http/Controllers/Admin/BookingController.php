@@ -10,6 +10,7 @@ use App\Models\Role;
 use App\Models\User;
 use App\Services\RentalBookingService;
 use App\Services\RentalFinancialService;
+use App\Services\RentalOperationService;
 use App\Services\RentalScheduleService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
@@ -62,9 +63,19 @@ class BookingController extends Controller
                 $eq->whereIn('status', ['pending_approval', 'awaiting_payment', 'payment_submitted']);
             });
         } elseif ($activeFilter === 'affected_bookings') {
-            $query->where(function ($aq): void {
+            $impactedIds = app(RentalOperationService::class)
+                ->detectImpactedNextBookings()
+                ->map(fn (array $impact): int => $impact['rental']->id)
+                ->all();
+
+            $query->where(function ($aq) use ($impactedIds): void {
                 $aq->whereNotNull('cancellation_requested_at')
-                    ->orWhereHas('changeRequests', fn ($cq) => $cq->whereIn('status', ['pending_admin', 'pending_customer']));
+                    ->orWhereHas('changeRequests', fn ($cq) => $cq->whereIn('status', ['pending_admin', 'pending_customer']))
+                    ->orWhereHas('histories', fn ($hq) => $hq->where('action', 'next_booking_impacted'));
+
+                if ($impactedIds !== []) {
+                    $aq->orWhereIn('id', $impactedIds);
+                }
             });
         }
 
@@ -214,7 +225,7 @@ class BookingController extends Controller
     /**
      * Show full booking details for admin review.
      */
-    public function show(Rental $rental): View
+    public function show(Rental $rental, RentalOperationService $operationService): View
     {
         $this->scheduleService->releaseExpiredHolds($rental->car_id);
         $rental->refresh()->load([
@@ -224,11 +235,13 @@ class BookingController extends Controller
             'payments.verifier',
             'changeRequests.proposedCar',
             'extensions.approver',
+            'inspections.inspector',
             'histories.actor',
         ]);
         $availableReplacementCars = Car::bookableForSchedule()->with('carType')->orderBy('name')->get();
+        $impactedNextBookings = $rental->car ? $operationService->detectImpactedNextBookings($rental->car) : collect();
 
-        return view('admin.bookings.show', compact('rental', 'availableReplacementCars'));
+        return view('admin.bookings.show', compact('rental', 'availableReplacementCars', 'impactedNextBookings'));
     }
 
     /**

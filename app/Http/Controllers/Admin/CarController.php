@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Car;
 use App\Models\CarType;
+use App\Services\RentalOperationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -73,7 +74,12 @@ class CarController extends Controller
 
         // Operator + pada array menggabungkan hasil validasi dengan nilai default null
         // untuk maintenance_reason saat status bukan 'maintenance' (aturan exclude_unless).
-        Car::create($validated + ['maintenance_reason' => null]);
+        Car::create($validated + [
+            'maintenance_reason' => null,
+            'readiness_status' => $this->resolveReadinessStatus($validated['status']),
+            'readiness_checked_by' => $request->user()?->id,
+            'readiness_checked_at' => now('Asia/Jakarta'),
+        ]);
 
         return redirect()->route('admin.cars.index')
             ->with('success', 'Kendaraan "'.$validated['name'].'" berhasil ditambahkan.');
@@ -84,7 +90,7 @@ class CarController extends Controller
      */
     public function show(Car $car): View
     {
-        $car->load('carType');
+        $car->load(['carType', 'readinessChecker']);
 
         return view('admin.cars.show', compact('car'));
     }
@@ -110,7 +116,12 @@ class CarController extends Controller
         // Ketika unit keluar dari status maintenance, exclude_unless menghapus
         // maintenance_reason dari $validated sehingga + ['maintenance_reason' => null]
         // otomatis membersihkan alasan perawatan lama di database.
-        $car->update($validated + ['maintenance_reason' => null]);
+        $car->update($validated + [
+            'maintenance_reason' => null,
+            'readiness_status' => $this->resolveReadinessStatus($validated['status']),
+            'readiness_checked_by' => $request->user()?->id,
+            'readiness_checked_at' => now('Asia/Jakarta'),
+        ]);
 
         return redirect()->route('admin.cars.index')
             ->with('success', 'Data kendaraan "'.$car->name.'" berhasil diperbarui.');
@@ -140,6 +151,52 @@ class CarController extends Controller
 
         return redirect()->route('admin.cars.index')
             ->with('success', 'Kendaraan "'.$name.'" berhasil '.($archived ? 'diarsipkan.' : 'dihapus dari sistem.'));
+    }
+
+    /**
+     * Laporkan kerusakan unit oleh admin agar unit ditahan sampai pemeriksaan selesai (S-05, A4).
+     */
+    public function reportDamage(
+        Request $request,
+        Car $car,
+        RentalOperationService $operationService
+    ): RedirectResponse {
+        $validated = $request->validate([
+            'maintenance_reason' => ['required', 'string', 'min:5', 'max:2000'],
+        ]);
+
+        $operationService->reportVehicleDamage($car, $request->user(), $validated['maintenance_reason']);
+
+        return back()->with('success', 'Kerusakan unit berhasil dicatat. Kendaraan ditahan pada status perawatan.');
+    }
+
+    /**
+     * Nyatakan kendaraan layak disewakan kembali oleh admin setelah pemeriksaan & persiapan (S-05, A4).
+     */
+    public function markReady(
+        Request $request,
+        Car $car,
+        RentalOperationService $operationService
+    ): RedirectResponse {
+        $validated = $request->validate([
+            'readiness_notes' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $operationService->markVehicleReady($car, $request->user(), $validated['readiness_notes'] ?? null);
+
+        return back()->with('success', 'Kendaraan dinyatakan layak dan siap untuk penyewaan berikutnya.');
+    }
+
+    /**
+     * Petakan status operasional armada menjadi readiness_status yang konsisten saat create/update admin.
+     */
+    private function resolveReadinessStatus(string $carStatus): string
+    {
+        return match ($carStatus) {
+            'maintenance' => Car::READINESS_NEEDS_MAINTENANCE,
+            'rented' => Car::READINESS_IN_USE,
+            default => Car::READINESS_READY,
+        };
     }
 
     /**

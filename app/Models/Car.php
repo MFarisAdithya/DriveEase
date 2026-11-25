@@ -14,6 +14,14 @@ class Car extends Model
 {
     use HasFactory;
 
+    public const READINESS_READY = 'ready';
+
+    public const READINESS_IN_USE = 'in_use';
+
+    public const READINESS_NEEDS_PREPARATION = 'needs_preparation';
+
+    public const READINESS_NEEDS_MAINTENANCE = 'needs_maintenance';
+
     protected $fillable = [
         'car_type_id',
         'name',
@@ -25,6 +33,10 @@ class Car extends Model
         'price_per_day',
         'status',
         'maintenance_reason',
+        'readiness_status',
+        'readiness_notes',
+        'readiness_checked_by',
+        'readiness_checked_at',
         'image',
         'description',
     ];
@@ -36,12 +48,18 @@ class Car extends Model
             'capacity' => 'integer',
             'price_per_day' => 'decimal:2',
             'archived_at' => 'datetime',
+            'readiness_checked_at' => 'datetime',
         ];
     }
 
     public function carType(): BelongsTo
     {
         return $this->belongsTo(CarType::class);
+    }
+
+    public function readinessChecker(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'readiness_checked_by');
     }
 
     /**
@@ -67,8 +85,18 @@ class Car extends Model
     protected function readyForRental(Builder $query): void
     {
         // Operator chaining whereNull()->where() menyaring hanya kendaraan aktif
-        // (archived_at bernilai null) yang berstatus available untuk kesiapan fisik.
+        // (archived_at bernilai null) yang berstatus available untuk kesiapan dasar.
         $query->whereNull('archived_at')->where('status', 'available');
+    }
+
+    #[Scope]
+    protected function readyForHandover(Builder $query): void
+    {
+        // Kesiapan serah-terima aktual mewajibkan unit tidak diarsipkan, berstatus available,
+        // dan sudah melewati pemeriksaan persiapan oleh staf/admin (readiness_status = ready).
+        $query->whereNull('archived_at')
+            ->where('status', 'available')
+            ->where('readiness_status', self::READINESS_READY);
     }
 
     #[Scope]
@@ -108,11 +136,13 @@ class Car extends Model
     }
 
     /**
-     * Determine whether this vehicle is physically ready for handover right now.
+     * Periksa apakah kendaraan benar-benar layak dan siap diserahterimakan saat ini (SYS-08, S-05).
      */
     public function isReadyForHandover(): bool
     {
-        return $this->isReadyForRental();
+        return ! $this->isArchived()
+            && $this->status === 'available'
+            && ($this->readiness_status ?? self::READINESS_READY) === self::READINESS_READY;
     }
 
     /**
@@ -123,6 +153,20 @@ class Car extends Model
         // Operator && mewajibkan kedua kondisi bernilai true: tidak diarsipkan
         // dan status operasional unit berada pada kondisi available.
         return ! $this->isArchived() && $this->status === 'available';
+    }
+
+    /**
+     * Kembalikan label status kesiapan operasional unit berbahasa Indonesia.
+     */
+    public function readinessLabel(): string
+    {
+        return match ($this->readiness_status) {
+            self::READINESS_READY => 'Layak & Siap Serah-Terima',
+            self::READINESS_IN_USE => 'Sedang Digunakan Penyewa',
+            self::READINESS_NEEDS_PREPARATION => 'Perlu Pemeriksaan & Persiapan',
+            self::READINESS_NEEDS_MAINTENANCE => 'Bermasalah / Perlu Perawatan',
+            default => ucfirst((string) $this->readiness_status),
+        };
     }
 
     /**

@@ -158,6 +158,7 @@ class BookingController extends Controller
             'payments',
             'changeRequests.proposedCar',
             'extensions.approver',
+            'inspections.inspector',
             'histories.actor',
         ]);
 

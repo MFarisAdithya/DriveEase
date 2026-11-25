@@ -345,6 +345,28 @@
             </div>
         @endif
 
+        @if ($rental->inspections->isNotEmpty())
+            <div class="space-y-3 border-t border-line pt-4">
+                <h2 class="text-sm font-bold text-ink">Hasil Inspeksi Kendaraan (Pengambilan &amp; Pengembalian)</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                    @foreach ($rental->inspections as $inspection)
+                        <div class="rounded-xl border border-line bg-surface-raised p-4 space-y-1.5">
+                            <p class="font-bold text-ink">{{ $inspection->typeLabel() }}</p>
+                            <p class="text-muted">Petugas: <strong class="text-ink">{{ $inspection->inspector?->name }}</strong> &middot; {{ $inspection->inspected_at?->timezone('Asia/Jakarta')->format('d M Y H:i') }} WIB</p>
+                            <p>Kilometer: <strong>{{ number_format($inspection->odometer_km, 0, ',', '.') }} km</strong> &middot; BBM: <strong>{{ $inspection->fuelLevelLabel() }}</strong></p>
+                            <p class="text-muted">{{ $inspection->condition_notes }}</p>
+                            @if ($inspection->has_damage && $inspection->damage_description)
+                                <p class="text-danger"><strong>Catatan Kerusakan:</strong> {{ $inspection->damage_description }}</p>
+                            @endif
+                            @if ($inspection->condition_photo)
+                                <p><a href="{{ route('documents.inspection-photo.show', $inspection) }}" target="_blank" class="font-semibold text-link hover:underline">Lihat Foto Kondisi (Privat)</a></p>
+                            @endif
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+        @endif
+
         @if ($rental->histories->isNotEmpty())
             <div class="space-y-2 border-t border-line pt-4">
                 <h2 class="text-sm font-bold text-ink">Jejak Aktivitas Pesanan</h2>
