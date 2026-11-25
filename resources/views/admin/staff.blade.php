@@ -4,7 +4,7 @@
 @section('page_title', 'Manajemen Staf')
 
 @section('content')
-<div class="max-w-5xl space-y-6">
+<div class="mx-auto max-w-5xl space-y-6">
     <div>
         <h2 class="text-xl font-bold text-ink">Manajemen Staf</h2>
         <p class="mt-1 text-xs text-muted">Tambahkan akun staf operasional, perbarui profil, atau nonaktifkan akses akun staf.</p>

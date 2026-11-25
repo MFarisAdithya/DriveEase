@@ -4,7 +4,7 @@
 @section('page_title', 'Pemesanan Langsung Pelanggan (Walk-In)')
 
 @section('content')
-<div class="max-w-5xl space-y-6">
+<div class="mx-auto max-w-5xl space-y-6">
     <div>
         <a href="{{ route('admin.bookings.index') }}" class="text-xs font-semibold text-muted hover:text-ink">&larr; Kembali ke Daftar Pemesanan</a>
     </div>

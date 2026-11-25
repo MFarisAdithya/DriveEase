@@ -6,7 +6,7 @@
     </ul>
 @endif
 {{-- isset($member) memilih route pembaruan staf atau pembuatan staf baru, dan menyisipkan @method('PATCH') hanya saat mengubah profil. --}}
-<form method="POST" action="{{ isset($member) ? route('admin.staff.update', $member) : route('admin.staff.store') }}" class="max-w-2xl space-y-4 rounded-xl border border-line bg-surface p-6 shadow-sm">
+<form method="POST" action="{{ isset($member) ? route('admin.staff.update', $member) : route('admin.staff.store') }}" class="w-full space-y-4 rounded-xl border border-line bg-surface p-6 shadow-sm">
     @csrf
     @isset($member)
         @method('PATCH')

@@ -4,7 +4,7 @@
 @section('page_title', 'Pengaturan Rental')
 
 @section('content')
-<form method="POST" action="{{ route('admin.rental-settings.update') }}" class="max-w-3xl space-y-6">
+<form method="POST" action="{{ route('admin.rental-settings.update') }}" class="mx-auto max-w-3xl space-y-6">
     @csrf
     @method('PATCH')
 

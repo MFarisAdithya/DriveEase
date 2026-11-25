@@ -4,7 +4,7 @@
 @section('page_title', 'Tinjau Dokumen Identitas Pelanggan')
 
 @section('content')
-<div class="max-w-5xl space-y-6">
+<div class="mx-auto max-w-5xl space-y-6">
     <!-- Back Link & Header -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>

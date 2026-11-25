@@ -4,7 +4,7 @@
 @section('page_title', 'Detail Pemesanan ' . $rental->rental_code)
 
 @section('content')
-<div class="max-w-5xl space-y-6">
+<div class="mx-auto max-w-5xl space-y-6">
     <div class="flex flex-wrap items-center justify-between gap-3">
         <a href="{{ route('admin.bookings.index') }}" class="text-xs font-semibold text-muted hover:text-ink">&larr; Kembali ke Daftar Pemesanan</a>
         <span class="font-mono text-xs font-bold px-3 py-1 rounded-full bg-surface border border-line text-ink">{{ $rental->rental_code }}</span>
