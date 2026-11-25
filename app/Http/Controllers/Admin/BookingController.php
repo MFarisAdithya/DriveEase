@@ -9,6 +9,7 @@ use App\Models\RentalSetting;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\RentalBookingService;
+use App\Services\RentalFinancialService;
 use App\Services\RentalScheduleService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
@@ -213,5 +214,61 @@ class BookingController extends Controller
 
         return redirect()->route('admin.bookings.show', $rental)
             ->with('success', 'Pesanan berhasil dibatalkan dan jadwal kendaraan telah dilepas.');
+    }
+
+    /**
+     * Cancel a booking with refund calculation according to cancellation policy (A-06, A-10).
+     */
+    public function cancelWithRefund(
+        Request $request,
+        Rental $rental,
+        RentalFinancialService $financialService
+    ): RedirectResponse {
+        $validated = $request->validate([
+            'cancellation_type' => ['required', 'in:customer_request,rental_fault,no_show'],
+            'cancellation_reason' => ['required', 'string', 'min:5', 'max:1000'],
+            'refund_amount' => ['nullable', 'numeric', 'min:0'],
+        ]);
+
+        $financialService->cancelWithRefund(
+            rental: $rental,
+            admin: $request->user(),
+            cancellationType: (string) $validated['cancellation_type'],
+            reason: (string) $validated['cancellation_reason'],
+            overrideRefundAmount: isset($validated['refund_amount']) && $validated['refund_amount'] !== ''
+                ? (float) $validated['refund_amount']
+                : null,
+        );
+
+        return redirect()->route('admin.bookings.show', $rental)
+            ->with('success', 'Pesanan dibatalkan dan perhitungan pengembalian dana telah dicatat.');
+    }
+
+    /**
+     * Record actual refund transfer date, amount, and reference number (A-10).
+     */
+    public function realizeRefund(
+        Request $request,
+        Rental $rental,
+        RentalFinancialService $financialService
+    ): RedirectResponse {
+        $validated = $request->validate([
+            'transfer_amount' => ['required', 'numeric', 'min:1'],
+            'transferred_at' => ['required', 'date'],
+            'refund_reference' => ['required', 'string', 'max:100'],
+            'refund_notes' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $financialService->realizeRefund(
+            rental: $rental,
+            admin: $request->user(),
+            transferAmount: (float) $validated['transfer_amount'],
+            transferredAt: CarbonImmutable::parse((string) $validated['transferred_at'], RentalScheduleService::TIMEZONE),
+            reference: (string) $validated['refund_reference'],
+            notes: $validated['refund_notes'] ?? null,
+        );
+
+        return redirect()->route('admin.bookings.show', $rental)
+            ->with('success', 'Realisasi transfer pengembalian dana berhasil dicatat.');
     }
 }

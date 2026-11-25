@@ -104,6 +104,8 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
     Route::post('/bookings/register-customer', [AdminBookingController::class, 'registerWalkInCustomer'])->name('bookings.register-customer');
     Route::get('/bookings/{rental}', [AdminBookingController::class, 'show'])->name('bookings.show');
     Route::patch('/bookings/{rental}/cancel', [AdminBookingController::class, 'cancel'])->name('bookings.cancel');
+    Route::patch('/bookings/{rental}/cancel-with-refund', [AdminBookingController::class, 'cancelWithRefund'])->name('bookings.cancel-with-refund');
+    Route::patch('/bookings/{rental}/refund', [AdminBookingController::class, 'realizeRefund'])->name('bookings.refund');
     Route::post('/bookings/{rental}/payments', [AdminPaymentController::class, 'storeWalkInProof'])->name('bookings.payments.store');
     Route::patch('/payments/{payment}/approve', [AdminPaymentController::class, 'approve'])->name('payments.approve');
     Route::patch('/payments/{payment}/reject', [AdminPaymentController::class, 'reject'])->name('payments.reject');
@@ -126,5 +128,6 @@ Route::middleware(['auth', 'role:customer'])->prefix('customer')->name('customer
     Route::post('/bookings', [CustomerBookingController::class, 'store'])->name('bookings.store');
     Route::get('/bookings/{rental}', [CustomerBookingController::class, 'show'])->name('bookings.show');
     Route::patch('/bookings/{rental}/cancel', [CustomerBookingController::class, 'cancel'])->name('bookings.cancel');
+    Route::post('/bookings/{rental}/request-cancellation', [CustomerBookingController::class, 'requestCancellation'])->name('bookings.request-cancellation');
     Route::post('/bookings/{rental}/payments', [CustomerPaymentController::class, 'store'])->name('bookings.payments.store');
 });

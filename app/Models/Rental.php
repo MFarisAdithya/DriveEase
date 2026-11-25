@@ -442,6 +442,18 @@ class Rental extends Model
     }
 
     /**
+     * Return a human-readable Indonesian label for refund_status.
+     */
+    public function refundStatusLabel(): string
+    {
+        return match ($this->refund_status) {
+            self::REFUND_PENDING => 'Menunggu Transfer Refund',
+            self::REFUND_PROCESSED => 'Refund Sudah Ditransfer',
+            default => 'Tidak Ada Refund',
+        };
+    }
+
+    /**
      * Return the current status notice or next action guidance for dashboard and detail pages (SYS-14).
      */
     public function nextActionNotice(): string

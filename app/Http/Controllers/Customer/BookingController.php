@@ -7,6 +7,7 @@ use App\Models\Car;
 use App\Models\Rental;
 use App\Models\RentalSetting;
 use App\Services\RentalBookingService;
+use App\Services\RentalFinancialService;
 use App\Services\RentalScheduleService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
@@ -172,5 +173,29 @@ class BookingController extends Controller
 
         return redirect()->route('customer.bookings.show', $rental)
             ->with('success', 'Pesanan berhasil dibatalkan dan jadwal kendaraan telah dilepas.');
+    }
+
+    /**
+     * Submit a cancellation request after payment proof submission or confirmation (C-08).
+     */
+    public function requestCancellation(
+        Request $request,
+        Rental $rental,
+        RentalFinancialService $financialService
+    ): RedirectResponse {
+        abort_unless($rental->user_id === $request->user()->id, 403, 'Anda tidak berhak mengajukan pembatalan untuk pesanan ini.');
+
+        $validated = $request->validate([
+            'cancellation_request_reason' => ['required', 'string', 'min:5', 'max:1000'],
+        ]);
+
+        $financialService->requestCustomerCancellation(
+            $rental,
+            $request->user(),
+            (string) $validated['cancellation_request_reason']
+        );
+
+        return redirect()->route('customer.bookings.show', $rental)
+            ->with('success', 'Pengajuan pembatalan berhasil dikirim dan sedang ditinjau admin.');
     }
 }

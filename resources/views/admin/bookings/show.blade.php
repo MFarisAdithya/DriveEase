@@ -141,6 +141,66 @@
             </div>
         @endif
 
+        @if ($rental->cancellation_requested_at || $rental->refund_status !== \App\Models\Rental::REFUND_NONE || $rental->refund_amount > 0)
+            <div class="rounded-xl border border-line bg-surface-raised p-5 space-y-3 text-xs">
+                <h3 class="text-sm font-bold text-ink">Pengelolaan Pembatalan &amp; Refund</h3>
+                @if ($rental->cancellation_requested_at)
+                    <p class="text-warning font-semibold">Pelanggan mengajukan pembatalan pada {{ $rental->cancellation_requested_at->timezone('Asia/Jakarta')->format('d M Y H:i') }} WIB: "{{ $rental->cancellation_request_reason }}"</p>
+                @endif
+                <p>Status Refund: <strong>{{ $rental->refundStatusLabel() }}</strong> ({{ $rental->refund_percentage }}%) &middot; Nominal: <strong>Rp {{ number_format((float) $rental->refund_amount, 0, ',', '.') }}</strong></p>
+                @if ($rental->refund_transferred_at)
+                    <p>Direalisasikan pada {{ $rental->refund_transferred_at->timezone('Asia/Jakarta')->format('d M Y H:i') }} WIB &middot; Referensi: <strong class="font-mono">{{ $rental->refund_reference }}</strong></p>
+                @endif
+
+                @if ($rental->rental_status === \App\Models\Rental::STATUS_CANCELLED && $rental->refund_status === \App\Models\Rental::REFUND_PENDING)
+                    <form method="POST" action="{{ route('admin.bookings.refund', $rental) }}" class="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-3 border-t border-line items-end">
+                        @csrf
+                        @method('PATCH')
+                        <div>
+                            <label for="transfer_amount" class="block font-semibold mb-1">Nominal Transfer (Rp)</label>
+                            <input id="transfer_amount" name="transfer_amount" type="number" min="1" max="{{ (int) $rental->paid_amount }}" value="{{ (int) $rental->refund_amount }}" required class="w-full rounded-lg border border-field-line bg-surface p-2">
+                        </div>
+                        <div>
+                            <label for="transferred_at" class="block font-semibold mb-1">Tanggal Transfer (WIB)</label>
+                            <input id="transferred_at" name="transferred_at" type="datetime-local" value="{{ now('Asia/Jakarta')->format('Y-m-d\TH:i') }}" required class="w-full rounded-lg border border-field-line bg-surface p-2">
+                        </div>
+                        <div>
+                            <label for="refund_reference" class="block font-semibold mb-1">Nomor Referensi</label>
+                            <input id="refund_reference" name="refund_reference" required placeholder="TRX-REF-001" class="w-full rounded-lg border border-field-line bg-surface p-2">
+                        </div>
+                        <button type="submit" class="rounded-lg bg-action hover:bg-action-hover px-4 py-2 font-bold text-ink">Catat Transfer Refund</button>
+                    </form>
+                @endif
+            </div>
+        @endif
+
+        @if (! $rental->canBeCancelledUnpaid() && in_array($rental->rental_status, [\App\Models\Rental::STATUS_PENDING, \App\Models\Rental::STATUS_CONFIRMED], true))
+            <form method="POST" action="{{ route('admin.bookings.cancel-with-refund', $rental) }}" class="rounded-xl border border-danger-line bg-danger-surface/30 p-5 space-y-3 text-xs">
+                @csrf
+                @method('PATCH')
+                <h3 class="text-sm font-bold text-danger">Batalkan Pesanan &amp; Tetapkan Refund</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                        <label for="cancellation_type" class="block font-semibold text-ink mb-1">Kategori Pembatalan</label>
+                        <select id="cancellation_type" name="cancellation_type" class="w-full rounded-lg border border-field-line bg-surface p-2">
+                            <option value="customer_request">Permintaan Pelanggan (Kebijakan Bertingkat)</option>
+                            <option value="rental_fault">Kesalahan / Kendala Rental (100%)</option>
+                            <option value="no_show">Pelanggan Tidak Hadir (0%)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="refund_amount_override" class="block font-semibold text-ink mb-1">Nominal Refund (Opsional, maks Rp {{ number_format((float) $rental->paid_amount, 0, ',', '.') }})</label>
+                        <input id="refund_amount_override" name="refund_amount" type="number" min="0" max="{{ (int) $rental->paid_amount }}" placeholder="Otomatis sesuai kebijakan" class="w-full rounded-lg border border-field-line bg-surface p-2">
+                    </div>
+                    <div>
+                        <label for="admin_cancel_reason" class="block font-semibold text-ink mb-1">Alasan Pembatalan</label>
+                        <input id="admin_cancel_reason" name="cancellation_reason" required minlength="5" placeholder="Alasan pembatalan resmi" class="w-full rounded-lg border border-field-line bg-surface p-2">
+                    </div>
+                </div>
+                <button type="submit" class="rounded-lg bg-danger-action px-4 py-2 font-bold text-white">Proses Pembatalan &amp; Refund</button>
+            </form>
+        @endif
+
         @if ($rental->histories->isNotEmpty())
             <div class="space-y-2 border-t border-line pt-4">
                 <h3 class="text-sm font-bold text-ink">Jejak Audit Transaksi</h3>

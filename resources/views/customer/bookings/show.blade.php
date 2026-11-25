@@ -148,6 +148,35 @@
             </div>
         @endif
 
+        @if ($rental->refund_amount > 0 || $rental->refund_status !== \App\Models\Rental::REFUND_NONE || $rental->cancellation_requested_at)
+            <div class="rounded-xl border border-line bg-surface-raised p-5 text-xs space-y-1.5">
+                <h2 class="text-sm font-bold text-ink">Informasi Pengembalian Dana (Refund)</h2>
+                @if ($rental->cancellation_requested_at)
+                    <p>Pengajuan pembatalan dikirim pada {{ $rental->cancellation_requested_at->timezone('Asia/Jakarta')->format('d M Y H:i') }} WIB: "{{ $rental->cancellation_request_reason }}"</p>
+                @endif
+                <p>Status Refund: <strong>{{ $rental->refundStatusLabel() }}</strong> ({{ $rental->refund_percentage }}%)</p>
+                <p>Nominal Refund: <strong>Rp {{ number_format((float) $rental->refund_amount, 0, ',', '.') }}</strong></p>
+                @if ($rental->refund_transferred_at)
+                    <p>Tanggal Transfer: <strong>{{ $rental->refund_transferred_at->timezone('Asia/Jakarta')->format('d M Y H:i') }} WIB</strong> &middot; Referensi: <strong class="font-mono">{{ $rental->refund_reference }}</strong></p>
+                @endif
+            </div>
+        @endif
+
+        @if (! $rental->canBeCancelledUnpaid() && in_array($rental->rental_status, [\App\Models\Rental::STATUS_PENDING, \App\Models\Rental::STATUS_CONFIRMED], true) && $rental->cancellation_requested_at === null)
+            <form method="POST" action="{{ route('customer.bookings.request-cancellation', $rental) }}" class="rounded-xl border border-line bg-surface-raised p-5 space-y-3">
+                @csrf
+                <h2 class="text-sm font-bold text-ink">Ajukan Pembatalan Pesanan</h2>
+                <p class="text-xs text-muted">Kebijakan refund pelanggan: &ge; 48 jam (100%), 24 s.d. &lt; 48 jam (75%), 6 s.d. &lt; 24 jam (50%), &lt; 6 jam (0%).</p>
+                <div>
+                    <label for="cancellation_request_reason" class="block text-xs font-semibold text-ink mb-1">Alasan Pengajuan Pembatalan</label>
+                    <input id="cancellation_request_reason" name="cancellation_request_reason" required minlength="5" placeholder="Jelaskan alasan pembatalan pesanan Anda" class="w-full rounded-lg border border-field-line bg-surface p-2 text-xs">
+                </div>
+                <button type="submit" class="rounded-lg border border-danger-line bg-danger-surface px-4 py-2 text-xs font-bold text-danger">
+                    Kirim Pengajuan Pembatalan
+                </button>
+            </form>
+        @endif
+
         @if ($rental->histories->isNotEmpty())
             <div class="space-y-2 border-t border-line pt-4">
                 <h2 class="text-sm font-bold text-ink">Jejak Aktivitas Pesanan</h2>
