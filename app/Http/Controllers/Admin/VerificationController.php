@@ -18,13 +18,27 @@ class VerificationController extends Controller
     public function index(Request $request): View
     {
         $status = $request->query('status');
+        $search = is_string($request->query('search')) ? trim($request->query('search')) : '';
 
+        // VerificationQueue::queries() menyiapkan builder Eloquent terpisah untuk setiap tab
+        // status antrean verifikasi agar angka badge dan isi tabel selalu konsisten.
         $queues = app(VerificationQueue::class)->queries();
         $status = is_string($status) && isset($queues[$status]) ? $status : 'all';
         $counts = array_map(fn ($query) => $query->count(), $queues);
-        $customers = $queues[$status]->latest('updated_at')->orderByDesc('id')->paginate(15)->withQueryString();
 
-        return view('admin.verifications.index', compact('customers', 'counts', 'status'));
+        $activeQuery = clone $queues[$status];
+        // Jika kata kunci pencarian diisi, bungkus filter ilike pada name/email dalam closure
+        // supaya kondisi OR tetap terisolasi di dalam filter status antrean yang dipilih.
+        if ($search !== '') {
+            $activeQuery->where(function ($query) use ($search): void {
+                $query->where('name', 'ilike', "%{$search}%")
+                    ->orWhere('email', 'ilike', "%{$search}%");
+            });
+        }
+
+        $customers = $activeQuery->latest('updated_at')->orderByDesc('id')->paginate(15)->withQueryString();
+
+        return view('admin.verifications.index', compact('customers', 'counts', 'status', 'search'));
     }
 
     /**
@@ -36,12 +50,21 @@ class VerificationController extends Controller
 
         $user->load(['verifier', 'role']);
 
-        // join() memperoleh nama kendaraan untuk setiap pesanan.
-        // where() membatasi riwayat pada pelanggan yang sedang ditinjau.
+        // join() menggabungkan tabel rentals dengan cars agar nama mobil ikut terbaca
+        // meskipun unit kendaraan lama tersebut sudah berstatus diarsipkan.
+        // where() membatasi riwayat hanya milik pelanggan yang sedang ditinjau.
         $rentals = DB::table('rentals')
             ->join('cars', 'cars.id', '=', 'rentals.car_id')
             ->where('rentals.user_id', $user->id)
-            ->select('rentals.rental_code', 'rentals.start_date', 'rentals.end_date', 'cars.name as car_name')
+            ->select(
+                'rentals.rental_code',
+                'rentals.start_date',
+                'rentals.end_date',
+                'rentals.total_amount',
+                'rentals.rental_status',
+                'rentals.payment_status',
+                'cars.name as car_name'
+            )
             ->orderByDesc('rentals.id')
             ->paginate(10);
 

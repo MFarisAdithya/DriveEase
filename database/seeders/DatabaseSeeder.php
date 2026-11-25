@@ -2,9 +2,11 @@
 
 namespace Database\Seeders;
 
+use App\Models\RentalSetting;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
@@ -73,7 +75,24 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        // 3. Car Types & Reference Fleet (Turo)
+        // 3. Rental Business Settings (default row only if not yet configured)
+        // insertOrIgnore() hanya menyisipkan baris ID 1 apabila belum ada di tabel
+        // rental_settings, sehingga perubahan pengaturan oleh admin tetap terjaga.
+        $defaultPublicInfo = RentalSetting::defaultPublicInfo();
+        DB::table('rental_settings')->insertOrIgnore([
+            'id' => 1,
+            'business_name' => $defaultPublicInfo->business_name,
+            'services' => $defaultPublicInfo->services,
+            'address' => $defaultPublicInfo->address,
+            'contact' => $defaultPublicInfo->contact,
+            'operating_hours' => $defaultPublicInfo->operating_hours,
+            'terms' => $defaultPublicInfo->terms,
+            'bank_name' => 'Bank Simulasi DriveEase',
+            'account_number' => '123456789012',
+            'account_holder' => 'PT DriveEase Simulasi',
+        ]);
+
+        // 4. Car Types & Reference Fleet (Turo)
         $this->call(TuroFleetSeeder::class);
     }
 }

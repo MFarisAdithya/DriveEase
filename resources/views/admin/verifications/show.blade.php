@@ -278,16 +278,31 @@
             </div>
         </div>
     </div>
+    <!-- Customer Rental History -->
+    <section class="bg-surface rounded-xl border border-line shadow-sm p-6">
+        <h3 class="text-sm font-bold text-ink mb-3">Riwayat Rental Pelanggan</h3>
+        <ul class="divide-y divide-line text-sm">
+            @forelse ($rentals as $rental)
+                <li class="py-3 flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                        <span class="font-mono font-bold text-ink">{{ $rental->rental_code }}</span>
+                        <span class="text-ink"> &middot; {{ $rental->car_name }}</span>
+                        <span class="block text-xs text-muted">{{ $rental->start_date }} sampai {{ $rental->end_date }}</span>
+                    </div>
+                    <div class="text-right text-xs">
+                        <span class="font-semibold text-ink block">Rp {{ number_format((float) $rental->total_amount, 0, ',', '.') }}</span>
+                        <span class="text-muted">{{ $rental->rental_status }} / {{ $rental->payment_status }}</span>
+                    </div>
+                </li>
+            @empty
+                <li class="py-3 text-muted">Belum ada riwayat rental.</li>
+            @endforelse
+        </ul>
+        @if ($rentals->hasPages())
+            <div class="mt-4 pt-3 border-t border-line">
+                {{ $rentals->links('layouts.pagination') }}
+            </div>
+        @endif
+    </section>
 </div>
-<section class="mt-6 rounded-xl border bg-white p-5">
-    <h2 class="mb-3 text-sm font-bold">Riwayat Rental Pelanggan</h2>
-    <ul class="space-y-2 text-sm">
-        @forelse ($rentals as $rental)
-            <li>{{ $rental->rental_code }} · {{ $rental->car_name }} · {{ $rental->start_date }} sampai {{ $rental->end_date }}</li>
-        @empty
-            <li>Belum ada riwayat rental.</li>
-        @endforelse
-    </ul>
-    {{ $rentals->links() }}
-</section>
 @endsection

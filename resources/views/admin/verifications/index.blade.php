@@ -25,13 +25,24 @@
     <section class="ui-panel" aria-label="Antrean verifikasi">
         <nav aria-label="Filter status verifikasi" class="flex flex-wrap gap-2 border-b border-line p-4">
             @foreach (['all' => 'Semua', 'ready' => 'Siap ditinjau', 'incomplete' => 'Belum lengkap', 'verified' => 'Disetujui', 'rejected' => 'Ditolak'] as $key => $label)
-                <a href="{{ route('admin.verifications.index', $key === 'all' ? [] : ['status' => $key]) }}"
+                <a href="{{ route('admin.verifications.index', array_filter(['status' => $key === 'all' ? null : $key, 'search' => ($search ?? '') !== '' ? $search : null])) }}"
                    @if ($status === $key) aria-current="page" @endif
                    class="inline-flex min-h-11 items-center gap-2 rounded-lg border px-3 text-sm {{ $status === $key ? 'border-field-line bg-accent font-bold' : 'border-line hover:bg-surface-raised' }}">
                     {{ $label }} <span class="tabular-nums">{{ $counts[$key] }}</span>
                 </a>
             @endforeach
         </nav>
+        <form method="GET" action="{{ route('admin.verifications.index') }}" class="flex flex-wrap items-center gap-2 border-b border-line px-4 py-3">
+            @if ($status !== 'all')
+                <input type="hidden" name="status" value="{{ $status }}">
+            @endif
+            <label for="verification-search" class="sr-only">Cari nama atau email pelanggan</label>
+            <input id="verification-search" name="search" value="{{ $search ?? '' }}" placeholder="Cari nama atau email pelanggan..." class="min-w-[220px] flex-1 rounded-lg border border-field-line bg-surface-raised px-3 py-2 text-xs">
+            <button type="submit" class="rounded-lg bg-action hover:bg-action-hover px-4 py-2 text-xs font-semibold text-ink transition-colors">Cari Pelanggan</button>
+            @if (($search ?? '') !== '')
+                <a href="{{ route('admin.verifications.index', $status === 'all' ? [] : ['status' => $status]) }}" class="text-xs font-semibold text-danger hover:underline">Reset</a>
+            @endif
+        </form>
         <p class="px-4 py-3 text-sm text-muted">{{ $customers->total() }} pelanggan pada daftar ini. Berkas lengkap belum berarti identitas disetujui.</p>
         <table class="queue-table w-full table-fixed text-left text-sm">
             <caption class="sr-only">Pelanggan, kelengkapan berkas, status akun, waktu pembaruan, dan tindakan pemeriksaan</caption>

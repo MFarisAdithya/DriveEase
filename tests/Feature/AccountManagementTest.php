@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Car;
 use App\Models\CarType;
+use App\Models\RentalSetting;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Auth\Notifications\ResetPassword;
@@ -213,12 +214,25 @@ class AccountManagementTest extends TestCase
         $this->assertDatabaseHas('rental_settings', ['id' => 1] + $settings);
 
         $invalidSettings = array_replace($settings, ['account_number' => 'nomor tidak valid']);
-        $this->patch(route('admin.rental-settings.update'), $invalidSettings)->assertSessionHasErrors('account_number');
+        $this->patch(route('admin.rental-settings.update'), $invalidSettings)
+            ->assertSessionHasErrors(['account_number' => 'Nomor rekening hanya boleh berisi angka tanpa spasi atau tanda baca.']);
         $this->assertDatabaseHas('rental_settings', ['id' => 1] + $settings);
+
+        // Pastikan model RentalSetting menyembunyikan rincian rekening saat diserialisasi.
+        $settingModel = RentalSetting::current();
+        $this->assertNotNull($settingModel);
+        $this->assertArrayNotHasKey('account_number', $settingModel->toArray());
+        $this->assertArrayNotHasKey('bank_name', $settingModel->toArray());
+        $this->assertArrayNotHasKey('account_holder', $settingModel->toArray());
 
         $customer = User::factory()->create(['role_id' => Role::where('name', 'customer')->firstOrFail()->id]);
         $this->actingAs($customer)->get(route('admin.rental-settings.edit'))->assertForbidden();
         $this->patch(route('admin.rental-settings.update'), $settings)->assertForbidden();
+
+        $staff = User::factory()->create(['role_id' => Role::where('name', 'staff')->firstOrFail()->id]);
+        $this->actingAs($staff)->get(route('admin.rental-settings.edit'))->assertForbidden();
+        $this->patch(route('admin.rental-settings.update'), $settings)->assertForbidden();
+
         $this->post(route('logout'));
         $this->get(route('home'))->assertOk()
             ->assertSee($settings['business_name'])
@@ -228,6 +242,18 @@ class AccountManagementTest extends TestCase
             ->assertSee($settings['operating_hours'])
             ->assertSee($settings['terms'])
             ->assertDontSee($settings['account_number']);
+    }
+
+    public function test_public_home_shows_default_business_info_when_settings_table_is_empty(): void
+    {
+        DB::table('rental_settings')->delete();
+        $defaultInfo = RentalSetting::defaultPublicInfo();
+
+        $this->get(route('home'))->assertOk()
+            ->assertSee($defaultInfo->business_name)
+            ->assertSee($defaultInfo->address)
+            ->assertSee($defaultInfo->contact)
+            ->assertSee($defaultInfo->operating_hours);
     }
 
     public function test_identity_numbers_are_encrypted_in_the_database(): void

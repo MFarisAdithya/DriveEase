@@ -318,6 +318,37 @@ class CustomerVerificationTest extends TestCase
         $responseFiltered = $this->actingAs($this->admin)->get(route('admin.verifications.index', ['status' => 'pending']));
         $responseFiltered->assertOk();
         $responseFiltered->assertSee($this->customer->name);
+
+        $responseSearched = $this->actingAs($this->admin)->get(route('admin.verifications.index', ['search' => $this->otherCustomer->email]));
+        $responseSearched->assertOk();
+        $responseSearched->assertSee($this->otherCustomer->name);
+        $responseSearched->assertDontSee($this->customer->name);
+    }
+
+    public function test_guest_and_invalid_document_type_are_rejected_and_sim_is_protected(): void
+    {
+        $simPath = 'identities/fake_sim.jpg';
+        Storage::disk('local')->put($simPath, 'fake-sim-content');
+        $this->customer->update(['sim_image' => $simPath]);
+
+        // Tamu harus dialihkan ke login saat meminta dokumen privat.
+        $this->get(route('documents.identity.show', ['user' => $this->customer, 'type' => 'sim']))
+            ->assertRedirect(route('login'));
+
+        // Pemilik dan admin berwenang boleh melihat SIM dengan header no-store.
+        $this->actingAs($this->customer)
+            ->get(route('documents.identity.show', ['user' => $this->customer, 'type' => 'sim']))
+            ->assertOk();
+
+        $adminResponse = $this->actingAs($this->admin)
+            ->get(route('documents.identity.show', ['user' => $this->customer, 'type' => 'sim']))
+            ->assertOk();
+        $this->assertStringContainsString('no-store', $adminResponse->headers->get('Cache-Control'));
+
+        // Tipe dokumen selain ktp/sim harus ditolak dengan 404.
+        $this->actingAs($this->admin)
+            ->get(route('documents.identity.show', ['user' => $this->customer, 'type' => 'passport']))
+            ->assertNotFound();
     }
 
     public function test_admin_can_approve_pending_customer_verification(): void

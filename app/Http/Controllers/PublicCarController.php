@@ -4,8 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Car;
 use App\Models\CarType;
+use App\Models\RentalSetting;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class PublicCarController extends Controller
@@ -15,6 +15,8 @@ class PublicCarController extends Controller
      */
     public function landing(): View
     {
+        // activeInventory() mengecualikan armada berarsip, sedangkan orderByRaw()
+        // memprioritaskan unit berstatus available sebelum mengambil 3 model unik.
         $featuredCars = Car::activeInventory()->with('carType')
             ->orderByRaw("CASE WHEN status = 'available' THEN 0 ELSE 1 END")
             ->orderBy('id')
@@ -23,11 +25,10 @@ class PublicCarController extends Controller
             ->take(3)
             ->values();
 
-        // select() membatasi data yang diteruskan ke Blade pada informasi publik.
-        // Rincian rekening hanya digunakan admin dan alur pembayaran.
-        $rentalInfo = DB::table('rental_settings')
-            ->select('business_name', 'services', 'address', 'contact', 'operating_hours', 'terms')
-            ->find(1);
+        // RentalSetting::publicInfo() hanya memilih kolom informasi usaha publik
+        // (tanpa bank_name, account_number, account_holder) serta memberi nilai bawaan
+        // ketika baris pengaturan belum disimpan admin.
+        $rentalInfo = RentalSetting::publicInfo();
 
         return view('landing', compact('featuredCars', 'rentalInfo'));
     }

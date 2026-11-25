@@ -425,14 +425,20 @@
             </div>
 
             @if ($rentalInfo)
-                <section class="mt-10 space-y-3 text-sm text-[#B6DFED]">
-                    <h2 class="text-lg font-bold text-white">{{ $rentalInfo->business_name }}</h2>
-                    <p class="whitespace-pre-line">{{ $rentalInfo->services }}</p>
-                    <p>{{ $rentalInfo->address }}</p>
-                    <p>{{ $rentalInfo->contact }}</p>
-                    <p>Jam operasional {{ $rentalInfo->operating_hours }} WIB</p>
-                    <h3 class="font-semibold text-white">Ketentuan rental</h3>
-                    <p class="whitespace-pre-line">{{ $rentalInfo->terms }}</p>
+                <section id="informasi-usaha" class="mt-10 rounded-2xl border border-white/10 bg-white/[0.04] p-6 sm:p-8 space-y-4 text-sm text-[#B6DFED]">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="space-y-2">
+                            <h2 class="text-lg font-bold text-white">{{ $rentalInfo->business_name }}</h2>
+                            <p class="whitespace-pre-line leading-relaxed">{{ $rentalInfo->services }}</p>
+                            <p>{{ $rentalInfo->address }}</p>
+                            <p>{{ $rentalInfo->contact }}</p>
+                            <p>Jam operasional {{ str_contains(strtoupper($rentalInfo->operating_hours), 'WIB') ? $rentalInfo->operating_hours : $rentalInfo->operating_hours.' WIB' }}</p>
+                        </div>
+                        <div class="space-y-2">
+                            <h3 class="font-semibold text-white">Ketentuan rental</h3>
+                            <p class="whitespace-pre-line leading-relaxed">{{ $rentalInfo->terms }}</p>
+                        </div>
+                    </div>
                 </section>
             @endif
             <div class="mt-12 pt-8 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#9ADAF6]">
