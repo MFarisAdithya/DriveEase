@@ -143,7 +143,7 @@ class BackupDriveEase extends Command
                 'database_connection' => (string) config('database.default'),
                 // Hanya sidik jari SHA-256 yang dicatat; nilai APP_KEY mentah wajib disimpan terpisah.
                 'app_key_fingerprint' => hash('sha256', $appKey),
-                'key_recovery_procedure' => 'Simpan APP_KEY pada pengelola rahasia terpisah dari paket cadangan. Saat pemulihan, pulihkan APP_KEY ke environment server terlebih dahulu, impor database dan salin direktori storage/app/private, lalu jalankan php artisan driveease:verify-restore --target-db=<db_terisolasi> --target-storage=<dir_privat_terisolasi>.',
+                'key_recovery_procedure' => 'Simpan APP_KEY pada pengelola rahasia terpisah dari paket cadangan. Saat pemulihan produksi, pulihkan APP_KEY ke environment server dan impor cadangan database/berkas secara manual. Untuk latihan otomatis, jalankan pada APP_ENV=testing dengan --target-db=driveease_restore_<nama_kosong> dan --target-storage=storage/framework/testing/<dir_kosong>.',
                 'tables' => $tableManifest,
                 'files' => $fileManifest,
             ];

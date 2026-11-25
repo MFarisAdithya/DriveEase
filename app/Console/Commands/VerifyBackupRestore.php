@@ -217,13 +217,22 @@ class VerifyBackupRestore extends Command
         }
 
         $targetDb = trim((string) $this->option('target-db'));
+        $targetStorage = trim((string) $this->option('target-storage'));
+
+        // Pemulihan nyata (--target-db atau --target-storage) hanya boleh berjalan pada lingkungan testing
+        // agar database utama, database proyek lain, maupun berkas aktif tidak pernah tersentuh.
+        if (($targetDb !== '' || $targetStorage !== '') && ! app()->environment('testing')) {
+            $this->error('Pemulihan nyata (--target-db dan --target-storage) hanya diizinkan pada lingkungan testing (APP_ENV=testing).');
+
+            return self::FAILURE;
+        }
+
         if ($targetDb !== '') {
             if (! $this->performIsolatedDatabaseRestore($targetDb, $tables, $targetRental['rental_code'])) {
                 return self::FAILURE;
             }
         }
 
-        $targetStorage = trim((string) $this->option('target-storage'));
         if ($targetStorage !== '') {
             if (! $this->performIsolatedStorageRestore($targetStorage, $backupDir, $manifest['files'] ?? [], $uniqueReferencedFiles)) {
                 return self::FAILURE;
@@ -239,20 +248,27 @@ class VerifyBackupRestore extends Command
     }
 
     /**
-     * Impor seluruh tabel cadangan ke database PostgreSQL terisolasi, setel ulang sequence, dan verifikasi hasilnya.
+     * Impor seluruh tabel cadangan ke database PostgreSQL kosong terisolasi, setel ulang sequence, dan verifikasi hasilnya.
      *
      * @param  array<string, list<array<string, mixed>>>  $tables
      */
     private function performIsolatedDatabaseRestore(string $targetDb, array $tables, string $targetRentalCode): bool
     {
-        if (preg_match('/^[a-z0-9_]+$/', $targetDb) !== 1) {
-            $this->error('Nama target-db tidak valid; hanya huruf kecil, angka, dan garis bawah yang diizinkan.');
+        // Hanya izinkan nama database dengan awalan khusus latihan restore testing (driveease_restore_*).
+        // Pola ini otomatis menolak database aplikasi lain maupun nama sembarang di server PostgreSQL.
+        if (preg_match('/^driveease_restore_[a-z0-9_]+$/', $targetDb) !== 1) {
+            $this->error('Nama target-db tidak valid; wajib diawali driveease_restore_ serta hanya berisi huruf kecil, angka, dan garis bawah.');
 
             return false;
         }
 
-        $activeDbName = (string) config('database.connections.'.config('database.default').'.database');
-        if (in_array($targetDb, self::FORBIDDEN_TARGET_DBS, true) || $targetDb === $activeDbName) {
+        $activeDefault = (string) config('database.default');
+        $activeDbName = strtolower((string) config("database.connections.{$activeDefault}.database"));
+        $configuredPgsqlDb = strtolower((string) config('database.connections.pgsql.database'));
+
+        if (in_array(strtolower($targetDb), self::FORBIDDEN_TARGET_DBS, true)
+            || strtolower($targetDb) === $activeDbName
+            || strtolower($targetDb) === $configuredPgsqlDb) {
             $this->error("Database {$targetDb} dilindungi dan tidak boleh ditimpa oleh latihan pemulihan.");
 
             return false;
@@ -274,14 +290,33 @@ class VerifyBackupRestore extends Command
                 ]),
             ]);
             DB::purge('restore_verify');
-            DB::connection('restore_verify')->getPdo();
+            $restoreConn = DB::connection('restore_verify');
+            if ($restoreConn->getDriverName() !== 'pgsql') {
+                $this->error('Target restore database harus menggunakan driver PostgreSQL.');
 
-            // Alihkan default connection sementara selama migrate:fresh dan impor agar DB::statement()
+                return false;
+            }
+            $restoreConn->getPdo();
+
+            // Periksa skema public sebelum migration: apabila sudah ada satu tabel saja, tolak proses
+            // agar latihan restore tidak pernah menghapus atau menimpa data pada database yang sudah terisi.
+            $existingTableCount = (int) ($restoreConn->selectOne(
+                "SELECT COUNT(*) AS total FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'"
+            )->total ?? 0);
+
+            if ($existingTableCount > 0) {
+                $this->error("Database target {$targetDb} tidak kosong ({$existingTableCount} tabel ditemukan). Pemulihan hanya diizinkan pada database PostgreSQL kosong.");
+
+                return false;
+            }
+
+            // Alihkan default connection sementara selama migrate dan impor agar DB::statement()
             // di file migration terdahulu ikut mengarah ke restore_verify, bukan ke database aktif.
             DB::setDefaultConnection('restore_verify');
             config(['database.default' => 'restore_verify']);
 
-            $migrateStatus = Artisan::call('migrate:fresh', [
+            // Jalankan migrate (bukan migrate:fresh) supaya perintah tidak pernah mengeksekusi DROP TABLE/db:wipe.
+            $migrateStatus = Artisan::call('migrate', [
                 '--database' => 'restore_verify',
                 '--force' => true,
             ]);
@@ -292,7 +327,6 @@ class VerifyBackupRestore extends Command
                 return false;
             }
 
-            $restoreConn = DB::connection('restore_verify');
             $restoreConn->transaction(function () use ($restoreConn, $tables): void {
                 foreach (self::RESTORE_ORDER as $table) {
                     $rows = $tables[$table] ?? [];
@@ -351,7 +385,7 @@ class VerifyBackupRestore extends Command
     }
 
     /**
-     * Salin dan verifikasi ulang SHA-256 berkas privat ke direktori penyimpanan terisolasi.
+     * Salin dan verifikasi ulang SHA-256 berkas privat ke subdirektori kosong di bawah storage/framework/testing.
      *
      * @param  array<string, array<string, mixed>>  $manifestFiles
      * @param  list<string>  $referencedFiles
@@ -362,24 +396,109 @@ class VerifyBackupRestore extends Command
         array $manifestFiles,
         array $referencedFiles
     ): bool {
+        $testingRoot = $this->normalizeAbsolutePath(storage_path('framework/testing'));
+        File::ensureDirectoryExists($testingRoot);
+        $realTestingRoot = realpath($testingRoot);
+        if ($realTestingRoot === false) {
+            $this->error('Direktori sandbox testing storage/framework/testing tidak tersedia.');
+
+            return false;
+        }
+
         $resolvedTarget = $this->normalizeAbsolutePath($targetStorage);
+        $resolvedBackupDir = $this->normalizeAbsolutePath($backupDir);
+
+        $toSlashLower = static fn (string $path): string => strtolower(rtrim(str_replace('\\', '/', $path), '/'));
+        $candidateLower = $toSlashLower($resolvedTarget);
+        $testingRootLower = $toSlashLower($testingRoot);
+        $backupDirLower = $toSlashLower($resolvedBackupDir);
+        $realTestingRootLower = $toSlashLower($realTestingRoot);
+
+        // Wajibkan target berada di subdirektori khusus di dalam storage/framework/testing
+        // dan tolak root testing itu sendiri agar data lain di luar sandbox tidak pernah tersentuh.
+        if (! str_starts_with($candidateLower, $testingRootLower.'/')) {
+            $this->error('Direktori target-storage wajib berupa subdirektori terisolasi di dalam storage/framework/testing.');
+
+            return false;
+        }
+
+        // Cegah tumpang tindih dengan paket sumber cadangan maupun area publik/storage aktif aplikasi.
+        if ($candidateLower === $backupDirLower
+            || str_starts_with($candidateLower, $backupDirLower.'/')
+            || str_starts_with($backupDirLower, $candidateLower.'/')) {
+            $this->error('Direktori target-storage tidak boleh sama dengan atau bertumpang tindih dengan direktori sumber cadangan.');
+
+            return false;
+        }
+
         $forbiddenRoots = [
-            strtolower(rtrim(str_replace('\\', '/', public_path()), '/')),
-            strtolower(rtrim(str_replace('\\', '/', storage_path('app/public')), '/')),
-            strtolower(rtrim(str_replace('\\', '/', Storage::disk('local')->path('')), '/')),
+            $toSlashLower(public_path()),
+            $toSlashLower(storage_path('app/public')),
+            $toSlashLower(Storage::disk('local')->path('')),
+            $toSlashLower(storage_path('app/backups')),
         ];
 
-        $candidateLower = strtolower(rtrim(str_replace('\\', '/', $resolvedTarget), '/'));
         foreach ($forbiddenRoots as $root) {
             if ($candidateLower === $root || str_starts_with($candidateLower, $root.'/')) {
-                $this->error('Direktori target-storage harus terisolasi dari direktori publik maupun storage privat aktif.');
+                $this->error('Direktori target-storage harus terisolasi dari direktori publik maupun storage aktif aplikasi.');
+
+                return false;
+            }
+        }
+
+        // Tolak symlink maupun berkas biasa serta pastikan seluruh ancestor yang sudah ada tidak keluar via symlink.
+        if (is_link($resolvedTarget) || (file_exists($resolvedTarget) && ! is_dir($resolvedTarget))) {
+            $this->error('Target-storage bukan direktori valid yang aman untuk latihan pemulihan.');
+
+            return false;
+        }
+
+        $cursor = $resolvedTarget;
+        while ($cursor !== '' && ! file_exists($cursor)) {
+            $parent = dirname($cursor);
+            if ($parent === $cursor) {
+                break;
+            }
+            $cursor = $parent;
+        }
+
+        if ($cursor === '' || is_link($cursor)) {
+            $this->error('Target-storage mengandung jalur tautan simbolik (symlink) yang ditolak.');
+
+            return false;
+        }
+
+        $realAncestor = realpath($cursor);
+        if ($realAncestor === false) {
+            $this->error('Jalur induk target-storage tidak dapat diverifikasi secara aman.');
+
+            return false;
+        }
+        $realAncestorLower = $toSlashLower($realAncestor);
+        if ($realAncestorLower !== $realTestingRootLower && ! str_starts_with($realAncestorLower, $realTestingRootLower.'/')) {
+            $this->error('Jalur fisik target-storage keluar dari sandbox storage/framework/testing.');
+
+            return false;
+        }
+
+        // Jangan pernah menghapus isi direktori target; wajibkan target belum ada atau benar-benar kosong.
+        if (is_dir($resolvedTarget)) {
+            $realTarget = realpath($resolvedTarget);
+            if ($realTarget === false || ! str_starts_with($toSlashLower($realTarget), $realTestingRootLower.'/')) {
+                $this->error('Jalur fisik direktori target-storage berada di luar sandbox testing.');
+
+                return false;
+            }
+
+            $entries = array_diff(scandir($resolvedTarget) ?: [], ['.', '..']);
+            if ($entries !== []) {
+                $this->error('Direktori target-storage harus belum ada atau benar-benar kosong agar tidak menimpa atau menghapus data yang sudah ada.');
 
                 return false;
             }
         }
 
         try {
-            File::deleteDirectory($resolvedTarget);
             File::ensureDirectoryExists($resolvedTarget);
 
             foreach ($manifestFiles as $relativePath => $meta) {

@@ -237,6 +237,133 @@ class BackupRestoreDrillTest extends TestCase
         }
     }
 
+    /**
+     * Memastikan target restore nyata tidak dapat menghapus atau menimpa data di luar lingkungan testing yang kosong.
+     */
+    public function test_verify_restore_blocks_non_testing_environment_and_prevents_deleting_existing_database_or_storage_data(): void
+    {
+        $originalLocalDisk = Storage::disk('local');
+        Storage::set('local', Storage::fake('local'));
+
+        $admin = $this->createUserWithRole('admin');
+        $customer = $this->createVerifiedCustomer();
+        Storage::disk('local')->put('identities/ktp-guard.jpg', 'ktp-guard-binary');
+        $customer->forceFill(['ktp_image' => 'identities/ktp-guard.jpg'])->saveOrFail();
+
+        $car = $this->createBookableCar(450000);
+        $pickupAt = CarbonImmutable::now('Asia/Jakarta')->addHours(6)->startOfHour();
+        $rental = app(RentalBookingService::class)->createBooking($customer, $car->id, $pickupAt, 1, true);
+
+        $this->actingAs($customer)->post(route('customer.bookings.payments.store', $rental), [
+            'payment_proof' => UploadedFile::fake()->image('guard-main.jpg'),
+        ])->assertRedirect();
+        $payment = $rental->payments()->firstOrFail();
+        $this->actingAs($admin)->patch(route('admin.payments.approve', $payment), [
+            'verified_amount' => (float) $rental->total_amount,
+            'received_at' => now('Asia/Jakarta')->format('Y-m-d\TH:i'),
+        ])->assertRedirect();
+
+        $suffix = uniqid();
+        $backupDir = storage_path('framework/testing/backup_guard_'.$suffix);
+        $outsideDir = storage_path('framework/cache/restore_guard_outside_'.$suffix);
+        $nonEmptyTargetDir = storage_path('framework/testing/restore_nonempty_'.$suffix);
+        $nonTestingTargetDir = storage_path('framework/testing/restore_nontest_'.$suffix);
+        $nonEmptyDbName = 'driveease_restore_nonempty_'.strtolower(substr(preg_replace('/[^a-z0-9]/i', '', $suffix) ?: 'x', 0, 8));
+        $postgresPdo = $this->connectPostgresMaintenance();
+        $originalEnv = $this->app->environment();
+
+        try {
+            $this->artisan('driveease:backup', ['--output' => $backupDir])->assertExitCode(0);
+
+            // 1. Pada environment non-testing (production dan local), pemulihan ke --target-db maupun --target-storage wajib ditolak,
+            //    sedangkan verifikasi paket read-only tanpa opsi target tetap diperbolehkan.
+            foreach (['production', 'local'] as $nonTestingEnv) {
+                $this->app->detectEnvironment(fn (): string => $nonTestingEnv);
+
+                $this->artisan('driveease:verify-restore', [
+                    'path' => $backupDir,
+                    '--rental-code' => $rental->rental_code,
+                    '--target-db' => 'driveease_restore_blocked',
+                ])->assertExitCode(1);
+
+                $this->artisan('driveease:verify-restore', [
+                    'path' => $backupDir,
+                    '--rental-code' => $rental->rental_code,
+                    '--target-storage' => $nonTestingTargetDir,
+                ])->assertExitCode(1);
+
+                $this->assertDirectoryDoesNotExist($nonTestingTargetDir);
+
+                $this->artisan('driveease:verify-restore', [
+                    'path' => $backupDir,
+                    '--rental-code' => $rental->rental_code,
+                ])->assertExitCode(0);
+            }
+
+            $this->app->detectEnvironment(fn (): string => $originalEnv);
+
+            // 2. Tolak target-db yang tidak berawalan driveease_restore_ (termasuk database aplikasi lain).
+            foreach (['driveease_db', 'driveease_test', 'other_app_db'] as $forbiddenDb) {
+                $this->artisan('driveease:verify-restore', [
+                    'path' => $backupDir,
+                    '--rental-code' => $rental->rental_code,
+                    '--target-db' => $forbiddenDb,
+                ])->assertExitCode(1);
+            }
+
+            // 3. Buat database berawalan driveease_restore_ tetapi sudah memiliki tabel dan data: harus ditolak dan datanya utuh.
+            $this->recreateIsolatedDatabase($postgresPdo, $nonEmptyDbName);
+            $basePgsql = config('database.connections.pgsql');
+            $nonEmptyPdo = new PDO(
+                "pgsql:host={$basePgsql['host']};port={$basePgsql['port']};dbname={$nonEmptyDbName}",
+                (string) $basePgsql['username'],
+                (string) $basePgsql['password']
+            );
+            $nonEmptyPdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+            $nonEmptyPdo->exec('CREATE TABLE sentinel_keep (id INT PRIMARY KEY, marker TEXT NOT NULL)');
+            $nonEmptyPdo->exec("INSERT INTO sentinel_keep (id, marker) VALUES (1, 'do-not-delete')");
+
+            $this->artisan('driveease:verify-restore', [
+                'path' => $backupDir,
+                '--rental-code' => $rental->rental_code,
+                '--target-db' => $nonEmptyDbName,
+            ])->assertExitCode(1);
+
+            $marker = $nonEmptyPdo->query('SELECT marker FROM sentinel_keep WHERE id = 1')->fetchColumn();
+            $this->assertSame('do-not-delete', $marker);
+            $nonEmptyPdo = null;
+
+            // 4. Tolak target-storage di luar sandbox testing, root testing itu sendiri, traversal .., tumpang tindih backupDir,
+            //    maupun subdirektori sandbox yang sudah berisi berkas; seluruh berkas yang ada tidak boleh terhapus.
+            File::ensureDirectoryExists($outsideDir);
+            File::put($outsideDir.DIRECTORY_SEPARATOR.'keep.txt', 'outside-safe');
+            File::ensureDirectoryExists($nonEmptyTargetDir);
+            File::put($nonEmptyTargetDir.DIRECTORY_SEPARATOR.'existing.txt', 'sandbox-nonempty-safe');
+
+            $traversalPath = storage_path('framework/testing/../cache/restore_guard_outside_'.$suffix);
+
+            foreach ([$outsideDir, storage_path('framework/testing'), $traversalPath, $backupDir, $nonEmptyTargetDir] as $unsafeStorage) {
+                $this->artisan('driveease:verify-restore', [
+                    'path' => $backupDir,
+                    '--rental-code' => $rental->rental_code,
+                    '--target-storage' => $unsafeStorage,
+                ])->assertExitCode(1);
+            }
+
+            $this->assertSame('outside-safe', File::get($outsideDir.DIRECTORY_SEPARATOR.'keep.txt'));
+            $this->assertSame('sandbox-nonempty-safe', File::get($nonEmptyTargetDir.DIRECTORY_SEPARATOR.'existing.txt'));
+            $this->assertFileExists($backupDir.DIRECTORY_SEPARATOR.'manifest.json');
+        } finally {
+            $this->app->detectEnvironment(fn (): string => $originalEnv);
+            Storage::set('local', $originalLocalDisk);
+            $this->dropIsolatedDatabase($postgresPdo, $nonEmptyDbName);
+            File::deleteDirectory($backupDir);
+            File::deleteDirectory($outsideDir);
+            File::deleteDirectory($nonEmptyTargetDir);
+            File::deleteDirectory($nonTestingTargetDir);
+        }
+    }
+
     private function connectPostgresMaintenance(): PDO
     {
         $host = (string) config('database.connections.pgsql.host', '127.0.0.1');
