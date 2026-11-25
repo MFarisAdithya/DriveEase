@@ -7,6 +7,7 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Crypt;
@@ -83,6 +84,16 @@ class User extends Authenticatable
     public function verifier(): BelongsTo
     {
         return $this->belongsTo(User::class, 'verified_by');
+    }
+
+    /**
+     * Define the one-to-many relationship to rental transactions owned by this user.
+     */
+    public function rentals(): HasMany
+    {
+        // hasMany() memungkinkan pengambilan seluruh transaksi milik satu pelanggan
+        // melalui relasi Eloquent $user->rentals() untuk riwayat dan otorisasi.
+        return $this->hasMany(Rental::class);
     }
 
     public function isAdmin(): bool

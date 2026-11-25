@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Storage;
 
 class Car extends Model
@@ -41,6 +42,16 @@ class Car extends Model
     public function carType(): BelongsTo
     {
         return $this->belongsTo(CarType::class);
+    }
+
+    /**
+     * Define the one-to-many relationship to rental transactions for this vehicle.
+     */
+    public function rentals(): HasMany
+    {
+        // hasMany() menghubungkan satu kendaraan (cars.id) dengan banyak baris
+        // transaksi penyewaan pada tabel rentals melalui foreign key car_id.
+        return $this->hasMany(Rental::class);
     }
 
     #[Scope]

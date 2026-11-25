@@ -18,6 +18,10 @@ return [
     'current_password' => 'Kata sandi saat ini tidak sesuai.',
     'regex' => 'Format :attribute tidak valid.',
     'lowercase' => ':attribute harus menggunakan huruf kecil.',
+    'after' => ':attribute harus lebih besar dari waktu saat ini.',
+    'accepted' => ':attribute wajib disetujui.',
+    'date' => 'Format :attribute tidak valid.',
+    'boolean' => ':attribute harus bernilai benar atau salah.',
     'max' => [
         'string' => ':attribute maksimal :max karakter.',
         'numeric' => ':attribute maksimal :max.',
@@ -46,5 +50,8 @@ return [
         'terms' => 'Ketentuan rental', 'bank_name' => 'Nama bank',
         'account_number' => 'Nomor rekening', 'account_holder' => 'Nama pemilik rekening',
         'token' => 'Token pemulihan',
+        'pickup_at' => 'Waktu pengambilan', 'total_days' => 'Jumlah hari sewa',
+        'accept_terms' => 'Persetujuan ketentuan rental', 'customer_id' => 'Pelanggan',
+        'car_id' => 'Kendaraan', 'notes' => 'Catatan',
     ],
 ];
