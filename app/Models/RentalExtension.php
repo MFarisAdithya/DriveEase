@@ -21,6 +21,8 @@ class RentalExtension extends Model
 
     public const STATUS_REJECTED = 'rejected';
 
+    public const STATUS_EXPIRED = 'expired';
+
     public const REFUND_NONE = Rental::REFUND_NONE;
 
     public const REFUND_PENDING = Rental::REFUND_PENDING;
@@ -49,6 +51,9 @@ class RentalExtension extends Model
         'payment_proof',
         'payment_submitted_at',
         'payment_deadline_at',
+        'payment_bank_name',
+        'payment_account_number',
+        'payment_account_holder',
         'payment_verified_by',
         'payment_verified_at',
         'payment_rejection_reason',
@@ -128,7 +133,7 @@ class RentalExtension extends Model
     }
 
     /**
-     * Periksa apakah pengajuan perpanjangan masih terbuka dan belum selesai/ditolak.
+     * Periksa apakah pengajuan perpanjangan masih terbuka dan belum selesai/ditolak/kedaluwarsa.
      */
     public function isOpen(): bool
     {
@@ -166,6 +171,7 @@ class RentalExtension extends Model
             self::STATUS_PAYMENT_SUBMITTED => 'Bukti Terunggah — Menunggu Verifikasi Admin',
             self::STATUS_COMPLETED => 'Perpanjangan Aktif & Lunas',
             self::STATUS_REJECTED => 'Perpanjangan Ditolak / Dibatalkan',
+            self::STATUS_EXPIRED => 'Perpanjangan Kedaluwarsa',
             default => ucfirst((string) $this->status),
         };
     }

@@ -147,18 +147,18 @@
                 @if ($rental->cancellation_requested_at)
                     <p class="text-warning font-semibold">Pelanggan mengajukan pembatalan pada {{ $rental->cancellation_requested_at->timezone('Asia/Jakarta')->format('d M Y H:i') }} WIB: "{{ $rental->cancellation_request_reason }}"</p>
                 @endif
-                <p>Status Refund: <strong>{{ $rental->refundStatusLabel() }}</strong> ({{ $rental->refund_percentage }}%) &middot; Nominal: <strong>Rp {{ number_format((float) $rental->refund_amount, 0, ',', '.') }}</strong></p>
+                <p>Status Refund: <strong>{{ $rental->refundStatusLabel() }}</strong> ({{ $rental->refund_percentage }}%) &middot; Total Hak Refund: <strong>Rp {{ number_format((float) $rental->refund_amount, 0, ',', '.') }}</strong> &middot; Sudah Ditransfer: <strong>Rp {{ number_format((float) $rental->refund_realized_amount, 0, ',', '.') }}</strong></p>
                 @if ($rental->refund_transferred_at)
                     <p>Direalisasikan pada {{ $rental->refund_transferred_at->timezone('Asia/Jakarta')->format('d M Y H:i') }} WIB &middot; Referensi: <strong class="font-mono">{{ $rental->refund_reference }}</strong></p>
                 @endif
 
-                @if (in_array($rental->rental_status, [\App\Models\Rental::STATUS_CANCELLED, \App\Models\Rental::STATUS_EXPIRED], true) && $rental->refund_status === \App\Models\Rental::REFUND_PENDING)
+                @if ($rental->refund_status === \App\Models\Rental::REFUND_PENDING)
                     <form method="POST" action="{{ route('admin.bookings.refund', $rental) }}" class="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-3 border-t border-line items-end">
                         @csrf
                         @method('PATCH')
                         <div>
                             <label for="transfer_amount" class="block font-semibold mb-1">Nominal Transfer (Rp)</label>
-                            <input id="transfer_amount" name="transfer_amount" type="number" step="0.01" min="1" max="{{ (float) $rental->paid_amount }}" value="{{ number_format((float) $rental->refund_amount, 2, '.', '') }}" required class="w-full rounded-lg border border-field-line bg-surface p-2">
+                            <input id="transfer_amount" name="transfer_amount" type="number" step="0.01" min="1" value="{{ number_format($rental->pendingRefundBalance(), 2, '.', '') }}" required class="w-full rounded-lg border border-field-line bg-surface p-2">
                         </div>
                         <div>
                             <label for="transferred_at" class="block font-semibold mb-1">Tanggal Transfer (WIB)</label>
@@ -388,7 +388,7 @@
                                     </div>
                                 </form>
                             </div>
-                        @elseif ($extension->status === \App\Models\RentalExtension::STATUS_REJECTED && $extension->refund_status === \App\Models\RentalExtension::REFUND_PENDING)
+                        @elseif (in_array($extension->status, [\App\Models\RentalExtension::STATUS_REJECTED, \App\Models\RentalExtension::STATUS_EXPIRED, \App\Models\RentalExtension::STATUS_COMPLETED], true) && $extension->refund_status === \App\Models\RentalExtension::REFUND_PENDING)
                             <form method="POST" action="{{ route('admin.extensions.refund', $extension) }}" class="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-3 border-t border-line items-end">
                                 @csrf
                                 @method('PATCH')

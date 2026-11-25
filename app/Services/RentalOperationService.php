@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Car;
 use App\Models\Inspection;
 use App\Models\Rental;
+use App\Models\RentalExtension;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -411,6 +412,31 @@ class RentalOperationService
                     ]
                 );
 
+                // Kedaluwarsakan otomatis pengajuan perpanjangan yang masih menunggu persetujuan
+                // karena kendaraan fisik telah dikembalikan dan tidak bisa diperpanjang lagi.
+                $pendingApprovalExtensions = RentalExtension::query()
+                    ->where('rental_id', $lockedRental->id)
+                    ->where('status', RentalExtension::STATUS_PENDING_APPROVAL)
+                    ->orderBy('id')
+                    ->lockForUpdate()
+                    ->get();
+
+                foreach ($pendingApprovalExtensions as $staleExtension) {
+                    $staleExtension->forceFill([
+                        'status' => RentalExtension::STATUS_EXPIRED,
+                        'payment_rejection_reason' => 'Kendaraan telah dikembalikan sebelum pengajuan perpanjangan diproses.',
+                    ])->save();
+
+                    $lockedRental->recordHistory(
+                        $staff,
+                        'extension_expired_on_return',
+                        RentalExtension::STATUS_PENDING_APPROVAL,
+                        RentalExtension::STATUS_EXPIRED,
+                        'Pengajuan perpanjangan otomatis kedaluwarsa saat kendaraan dikembalikan.',
+                        ['extension_id' => $staleExtension->id]
+                    );
+                }
+
                 // Deteksi dan catat pesanan berikutnya yang terdampak oleh keterlambatan atau kerusakan unit (SYS-10).
                 $this->flagImpactedNextBookingsInternal($car, $staff, $actualReturnAt);
 
@@ -584,11 +610,13 @@ class RentalOperationService
             $pickupWib = CarbonImmutable::instance($upcoming->pickup_at)->timezone(RentalScheduleService::TIMEZONE);
             $requiredReadyAt = $pickupWib->subMinutes(RentalScheduleService::BUFFER_MINUTES);
 
-            if ($unit->isInMaintenance() || $unit->readiness_status === Car::READINESS_NEEDS_MAINTENANCE) {
+            if ($unit->isArchived() || $unit->isInMaintenance() || $unit->readiness_status === Car::READINESS_NEEDS_MAINTENANCE) {
                 $impacts->push([
                     'rental' => $upcoming,
                     'car' => $unit,
-                    'reason' => 'Unit '.$unit->name.' sedang perawatan / mengalami kerusakan ('.$unit->maintenance_reason.').',
+                    'reason' => $unit->isArchived()
+                        ? 'Unit '.$unit->name.' diarsipkan sehingga memerlukan penggantian unit atau penjadwalan ulang.'
+                        : 'Unit '.$unit->name.' sedang perawatan / mengalami kerusakan ('.$unit->maintenance_reason.').',
                     'severity' => 'high',
                 ]);
 
@@ -643,6 +671,20 @@ class RentalOperationService
         }
 
         return $impacts;
+    }
+
+    /**
+     * Panggil deteksi dan pencatatan peringatan pesanan berikutnya yang terdampak dari luar layanan (A-02, SYS-10).
+     *
+     * @return Collection<int, array{rental: Rental, car: Car, reason: string, severity: string}>
+     */
+    public function flagImpactedNextBookings(Car $car, ?User $actor = null, ?CarbonInterface $at = null): Collection
+    {
+        return $this->flagImpactedNextBookingsInternal(
+            $car,
+            $actor,
+            $at ?? CarbonImmutable::now(RentalScheduleService::TIMEZONE)
+        );
     }
 
     /**

@@ -122,6 +122,7 @@ class Rental extends Model
         'daily_price',
         'total_amount',
         'paid_amount',
+        'overpayment_amount',
         'booking_channel',
         'created_by',
         'terms_accepted_at',
@@ -138,6 +139,7 @@ class Rental extends Model
         'cancellation_request_reason',
         'refund_percentage',
         'refund_amount',
+        'refund_realized_amount',
         'refund_status',
         'refund_transferred_at',
         'refund_reference',
@@ -157,6 +159,9 @@ class Rental extends Model
         'additional_charges_total',
         'additional_charges_assessed_at',
         'additional_charges_assessed_by',
+        'additional_charge_bank_name',
+        'additional_charge_account_number',
+        'additional_charge_account_holder',
         'additional_charge_status',
         'additional_charge_paid_amount',
         'additional_charge_proof',
@@ -211,8 +216,10 @@ class Rental extends Model
             'daily_price' => 'decimal:2',
             'total_amount' => 'decimal:2',
             'paid_amount' => 'decimal:2',
+            'overpayment_amount' => 'decimal:2',
             'refund_percentage' => 'integer',
             'refund_amount' => 'decimal:2',
+            'refund_realized_amount' => 'decimal:2',
             'late_fee_amount' => 'decimal:2',
             'fuel_fee_amount' => 'decimal:2',
             'damage_fee_amount' => 'decimal:2',
@@ -528,6 +535,14 @@ class Rental extends Model
             self::REFUND_PROCESSED => 'Refund Sudah Ditransfer',
             default => 'Tidak Ada Refund',
         };
+    }
+
+    /**
+     * Hitung sisa kewajiban pengembalian dana yang belum direalisasikan admin.
+     */
+    public function pendingRefundBalance(): float
+    {
+        return max(0.0, round((float) $this->refund_amount - (float) $this->refund_realized_amount, 2));
     }
 
     /**

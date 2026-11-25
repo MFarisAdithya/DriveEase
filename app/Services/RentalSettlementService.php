@@ -123,7 +123,8 @@ class RentalSettlementService
                 $lateFee = max(0.0, round((float) $lockedRental->late_fee_amount, 2));
                 $combinedTotal = $this->financialService->calculateAdditionalChargesTotal($lateFee, $normalizedFuel, $normalizedDamage);
 
-                if ($combinedTotal > 0 && ! (RentalSetting::current()?->hasValidPaymentAccount() ?? false)) {
+                $settings = RentalSetting::current();
+                if ($combinedTotal > 0 && ! ($settings?->hasValidPaymentAccount() ?? false)) {
                     throw ValidationException::withMessages([
                         'additional_charges' => 'Rekening pembayaran rental belum dikonfigurasi dengan lengkap untuk menerima pelunasan tagihan tambahan.',
                     ]);
@@ -143,6 +144,18 @@ class RentalSettlementService
                     $previousEvidencePath = $lockedRental->damage_evidence_path;
                 }
 
+                $bankSnapshot = $combinedTotal > 0 && $settings !== null
+                    ? [
+                        'additional_charge_bank_name' => $settings->bank_name,
+                        'additional_charge_account_number' => $settings->account_number,
+                        'additional_charge_account_holder' => $settings->account_holder,
+                    ]
+                    : [
+                        'additional_charge_bank_name' => null,
+                        'additional_charge_account_number' => null,
+                        'additional_charge_account_holder' => null,
+                    ];
+
                 $lockedRental->forceFill([
                     'fuel_fee_amount' => $normalizedFuel,
                     'fuel_fee_reason' => $trimmedFuelReason !== '' ? $trimmedFuelReason : null,
@@ -156,7 +169,7 @@ class RentalSettlementService
                     'status_notice' => $combinedTotal > 0 && $newStatus === Rental::ADDITIONAL_CHARGE_UNPAID
                         ? 'Tagihan tambahan akhir sebesar Rp '.number_format($combinedTotal, 0, ',', '.').' telah ditetapkan. Silakan lakukan transfer dan unggah bukti pembayaran.'
                         : 'Pemeriksaan biaya tambahan selesai tanpa tagihan tertunggak. Transaksi siap ditutup oleh admin.',
-                ])->saveOrFail();
+                ] + $bankSnapshot)->saveOrFail();
 
                 $lockedRental->recordHistory(
                     $admin,
@@ -321,6 +334,21 @@ class RentalSettlementService
 
             $previousStatus = $lockedRental->additional_charge_status;
             $newPaid = round((float) $lockedRental->additional_charge_paid_amount + $normalizedAmount, 2);
+            $excessAmount = max(0.0, round($normalizedAmount - $remaining, 2));
+
+            $overpaymentData = [];
+            $notice = 'Pembayaran tagihan tambahan terverifikasi lunas (Ref: '.$trimmedRef.'). Transaksi siap diselesaikan.';
+            if ($excessAmount > 0) {
+                $overpaymentData = [
+                    'overpayment_amount' => round((float) $lockedRental->overpayment_amount + $excessAmount, 2),
+                    'refund_amount' => round((float) $lockedRental->refund_amount + $excessAmount, 2),
+                    'refund_status' => Rental::REFUND_PENDING,
+                    'refund_notes' => trim(($lockedRental->refund_notes ? $lockedRental->refund_notes.' ' : '')
+                        .'Kelebihan bayar tagihan tambahan sebesar Rp '.number_format($excessAmount, 0, ',', '.').'.'),
+                ];
+                $notice .= ' Terdapat kelebihan bayar sebesar Rp '.number_format($excessAmount, 0, ',', '.')
+                    .' yang ditetapkan untuk dikembalikan oleh admin.';
+            }
 
             $lockedRental->forceFill([
                 'additional_charge_paid_amount' => $newPaid,
@@ -329,8 +357,8 @@ class RentalSettlementService
                 'additional_charge_verified_at' => $nowWib,
                 'additional_charge_payment_reference' => $trimmedRef,
                 'additional_charge_rejection_reason' => null,
-                'status_notice' => 'Pembayaran tagihan tambahan terverifikasi lunas (Ref: '.$trimmedRef.'). Transaksi siap diselesaikan.',
-            ])->saveOrFail();
+                'status_notice' => $notice,
+            ] + $overpaymentData)->saveOrFail();
 
             $lockedRental->recordHistory(
                 $admin,
@@ -340,6 +368,7 @@ class RentalSettlementService
                 'Pelunasan tagihan tambahan diverifikasi admin.',
                 [
                     'verified_amount' => $normalizedAmount,
+                    'overpayment_amount' => $excessAmount,
                     'total_additional_paid' => $newPaid,
                     'payment_reference' => $trimmedRef,
                 ]
@@ -449,6 +478,8 @@ class RentalSettlementService
         return DB::transaction(function () use ($rental, $admin, $trimmedNotes, $nowWib): Rental {
             // Ikuti urutan kunci global: Car -> Rental -> RentalExtension (ordered ASC).
             Car::query()->lockForUpdate()->findOrFail($rental->car_id);
+            app(RentalExtensionService::class)->releaseExpiredExtensions($rental->car_id, $nowWib);
+
             $lockedRental = Rental::query()->with(['pickupInspection', 'returnInspection'])->lockForUpdate()->findOrFail($rental->id);
             $extensions = RentalExtension::query()
                 ->where('rental_id', $lockedRental->id)

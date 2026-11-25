@@ -23,6 +23,8 @@ class RentalFinancialService
         ?CarbonInterface $cancelledAt = null
     ): array {
         $paidAmount = max(0.0, round((float) $rental->paid_amount, 2));
+        $totalAmount = max(0.0, round((float) $rental->total_amount, 2));
+        $alreadyRealized = max(0.0, round((float) $rental->refund_realized_amount, 2));
         $reference = $cancelledAt
             ? CarbonImmutable::instance($cancelledAt)->timezone(RentalScheduleService::TIMEZONE)
             : CarbonImmutable::now(RentalScheduleService::TIMEZONE);
@@ -54,8 +56,14 @@ class RentalFinancialService
             }
         }
 
-        // Pengembalian dana dibatasi oleh dana yang benar-benar diterima (A-10, SYS-11).
-        $amount = min($paidAmount, round($paidAmount * ($percentage / 100), 2));
+        // Hak pembatalan dihitung atas dana tagihan utama (maks total_amount); apabila terdapat kelebihan bayar
+        // yang belum dikembalikan, dana lebih tersebut selalu dikembalikan 100% tanpa terpotong penalti batal.
+        $basePaid = min($paidAmount, $totalAmount > 0 ? $totalAmount : $paidAmount);
+        $baseRefund = round($basePaid * ($percentage / 100), 2);
+        $excessPaid = max(0.0, round($paidAmount - $basePaid, 2));
+        $remainingUnrealizedExcess = max(0.0, round($excessPaid - $alreadyRealized, 2));
+        $cashHeld = max(0.0, round($paidAmount - $alreadyRealized, 2));
+        $amount = min($cashHeld, round($baseRefund + $remainingUnrealizedExcess, 2));
 
         return [
             'percentage' => $percentage,
@@ -268,24 +276,29 @@ class RentalFinancialService
                 ? $lockedRental->cancellation_requested_at
                 : $nowWib;
 
-            // Hak pengembalian dana selalu ditetapkan tepat sesuai rumus kebijakan SKPL tanpa override sepihak.
+            // Hak pengembalian dana selalu ditetapkan tepat sesuai rumus kebijakan SKPL tanpa override sepihak,
+            // lalu digabungkan dengan nominal refund yang sebelumnya sudah terealisasi (mis. kelebihan bayar awal).
+            $alreadyRealized = max(0.0, round((float) $lockedRental->refund_realized_amount, 2));
             $policy = $this->calculateRefundPolicy($lockedRental, $cancellationType, $policyReference);
-            $refundAmount = $policy['amount'];
+            $newObligation = $policy['amount'];
+            $totalRefundEntitlement = round($alreadyRealized + $newObligation, 2);
 
             $previousStatus = $lockedRental->rental_status;
-            $refundStatus = $refundAmount > 0 ? Rental::REFUND_PENDING : Rental::REFUND_NONE;
+            $refundStatus = $newObligation > 0
+                ? Rental::REFUND_PENDING
+                : ($alreadyRealized > 0 ? Rental::REFUND_PROCESSED : Rental::REFUND_NONE);
 
             $lockedRental->transitionRentalStatus(
                 Rental::STATUS_CANCELLED,
-                $refundAmount > 0
-                    ? 'Pesanan dibatalkan. Hak pengembalian dana sebesar Rp '.number_format($refundAmount, 0, ',', '.').' sedang diproses admin.'
-                    : 'Pesanan dibatalkan tanpa pengembalian dana sesuai ketentuan.'
+                $newObligation > 0
+                    ? 'Pesanan dibatalkan. Hak pengembalian dana sebesar Rp '.number_format($newObligation, 0, ',', '.').' sedang diproses admin.'
+                    : 'Pesanan dibatalkan tanpa sisa kewajiban pengembalian dana baru sesuai ketentuan.'
             );
             $lockedRental->cancelled_at = $nowWib;
             $lockedRental->cancellation_type = $cancellationType;
             $lockedRental->cancellation_reason = $trimmedReason;
             $lockedRental->refund_percentage = $policy['percentage'];
-            $lockedRental->refund_amount = $refundAmount;
+            $lockedRental->refund_amount = $totalRefundEntitlement;
             $lockedRental->refund_status = $refundStatus;
             $lockedRental->saveOrFail();
 
@@ -299,7 +312,8 @@ class RentalFinancialService
                     'cancellation_type' => $cancellationType,
                     'contact_attempted' => $cancellationType === Rental::CANCEL_NO_SHOW ? true : null,
                     'refund_percentage' => $policy['percentage'],
-                    'refund_amount' => $refundAmount,
+                    'new_refund_obligation' => $newObligation,
+                    'refund_amount' => $totalRefundEntitlement,
                     'refund_status' => $refundStatus,
                 ]
             );
@@ -309,7 +323,7 @@ class RentalFinancialService
     }
 
     /**
-     * Catat realisasi transfer pengembalian dana pada pesanan dibatalkan atau kedaluwarsa yang memiliki dana masuk (A-10, A1, SYS-13).
+     * Catat realisasi transfer pengembalian dana (batal, kedaluwarsa parsial, maupun kelebihan bayar aktif) (A-10, A1, SYS-13).
      *
      * @throws ValidationException
      */
@@ -335,9 +349,15 @@ class RentalFinancialService
             Car::query()->lockForUpdate()->findOrFail($rental->car_id);
             $lockedRental = Rental::query()->lockForUpdate()->findOrFail($rental->id);
 
-            if (! in_array($lockedRental->rental_status, [Rental::STATUS_CANCELLED, Rental::STATUS_EXPIRED], true)) {
+            if (! in_array($lockedRental->rental_status, [
+                Rental::STATUS_CONFIRMED,
+                Rental::STATUS_PICKED_UP,
+                Rental::STATUS_RETURNED,
+                Rental::STATUS_CANCELLED,
+                Rental::STATUS_EXPIRED,
+            ], true)) {
                 throw ValidationException::withMessages([
-                    'refund' => 'Realisasi pengembalian dana hanya dapat dicatat pada pesanan yang dibatalkan atau kedaluwarsa.',
+                    'refund' => 'Realisasi pengembalian dana tidak tersedia pada status pesanan saat ini.',
                 ]);
             }
 
@@ -347,23 +367,29 @@ class RentalFinancialService
                 ]);
             }
 
-            $paidAmount = max(0.0, round((float) $lockedRental->paid_amount, 2));
-            $entitledRefund = max(0.0, round((float) $lockedRental->refund_amount, 2));
+            $totalCashReceived = round(
+                max(0.0, (float) $lockedRental->paid_amount) + max(0.0, (float) $lockedRental->additional_charge_paid_amount),
+                2
+            );
+            $alreadyRealized = max(0.0, round((float) $lockedRental->refund_realized_amount, 2));
+            $remainingCashHeld = max(0.0, round($totalCashReceived - $alreadyRealized, 2));
+            $pendingRefund = $lockedRental->pendingRefundBalance();
 
-            if ($normalizedAmount <= 0 || $normalizedAmount > $paidAmount || $normalizedAmount !== $entitledRefund) {
+            if ($normalizedAmount <= 0 || $normalizedAmount > $remainingCashHeld || $normalizedAmount !== $pendingRefund) {
                 throw ValidationException::withMessages([
-                    'transfer_amount' => 'Nominal transfer refund harus sama persis dengan hak refund sesuai kebijakan (Rp '
-                        .number_format($entitledRefund, 0, ',', '.')
-                        .') dan tidak melebihi dana diterima (Rp '
-                        .number_format($paidAmount, 0, ',', '.').').',
+                    'transfer_amount' => 'Nominal transfer refund harus sama persis dengan sisa hak refund (Rp '
+                        .number_format($pendingRefund, 0, ',', '.')
+                        .') dan tidak melebihi dana yang masih ditahan (Rp '
+                        .number_format($remainingCashHeld, 0, ',', '.').').',
                 ]);
             }
 
-            $lockedRental->refund_amount = $normalizedAmount;
+            $lockedRental->refund_realized_amount = round($alreadyRealized + $normalizedAmount, 2);
+            $lockedRental->refund_amount = round((float) $lockedRental->refund_realized_amount, 2);
             $lockedRental->refund_status = Rental::REFUND_PROCESSED;
             $lockedRental->refund_transferred_at = CarbonImmutable::instance($transferredAt)->timezone(RentalScheduleService::TIMEZONE);
             $lockedRental->refund_reference = $trimmedReference;
-            $lockedRental->refund_notes = is_string($notes) && trim($notes) !== '' ? trim($notes) : null;
+            $lockedRental->refund_notes = is_string($notes) && trim($notes) !== '' ? trim($notes) : $lockedRental->refund_notes;
             $lockedRental->refund_processed_by = $admin->id;
             $lockedRental->status_notice = 'Pengembalian dana sebesar Rp '.number_format($normalizedAmount, 0, ',', '.')
                 .' telah ditransfer (Ref: '.$trimmedReference.').';

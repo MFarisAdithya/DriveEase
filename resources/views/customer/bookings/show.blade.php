@@ -308,6 +308,9 @@
                             <form method="POST" action="{{ route('customer.extensions.payment.store', $extension) }}" enctype="multipart/form-data" class="pt-2 space-y-2 border-t border-line">
                                 @csrf
                                 <p class="text-muted">
+                                    Rekening tujuan perpanjangan: <strong class="text-ink">{{ $extension->payment_bank_name ?? $rental->payment_bank_name }} {{ $extension->payment_account_number ?? $rental->payment_account_number }}</strong> (a.n. {{ $extension->payment_account_holder ?? $rental->payment_account_holder }}).
+                                </p>
+                                <p class="text-muted">
                                     Tenggat pembayaran perpanjangan: <strong class="text-ink">{{ $extension->payment_deadline_at?->timezone('Asia/Jakarta')->format('d M Y H:i') }} WIB</strong>.
                                     Jadwal baru aktif setelah admin memverifikasi pembayaran tambahan Anda.
                                 </p>
@@ -407,7 +410,7 @@
                 @if ($rental->rental_status === \App\Models\Rental::STATUS_RETURNED && in_array($rental->additional_charge_status, [\App\Models\Rental::ADDITIONAL_CHARGE_UNPAID, \App\Models\Rental::ADDITIONAL_CHARGE_REJECTED], true))
                     <form method="POST" action="{{ route('customer.bookings.additional-charges.proof', $rental) }}" enctype="multipart/form-data" class="rounded-xl border border-line bg-surface-raised p-4 space-y-2 text-xs">
                         @csrf
-                        <p class="text-muted">Transfer sisa tagihan tambahan Rp <strong class="text-ink">{{ number_format($rental->remainingAdditionalChargeBalance(), 0, ',', '.') }}</strong> ke rekening <strong class="text-ink">{{ $rental->payment_bank_name }} {{ $rental->payment_account_number }}</strong> (a.n. {{ $rental->payment_account_holder }}).</p>
+                        <p class="text-muted">Transfer sisa tagihan tambahan Rp <strong class="text-ink">{{ number_format($rental->remainingAdditionalChargeBalance(), 0, ',', '.') }}</strong> ke rekening <strong class="text-ink">{{ $rental->additional_charge_bank_name ?? $rental->payment_bank_name }} {{ $rental->additional_charge_account_number ?? $rental->payment_account_number }}</strong> (a.n. {{ $rental->additional_charge_account_holder ?? $rental->payment_account_holder }}).</p>
                         <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                             <input name="additional_charge_proof" type="file" required accept=".jpg,.jpeg,.png,.webp" class="flex-1 rounded-lg border border-field-line bg-surface p-2">
                             <button type="submit" class="rounded-lg bg-action hover:bg-action-hover px-4 py-2 font-bold text-ink shrink-0">

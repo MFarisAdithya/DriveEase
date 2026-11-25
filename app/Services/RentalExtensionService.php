@@ -50,8 +50,10 @@ class RentalExtensionService
         $trimmedNotes = trim((string) $notes);
 
         return DB::transaction(function () use ($rental, $customer, $additionalDays, $trimmedNotes, $nowWib): RentalExtension {
-            // Ikuti urutan kunci global: Car -> Rental.
+            // Ikuti urutan kunci global: Car -> Rental -> RentalExtension.
             $car = Car::query()->lockForUpdate()->findOrFail($rental->car_id);
+            $this->releaseExpiredExtensions($car->id, $nowWib);
+
             $lockedRental = Rental::query()->lockForUpdate()->findOrFail($rental->id);
 
             // Perpanjangan hanya diizinkan setelah pesanan awal lunas (confirmed atau picked_up).
@@ -121,7 +123,7 @@ class RentalExtensionService
     }
 
     /**
-     * Setujui pengajuan perpanjangan oleh admin setelah pemeriksaan ketersediaan tahap pertama (A-08, SYS-09).
+     * Setujui pengajuan perpanjangan oleh admin setelah pemeriksaan ketersediaan tahap pertama (A-08, SYS-09, A-13).
      *
      * @throws ValidationException
      */
@@ -133,7 +135,8 @@ class RentalExtensionService
             ]);
         }
 
-        if (! (RentalSetting::current()?->hasValidPaymentAccount() ?? false)) {
+        $settings = RentalSetting::current();
+        if (! ($settings?->hasValidPaymentAccount() ?? false)) {
             throw ValidationException::withMessages([
                 'extension_id' => 'Rekening pembayaran rental belum dikonfigurasi dengan lengkap.',
             ]);
@@ -142,7 +145,7 @@ class RentalExtensionService
         $nowWib = CarbonImmutable::now(RentalScheduleService::TIMEZONE);
         $trimmedNotes = trim((string) $notes);
 
-        return DB::transaction(function () use ($extension, $admin, $trimmedNotes, $nowWib): RentalExtension {
+        return DB::transaction(function () use ($extension, $admin, $settings, $trimmedNotes, $nowWib): RentalExtension {
             // Ikuti urutan kunci global: Car -> Rental -> RentalExtension.
             $carId = (int) Rental::query()->whereKey($extension->rental_id)->value('car_id');
             $car = Car::query()->lockForUpdate()->findOrFail($carId);
@@ -174,7 +177,7 @@ class RentalExtensionService
             }
 
             // Jadwal kembali pesanan ($lockedRental->return_at) sengaja BELUM diubah di sini.
-            // Sesuai A-08 dan SYS-09, jadwal baru baru aktif setelah pembayaran tambahan lunas diverifikasi admin.
+            // Snapshot rekening pembayaran disimpan pada tagihan perpanjangan agar tetap utuh walau rekening diubah (A-13).
             $twoHoursDeadline = $nowWib->addHours(2);
             $paymentDeadline = $twoHoursDeadline->lessThan($proposedReturnAt) ? $twoHoursDeadline : $proposedReturnAt;
 
@@ -183,6 +186,9 @@ class RentalExtensionService
                 'approved_by' => $admin->id,
                 'approved_at' => $nowWib,
                 'payment_deadline_at' => $paymentDeadline,
+                'payment_bank_name' => $settings->bank_name,
+                'payment_account_number' => $settings->account_number,
+                'payment_account_holder' => $settings->account_holder,
                 'notes' => $trimmedNotes !== '' ? $trimmedNotes : $lockedExtension->notes,
             ])->save();
 
@@ -292,6 +298,8 @@ class RentalExtensionService
                 // Ikuti urutan kunci global: Car -> Rental -> RentalExtension.
                 $carId = (int) Rental::query()->whereKey($extension->rental_id)->value('car_id');
                 Car::query()->lockForUpdate()->findOrFail($carId);
+                $this->releaseExpiredExtensions($carId, $nowWib);
+
                 $lockedRental = Rental::query()->lockForUpdate()->findOrFail($extension->rental_id);
                 $lockedExtension = RentalExtension::query()->lockForUpdate()->findOrFail($extension->id);
 
@@ -359,7 +367,7 @@ class RentalExtensionService
     }
 
     /**
-     * Verifikasi nominal aktual uang masuk perpanjangan dan aktifkan batas kembali baru setelah cek ulang jadwal (A-08, SYS-09).
+     * Verifikasi nominal aktual uang masuk perpanjangan (termasuk auto-refund bila lebih bayar) dan aktifkan batas kembali baru (A-08, SYS-09).
      *
      * @throws ValidationException
      */
@@ -417,8 +425,27 @@ class RentalExtensionService
             $previousReturnAt = $lockedRental->return_at;
             $newTotalDays = $lockedRental->total_days + $lockedExtension->additional_days;
             $newTotalAmount = round((float) $lockedRental->total_amount + (float) $lockedExtension->additional_amount, 2);
+            $excessAmount = max(0.0, round($normalizedVerified - $remainingBalance, 2));
             $newRentalPaidAmount = round((float) $lockedRental->paid_amount + $normalizedVerified, 2);
             $newExtensionPaidAmount = round((float) $lockedExtension->paid_amount + $normalizedVerified, 2);
+
+            $notice = 'Pembayaran perpanjangan terverifikasi. Batas pengembalian baru berlaku hingga '.$proposedReturnAt->format('d M Y H:i').' WIB.';
+            $rentalOverpaymentUpdate = [];
+            $extRefundData = [];
+
+            if ($excessAmount > 0) {
+                // Kelebihan pembayaran perpanjangan dicatat pada saldo lebih pesanan utama agar refund terpadu
+                // tetap tercatat dengan akurat atau direalisasikan langsung melalui refund perpanjangan.
+                $extRefundData = [
+                    'refund_amount' => $excessAmount,
+                    'refund_status' => RentalExtension::REFUND_PENDING,
+                    'refund_notes' => 'Kelebihan bayar biaya perpanjangan sewa.',
+                ];
+                $rentalOverpaymentUpdate = [
+                    'overpayment_amount' => round((float) $lockedRental->overpayment_amount + $excessAmount, 2),
+                ];
+                $notice .= ' Kelebihan bayar perpanjangan sebesar Rp '.number_format($excessAmount, 0, ',', '.').' menunggu pengembalian dana admin.';
+            }
 
             $lockedRental->forceFill([
                 'return_at' => $proposedReturnAt,
@@ -426,8 +453,8 @@ class RentalExtensionService
                 'total_days' => $newTotalDays,
                 'total_amount' => $newTotalAmount,
                 'paid_amount' => $newRentalPaidAmount,
-                'status_notice' => 'Pembayaran perpanjangan terverifikasi. Batas pengembalian baru berlaku hingga '.$proposedReturnAt->format('d M Y H:i').' WIB.',
-            ])->save();
+                'status_notice' => $notice,
+            ] + $rentalOverpaymentUpdate)->save();
 
             $lockedExtension->forceFill([
                 'status' => RentalExtension::STATUS_COMPLETED,
@@ -436,7 +463,7 @@ class RentalExtensionService
                 'payment_verified_by' => $admin->id,
                 'payment_verified_at' => $nowWib,
                 'payment_rejection_reason' => null,
-            ])->save();
+            ] + $extRefundData)->save();
 
             $lockedRental->recordHistory(
                 $admin,
@@ -448,6 +475,7 @@ class RentalExtensionService
                     'extension_id' => $lockedExtension->id,
                     'additional_days' => $lockedExtension->additional_days,
                     'verified_amount' => $normalizedVerified,
+                    'overpayment_amount' => $excessAmount,
                     'additional_amount' => (float) $lockedExtension->additional_amount,
                     'previous_return_at' => $previousReturnAt?->toIso8601String(),
                     'new_return_at' => $proposedReturnAt->toIso8601String(),
@@ -603,7 +631,83 @@ class RentalExtensionService
     }
 
     /**
-     * Catat realisasi pengembalian dana perpanjangan yang batal diaktifkan setelah uang transfer diterima (A2, SYS-12).
+     * Lepaskan pengajuan perpanjangan yang melewati batas waktu pembayaran dan rekonsiliasi dana parsial bila ada (SYS-06, SYS-12).
+     */
+    public function releaseExpiredExtensions(?int $carId = null, ?CarbonInterface $at = null): int
+    {
+        $reference = $at
+            ? CarbonImmutable::instance($at)->timezone(RentalScheduleService::TIMEZONE)
+            : CarbonImmutable::now(RentalScheduleService::TIMEZONE);
+        $cutoff = $reference->format('Y-m-d H:i:s');
+
+        return DB::transaction(function () use ($carId, $cutoff): int {
+            $expiredQuery = RentalExtension::query()
+                ->where('status', RentalExtension::STATUS_AWAITING_PAYMENT)
+                ->whereNotNull('payment_deadline_at')
+                ->where('payment_deadline_at', '<=', $cutoff)
+                ->when($carId !== null, function ($q) use ($carId): void {
+                    $q->whereHas('rental', fn ($rq) => $rq->where('car_id', $carId));
+                });
+
+            $rentalIds = (clone $expiredQuery)->orderBy('rental_id')->pluck('rental_id')->unique()->values()->all();
+            if ($rentalIds === []) {
+                return 0;
+            }
+
+            // Ikuti urutan kunci global: cars ASC -> rentals ASC -> rental_extensions ASC.
+            $carIds = Rental::query()->whereIn('id', $rentalIds)->orderBy('car_id')->pluck('car_id')->unique()->values()->all();
+            if ($carIds !== []) {
+                Car::query()->whereIn('id', $carIds)->orderBy('id')->lockForUpdate()->get();
+            }
+
+            $lockedRentals = Rental::query()->whereIn('id', $rentalIds)->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+            $expiredExtensions = $expiredQuery->orderBy('id')->lockForUpdate()->get();
+
+            $updatedCount = 0;
+
+            foreach ($expiredExtensions as $extension) {
+                $paidAmount = max(0.0, round((float) $extension->paid_amount, 2));
+                $refundStatus = $paidAmount > 0 ? RentalExtension::REFUND_PENDING : RentalExtension::REFUND_NONE;
+
+                $extension->forceFill([
+                    'status' => RentalExtension::STATUS_EXPIRED,
+                    'refund_amount' => $paidAmount,
+                    'refund_status' => $refundStatus,
+                    'payment_rejection_reason' => $extension->payment_rejection_reason
+                        ?: 'Batas waktu pembayaran perpanjangan telah berakhir.',
+                ])->save();
+
+                $rental = $lockedRentals->get($extension->rental_id);
+                if ($rental instanceof Rental) {
+                    $notice = $paidAmount > 0
+                        ? 'Pengajuan perpanjangan kedaluwarsa. Dana masuk sebesar Rp '.number_format($paidAmount, 0, ',', '.').' ditetapkan sebagai refund 100% menunggu transfer admin.'
+                        : 'Pengajuan perpanjangan melewati batas waktu pembayaran sehingga otomatis kedaluwarsa.';
+
+                    $rental->forceFill(['status_notice' => $notice])->save();
+                    $rental->recordHistory(
+                        null,
+                        'extension_expired',
+                        RentalExtension::STATUS_AWAITING_PAYMENT,
+                        RentalExtension::STATUS_EXPIRED,
+                        'Melewati batas waktu pembayaran perpanjangan.',
+                        [
+                            'extension_id' => $extension->id,
+                            'paid_amount' => $paidAmount,
+                            'refund_amount' => $paidAmount,
+                            'refund_status' => $refundStatus,
+                        ]
+                    );
+                }
+
+                $updatedCount++;
+            }
+
+            return $updatedCount;
+        });
+    }
+
+    /**
+     * Catat realisasi pengembalian dana perpanjangan yang batal, kedaluwarsa, atau berlebih bayar (A2, SYS-12).
      *
      * @throws ValidationException
      */
@@ -637,7 +741,14 @@ class RentalExtensionService
             $lockedRental = Rental::query()->lockForUpdate()->findOrFail($extension->rental_id);
             $lockedExtension = RentalExtension::query()->lockForUpdate()->findOrFail($extension->id);
 
-            if ($lockedExtension->status !== RentalExtension::STATUS_REJECTED || $lockedExtension->refund_status !== RentalExtension::REFUND_PENDING) {
+            $refundableStatuses = [
+                RentalExtension::STATUS_REJECTED,
+                RentalExtension::STATUS_EXPIRED,
+                RentalExtension::STATUS_COMPLETED,
+            ];
+
+            if (! in_array($lockedExtension->status, $refundableStatuses, true)
+                || $lockedExtension->refund_status !== RentalExtension::REFUND_PENDING) {
                 throw ValidationException::withMessages([
                     'extension_refund' => 'Perpanjangan ini tidak memiliki kewajiban refund berstatus menunggu transfer.',
                 ]);

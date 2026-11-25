@@ -178,9 +178,23 @@ class RentalPaymentService
             $lockedRental->payment_verified_at = $nowWib;
             $lockedRental->payment_rejection_reason = null;
             $lockedRental->transitionPaymentStatus(Rental::PAYMENT_PAID);
+
+            $excessAmount = max(0.0, round($normalizedAmount - $remaining, 2));
+            $notice = 'Pembayaran lunas terverifikasi. Pesanan Anda telah dikonfirmasi dan siap diambil sesuai jadwal.';
+
+            if ($excessAmount > 0) {
+                $lockedRental->overpayment_amount = round((float) $lockedRental->overpayment_amount + $excessAmount, 2);
+                $lockedRental->refund_amount = round((float) $lockedRental->refund_amount + $excessAmount, 2);
+                $lockedRental->refund_status = Rental::REFUND_PENDING;
+                $lockedRental->refund_notes = trim(($lockedRental->refund_notes ? $lockedRental->refund_notes.' ' : '')
+                    .'Kelebihan bayar sewa utama sebesar Rp '.number_format($excessAmount, 0, ',', '.').'.');
+                $notice .= ' Terdapat kelebihan pembayaran sebesar Rp '.number_format($excessAmount, 0, ',', '.')
+                    .' yang ditetapkan untuk dikembalikan oleh admin.';
+            }
+
             $lockedRental->transitionRentalStatus(
                 Rental::STATUS_CONFIRMED,
-                'Pembayaran lunas terverifikasi. Pesanan Anda telah dikonfirmasi dan siap diambil sesuai jadwal.'
+                $notice
             );
             $lockedRental->saveOrFail();
 
@@ -193,6 +207,7 @@ class RentalPaymentService
                 [
                     'payment_id' => $lockedPayment->id,
                     'verified_amount' => $normalizedAmount,
+                    'overpayment_amount' => $excessAmount,
                     'total_paid_amount' => (float) $lockedRental->paid_amount,
                 ]
             );

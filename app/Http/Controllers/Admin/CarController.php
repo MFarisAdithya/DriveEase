@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Car;
 use App\Models\CarType;
+use App\Models\Rental;
 use App\Services\RentalOperationService;
+use App\Services\RentalScheduleService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -72,6 +74,13 @@ class CarController extends Controller
         $this->normalizePlateNumber($request);
         $validated = $this->validateVehicle($request);
 
+        // Unit baru tidak boleh langsung disetel 'rented' tanpa transaksi serah-terima berjalan.
+        if ($validated['status'] === 'rented') {
+            return back()
+                ->withInput()
+                ->withErrors(['status' => 'Status sedang disewa hanya dapat diatur otomatis melalui proses serah-terima kendaraan.']);
+        }
+
         // Operator + pada array menggabungkan hasil validasi dengan nilai default null
         // untuk maintenance_reason saat status bukan 'maintenance' (aturan exclude_unless).
         Car::create($validated + [
@@ -108,20 +117,65 @@ class CarController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, Car $car): RedirectResponse
-    {
+    public function update(
+        Request $request,
+        Car $car,
+        RentalOperationService $operationService
+    ): RedirectResponse {
         $this->normalizePlateNumber($request);
         $validated = $this->validateVehicle($request, $car);
+        $actor = $request->user();
 
-        // Ketika unit keluar dari status maintenance, exclude_unless menghapus
-        // maintenance_reason dari $validated sehingga + ['maintenance_reason' => null]
-        // otomatis membersihkan alasan perawatan lama di database.
-        $car->update($validated + [
-            'maintenance_reason' => null,
-            'readiness_status' => $this->resolveReadinessStatus($validated['status']),
-            'readiness_checked_by' => $request->user()?->id,
-            'readiness_checked_at' => now('Asia/Jakarta'),
-        ]);
+        $errorRedirect = DB::transaction(function () use ($car, $validated, $actor, $operationService): ?RedirectResponse {
+            // Kunci Car terlebih dahulu sebelum memeriksa transaksi aktif pada Rental agar bebas deadlock.
+            $lockedCar = Car::query()->lockForUpdate()->findOrFail($car->id);
+
+            if ($lockedCar->isArchived() && $validated['status'] !== $lockedCar->status) {
+                return back()->withInput()->withErrors([
+                    'status' => 'Status operasional kendaraan yang sudah diarsipkan tidak dapat diubah.',
+                ]);
+            }
+
+            $hasActiveTrip = Rental::query()
+                ->where('car_id', $lockedCar->id)
+                ->where('rental_status', Rental::STATUS_PICKED_UP)
+                ->lockForUpdate()
+                ->exists();
+
+            if ($hasActiveTrip && $validated['status'] !== 'rented') {
+                return back()->withInput()->withErrors([
+                    'status' => 'Kendaraan sedang digunakan oleh penyewa dan tidak dapat diubah statusnya sebelum pengembalian dicatat.',
+                ]);
+            }
+
+            if (! $hasActiveTrip && $validated['status'] === 'rented') {
+                return back()->withInput()->withErrors([
+                    'status' => 'Status sedang disewa hanya dapat aktif ketika terdapat transaksi serah-terima berjalan.',
+                ]);
+            }
+
+            // Pembaruan data katalog pada unit available tidak boleh melewati status needs_preparation
+            // yang ditetapkan staf/sistem pascapengembalian (S-05).
+            $nextReadiness = $this->resolveReadinessStatus($validated['status'], $lockedCar->readiness_status);
+            $readinessChanged = $nextReadiness !== $lockedCar->readiness_status;
+
+            $lockedCar->update($validated + [
+                'maintenance_reason' => null,
+                'readiness_status' => $nextReadiness,
+                'readiness_checked_by' => $readinessChanged ? $actor?->id : $lockedCar->readiness_checked_by,
+                'readiness_checked_at' => $readinessChanged ? now('Asia/Jakarta') : $lockedCar->readiness_checked_at,
+            ]);
+
+            if ($validated['status'] === 'maintenance') {
+                $operationService->flagImpactedNextBookings($lockedCar, $actor);
+            }
+
+            return null;
+        });
+
+        if ($errorRedirect !== null) {
+            return $errorRedirect;
+        }
 
         return redirect()->route('admin.cars.index')
             ->with('success', 'Data kendaraan "'.$car->name.'" berhasil diperbarui.');
@@ -130,27 +184,47 @@ class CarController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Car $car): RedirectResponse
-    {
+    public function destroy(
+        Car $car,
+        RentalScheduleService $scheduleService
+    ): RedirectResponse {
         $name = $car->name;
-        // DB::transaction() dan lockForUpdate() memastikan pemeriksaan riwayat rental
-        // dan keputusan arsip/hapus berjalan atomik tanpa race condition.
-        $archived = DB::transaction(function () use ($car): bool {
+        $nowWib = now('Asia/Jakarta');
+
+        // DB::transaction() dan lockForUpdate() memeriksa pesanan penahan jadwal (pending aktif,
+        // confirmed, atau picked_up) sebelum memutuskan tolak, arsip, atau hapus permanen.
+        $outcome = DB::transaction(function () use ($car, $scheduleService, $nowWib): string {
             $lockedCar = Car::query()->lockForUpdate()->findOrFail($car->id);
+            $scheduleService->releaseExpiredHolds($lockedCar->id, $nowWib);
+
+            $hasHoldingRental = Rental::query()
+                ->where('car_id', $lockedCar->id)
+                ->holdingSchedule($nowWib)
+                ->lockForUpdate()
+                ->exists();
+
+            if ($hasHoldingRental) {
+                return 'blocked_active';
+            }
+
             if (DB::table('rentals')->where('car_id', $lockedCar->id)->exists()) {
                 $lockedCar->archived_at ??= now();
                 $lockedCar->save();
 
-                return true;
+                return 'archived';
             }
 
             $lockedCar->delete();
 
-            return false;
+            return 'deleted';
         });
 
+        if ($outcome === 'blocked_active') {
+            return back()->with('error', 'Kendaraan "'.$name.'" masih memiliki pesanan aktif atau mendatang (menunggu/terkonfirmasi/sedang disewa). Tangani terlebih dahulu dengan penggantian unit, penjadwalan ulang, atau pembatalan sebelum mengarsipkan.');
+        }
+
         return redirect()->route('admin.cars.index')
-            ->with('success', 'Kendaraan "'.$name.'" berhasil '.($archived ? 'diarsipkan.' : 'dihapus dari sistem.'));
+            ->with('success', 'Kendaraan "'.$name.'" berhasil '.($outcome === 'archived' ? 'diarsipkan.' : 'dihapus dari sistem.'));
     }
 
     /**
@@ -188,14 +262,16 @@ class CarController extends Controller
     }
 
     /**
-     * Petakan status operasional armada menjadi readiness_status yang konsisten saat create/update admin.
+     * Petakan status operasional armada menjadi readiness_status tanpa melewati persiapan staf.
      */
-    private function resolveReadinessStatus(string $carStatus): string
+    private function resolveReadinessStatus(string $carStatus, ?string $currentReadiness = null): string
     {
         return match ($carStatus) {
             'maintenance' => Car::READINESS_NEEDS_MAINTENANCE,
             'rented' => Car::READINESS_IN_USE,
-            default => Car::READINESS_READY,
+            default => $currentReadiness === Car::READINESS_NEEDS_PREPARATION
+                ? Car::READINESS_NEEDS_PREPARATION
+                : Car::READINESS_READY,
         };
     }
 

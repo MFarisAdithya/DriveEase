@@ -208,8 +208,9 @@ class DriveEaseProgress1Test extends TestCase
             'transmission' => $car->transmission,
             'capacity' => $car->capacity,
             'price_per_day' => $updatedPrice,
-            'status' => 'rented',
-            'description' => 'Pembaruan tarif dan status oleh test.',
+            'status' => 'maintenance',
+            'maintenance_reason' => 'Servis berkala oleh pengujian admin.',
+            'description' => 'Pembaruan tarif dan status perawatan oleh test.',
         ]);
 
         $response->assertRedirect(route('admin.cars.index'));
@@ -217,7 +218,7 @@ class DriveEaseProgress1Test extends TestCase
 
         $car->refresh();
         $this->assertEquals($updatedPrice, (int) $car->price_per_day);
-        $this->assertEquals('rented', $car->status);
+        $this->assertEquals('maintenance', $car->status);
     }
 
     /**
