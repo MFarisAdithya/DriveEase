@@ -1,12 +1,14 @@
 <?php
 
 use App\Http\Controllers\AccountController;
+use App\Http\Controllers\Admin\BookingController as AdminBookingController;
 use App\Http\Controllers\Admin\CarController as AdminCarController;
 use App\Http\Controllers\Admin\CarTypeController as AdminCarTypeController;
 use App\Http\Controllers\Admin\RentalSettingsController;
 use App\Http\Controllers\Admin\StaffController;
 use App\Http\Controllers\Admin\VerificationController as AdminVerificationController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\Customer\BookingController as CustomerBookingController;
 use App\Http\Controllers\Customer\VerificationController as CustomerVerificationController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentController;
@@ -86,6 +88,14 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
     Route::get('/verifications/{user}', [AdminVerificationController::class, 'show'])->name('verifications.show');
     Route::patch('/verifications/{user}/approve', [AdminVerificationController::class, 'approve'])->name('verifications.approve');
     Route::patch('/verifications/{user}/reject', [AdminVerificationController::class, 'reject'])->name('verifications.reject');
+
+    // Admin Online & Walk-In Booking Management (A-06, A-15)
+    Route::get('/bookings', [AdminBookingController::class, 'index'])->name('bookings.index');
+    Route::get('/bookings/create', [AdminBookingController::class, 'create'])->name('bookings.create');
+    Route::post('/bookings', [AdminBookingController::class, 'store'])->name('bookings.store');
+    Route::post('/bookings/register-customer', [AdminBookingController::class, 'registerWalkInCustomer'])->name('bookings.register-customer');
+    Route::get('/bookings/{rental}', [AdminBookingController::class, 'show'])->name('bookings.show');
+    Route::patch('/bookings/{rental}/cancel', [AdminBookingController::class, 'cancel'])->name('bookings.cancel');
 });
 
 // Staff Routes (Protected by auth and role:staff)
@@ -98,4 +108,11 @@ Route::middleware(['auth', 'role:customer'])->prefix('customer')->name('customer
     Route::get('/dashboard', [DashboardController::class, 'customer'])->name('dashboard');
     Route::get('/verification', [CustomerVerificationController::class, 'create'])->name('verification.create');
     Route::post('/verification', [CustomerVerificationController::class, 'store'])->name('verification.store');
+
+    // Customer Online Vehicle Booking (C-05, C-07, C-08)
+    Route::get('/bookings', [CustomerBookingController::class, 'index'])->name('bookings.index');
+    Route::get('/bookings/create', [CustomerBookingController::class, 'create'])->name('bookings.create');
+    Route::post('/bookings', [CustomerBookingController::class, 'store'])->name('bookings.store');
+    Route::get('/bookings/{rental}', [CustomerBookingController::class, 'show'])->name('bookings.show');
+    Route::patch('/bookings/{rental}/cancel', [CustomerBookingController::class, 'cancel'])->name('bookings.cancel');
 });

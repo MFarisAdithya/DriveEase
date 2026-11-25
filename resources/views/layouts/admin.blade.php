@@ -45,6 +45,14 @@
                 Kendaraan
             </a>
 
+            <a href="{{ route('admin.bookings.index') }}"
+               class="flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors {{ request()->routeIs('admin.bookings.*') ? 'bg-action-hover text-ink shadow-sm' : 'text-subtle hover:bg-surface-hover hover:text-ink' }}">
+                <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                </svg>
+                Pemesanan
+            </a>
+
             <a href="{{ route('admin.staff.index') }}"
                class="flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors {{ request()->routeIs('admin.staff.*') ? 'bg-action-hover text-ink shadow-sm' : 'text-subtle hover:bg-surface-hover hover:text-ink' }}">
                 <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -118,7 +126,7 @@
             <details class="relative md:hidden">
                 <summary class="cursor-pointer py-3 font-semibold">Menu</summary>
                 <nav aria-label="Navigasi admin" class="absolute left-0 top-full z-40 grid w-56 gap-1 border border-line bg-surface-raised p-3 shadow-lg">
-                    @foreach (['admin.dashboard' => 'Dasbor', 'admin.cars.index' => 'Kelola armada', 'admin.car-types.index' => 'Kategori kendaraan', 'admin.verifications.index' => 'Verifikasi pelanggan', 'admin.staff.index' => 'Kelola staf', 'admin.rental-settings.edit' => 'Pengaturan rental'] as $destination => $label)
+                    @foreach (['admin.dashboard' => 'Dasbor', 'admin.cars.index' => 'Kelola armada', 'admin.bookings.index' => 'Pemesanan', 'admin.car-types.index' => 'Kategori kendaraan', 'admin.verifications.index' => 'Verifikasi pelanggan', 'admin.staff.index' => 'Kelola staf', 'admin.rental-settings.edit' => 'Pengaturan rental'] as $destination => $label)
                         <a class="p-2 hover:underline" href="{{ route($destination) }}">{{ $label }}</a>
                     @endforeach
                     <a href="{{ route('account.edit') }}" class="mb-2 flex items-center justify-center rounded-lg border border-field-line px-3 py-2 text-xs font-medium text-subtle hover:bg-surface-hover hover:text-ink transition-colors">Akun Saya</a>

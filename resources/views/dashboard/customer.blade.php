@@ -118,6 +118,27 @@
         </div>
     @endif
 
+    @if ($recentBookings->isNotEmpty())
+        <section class="bg-surface rounded-xl border border-line p-5 shadow-sm space-y-3">
+            <div class="flex items-center justify-between">
+                <h3 class="text-sm font-bold text-ink">Pesanan &amp; Pemberitahuan Terbaru</h3>
+                <a href="{{ route('customer.bookings.index') }}" class="text-xs font-semibold text-link hover:underline">Lihat semua &rarr;</a>
+            </div>
+            <div class="divide-y divide-line text-xs">
+                @foreach ($recentBookings as $booking)
+                    <div class="py-2.5 flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                            <span class="font-mono font-bold text-ink">{{ $booking->rental_code }}</span>
+                            <span class="text-ink"> &middot; {{ $booking->car?->name }}</span>
+                            <span class="block text-muted">{{ $booking->nextActionNotice() }}</span>
+                        </div>
+                        <a href="{{ route('customer.bookings.show', $booking) }}" class="font-semibold text-link hover:underline">Rincian &rarr;</a>
+                    </div>
+                @endforeach
+            </div>
+        </section>
+    @endif
+
     <!-- Section Header -->
     <div class="flex items-center justify-between pt-2">
         <div>
