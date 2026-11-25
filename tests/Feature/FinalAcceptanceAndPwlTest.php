@@ -194,7 +194,7 @@ class FinalAcceptanceAndPwlTest extends TestCase
         ])->assertRedirect(route('customer.dashboard'));
         $this->assertNotSame($initialSessionId, session()->getId());
 
-        $this->post('/logout')->assertRedirect(route('login'));
+        $this->post('/logout')->assertRedirect(route('home'));
         $this->assertGuest();
         $this->get(route('customer.dashboard'))->assertRedirect(route('login'));
 

@@ -60,7 +60,7 @@ class AccountManagementTest extends TestCase
                 ->assertSessionHasNoErrors();
             $this->assertTrue(Hash::check($password['password'], $account->fresh()->password));
 
-            $this->post(route('logout'))->assertRedirect(route('login'));
+            $this->post(route('logout'))->assertRedirect(route('home'));
             $this->get(route('account.edit'))->assertRedirect(route('login'));
         }
     }
@@ -84,7 +84,7 @@ class AccountManagementTest extends TestCase
         $this->assertNotSame($beforeLoginSessionId, $afterLoginSessionId);
         $this->assertAuthenticatedAs($customer);
 
-        $this->post(route('logout'))->assertRedirect(route('login'));
+        $this->post(route('logout'))->assertRedirect(route('home'));
         $this->assertGuest();
         $this->assertNotSame($afterLoginSessionId, session()->getId());
     }
