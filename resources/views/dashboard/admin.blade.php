@@ -102,8 +102,6 @@
                 <span class="block">{{ $stats['incomplete_verifications'] }} menunggu kelengkapan</span>
             </p>
         </a>
-            <p class="text-xs text-muted mt-1">Dalam masa perbaikan/bengkel</p>
-        </div>
     </div>
 
     <!-- Recent Vehicles Table -->

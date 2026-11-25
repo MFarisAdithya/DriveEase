@@ -37,6 +37,7 @@
                 <option value="available" {{ request('status') == 'available' ? 'selected' : '' }}>Tersedia</option>
                 <option value="rented" {{ request('status') == 'rented' ? 'selected' : '' }}>Sedang Disewa</option>
                 <option value="maintenance" {{ request('status') == 'maintenance' ? 'selected' : '' }}>Perawatan</option>
+                <option value="archived" {{ request('status') == 'archived' ? 'selected' : '' }}>Diarsipkan</option>
             </select>
 
             <button type="submit" class="px-4 py-2 bg-surface-hover hover:bg-line text-ink text-xs font-semibold rounded-lg transition-colors">
@@ -97,9 +98,11 @@
                                 Rp {{ number_format($car->price_per_day, 0, ',', '.') }}
                             </td>
                             <td class="py-3.5 px-5">
-                                @if ($car->archived_at)
-<span class="text-xs font-semibold text-subtle">Diarsipkan</span>
-@elseif ($car->status === 'available')
+                                @if ($car->isArchived())
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-surface-hover text-subtle border border-line">
+                                        Diarsipkan
+                                    </span>
+                                @elseif ($car->status === 'available')
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-success-surface text-success">
                                         Tersedia
                                     </span>
@@ -111,6 +114,9 @@
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-danger-surface text-danger">
                                         Perawatan
                                     </span>
+                                    @if ($car->maintenance_reason)
+                                        <span class="mt-1 block text-[11px] text-muted">{{ \Illuminate\Support\Str::limit($car->maintenance_reason, 50) }}</span>
+                                    @endif
                                 @endif
                             </td>
                             <td class="py-3.5 px-5 text-right">
@@ -130,7 +136,8 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
                                         </svg>
                                     </a>
-                                    <form action="{{ route('admin.cars.destroy', $car) }}" 
+                                    @unless ($car->isArchived())
+                                    <form action="{{ route('admin.cars.destroy', $car) }}"
                                           method="POST" 
                                           class="inline-block" 
                                           onsubmit="return confirm('Apakah Anda yakin ingin menghapus armada {{ $car->name }} ({{ $car->plate_number }})? Tindakan ini tidak dapat dibatalkan.');">
@@ -144,6 +151,7 @@
                                             </svg>
                                         </button>
                                     </form>
+                                    @endunless
                                 </div>
                             </td>
                         </tr>

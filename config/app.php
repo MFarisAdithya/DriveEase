@@ -65,7 +65,9 @@ return [
     |
     */
 
-    'timezone' => 'UTC',
+    // Seluruh jadwal operasional dan transaksi DriveEase memakai Waktu Indonesia Barat (WIB).
+    // env() membaca APP_TIMEZONE jika diatur pada server, dengan default Asia/Jakarta.
+    'timezone' => env('APP_TIMEZONE', 'Asia/Jakarta'),
 
     /*
     |--------------------------------------------------------------------------

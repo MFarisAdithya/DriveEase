@@ -88,7 +88,7 @@
                            id="plate_number" 
                            name="plate_number" 
                            value="{{ old('plate_number') }}" 
-                           placeholder="Contoh: B 1234 XYZ" 
+                           placeholder="Contoh: B 1234 XYZ" maxlength="15"
                            class="bg-surface-raised w-full font-mono uppercase px-3.5 py-2.5 rounded-lg border {{ $errors->has('plate_number') ? 'border-danger-line focus:ring-danger-line' : 'border-field-line focus:border-focus focus:ring-focus' }} text-sm focus:outline-none focus:ring-2 transition-colors">
                     @error('plate_number')
                         <p class="mt-1.5 text-xs text-danger font-medium">{{ $message }}</p>
@@ -162,8 +162,8 @@
                                id="price_per_day" 
                                name="price_per_day" 
                                value="{{ old('price_per_day') }}" 
-                               min="10000" 
-                               step="10000" 
+                               min="1" 
+                               step="1" 
                                placeholder="Contoh: 450000" 
                                class="bg-surface-raised w-full pl-10 pr-3.5 py-2.5 rounded-lg border {{ $errors->has('price_per_day') ? 'border-danger-line focus:ring-danger-line' : 'border-field-line focus:border-focus focus:ring-focus' }} text-sm focus:outline-none focus:ring-2 transition-colors font-medium">
                     </div>
@@ -191,10 +191,10 @@
             </div>
 
             <div>
-                <label for="maintenance_reason" class="block text-sm font-semibold">Alasan perawatan (wajib jika status perawatan)</label>
-                <input id="maintenance_reason" name="maintenance_reason" value="{{ old('maintenance_reason', $car->maintenance_reason ?? '') }}" class="w-full rounded-lg border border-field-line p-2">
+                <label for="maintenance_reason" class="block text-xs font-semibold text-ink uppercase tracking-wider mb-1.5">Alasan Perawatan (Wajib jika status perawatan)</label>
+                <input id="maintenance_reason" name="maintenance_reason" value="{{ old('maintenance_reason', $car->maintenance_reason ?? '') }}" placeholder="Contoh: Periksa sistem pengereman dan servis berkala" class="bg-surface-raised w-full px-3.5 py-2.5 rounded-lg border {{ $errors->has('maintenance_reason') ? 'border-danger-line focus:ring-danger-line' : 'border-field-line focus:border-focus focus:ring-focus' }} text-sm focus:outline-none focus:ring-2 transition-colors">
                 @error('maintenance_reason')
-                    <p role="alert" class="text-sm text-danger">{{ $message }}</p>
+                    <p role="alert" class="mt-1.5 text-xs text-danger font-medium">{{ $message }}</p>
                 @enderror
             </div>
 

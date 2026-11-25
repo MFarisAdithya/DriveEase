@@ -299,8 +299,18 @@
                                 <span class="text-xs font-medium text-[#5B748B]">Foto armada</span>
                             @endif
 
-                            <span class="absolute top-3.5 left-3.5 px-3 py-1 rounded-full text-[11px] font-bold backdrop-blur-sm {{ $car->status === 'available' ? 'bg-emerald-500/90 text-white' : 'bg-[#0B2840]/85 text-white' }}">
-                                {{ $car->status === 'available' ? 'Tersedia' : 'Sedang Disewa' }}
+                            @php
+                                $statusLabel = match ($car->status) {
+                                    'available' => 'Tersedia',
+                                    'maintenance' => 'Dalam Perawatan',
+                                    default => 'Sedang Disewa',
+                                };
+                                $statusBadgeClass = $car->status === 'available'
+                                    ? 'bg-emerald-500/90 text-white'
+                                    : ($car->status === 'maintenance' ? 'bg-amber-600/90 text-white' : 'bg-[#0B2840]/85 text-white');
+                            @endphp
+                            <span class="absolute top-3.5 left-3.5 px-3 py-1 rounded-full text-[11px] font-bold backdrop-blur-sm {{ $statusBadgeClass }}">
+                                {{ $statusLabel }}
                             </span>
                         </figure>
 

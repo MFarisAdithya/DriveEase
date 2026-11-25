@@ -8,6 +8,7 @@ use App\Models\CarType;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -18,18 +19,27 @@ class CarController extends Controller
      */
     public function index(Request $request): View
     {
+        // Car::with('carType') melakukan eager loading relasi kategori agar
+        // daftar armada tidak memicu query N+1 ketika menampilkan nama kategori.
         $query = Car::with('carType');
 
-        if ($request->filled('status')) {
-            $query->where('status', $request->status);
+        // Cabang if/elseif memisahkan filter unit arsip dari status unit aktif
+        // sehingga unit yang sudah diarsipkan tidak ikut muncul pada filter aktif.
+        if ($request->status === 'archived') {
+            $query->whereNotNull('archived_at');
+        } elseif (in_array($request->status, ['available', 'rented', 'maintenance'], true)) {
+            $query->activeInventory()->where('status', $request->status);
         }
 
-        if ($request->filled('car_type_id')) {
-            $query->where('car_type_id', $request->car_type_id);
+        // is_numeric() mencegah string acak pada query car_type_id dikirim ke kolom integer PostgreSQL.
+        if ($request->filled('car_type_id') && is_numeric($request->car_type_id)) {
+            $query->where('car_type_id', (int) $request->car_type_id);
         }
 
         if ($request->filled('search')) {
-            $search = $request->search;
+            $search = trim((string) $request->search);
+            // Closure di dalam where() membungkus kondisi OR dengan tanda kurung SQL
+            // agar filter pencarian tetap terikat bersama filter status dan kategori.
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'ilike', "%{$search}%")
                     ->orWhere('brand', 'ilike', "%{$search}%")
@@ -38,7 +48,7 @@ class CarController extends Controller
         }
 
         $cars = $query->latest()->paginate(10)->withQueryString();
-        $carTypes = CarType::all();
+        $carTypes = CarType::orderBy('name')->get();
 
         return view('admin.cars.index', compact('cars', 'carTypes'));
     }
@@ -58,41 +68,12 @@ class CarController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
-        $currentYear = (int) date('Y');
+        $this->normalizePlateNumber($request);
+        $validated = $this->validateVehicle($request);
 
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:100'],
-            'car_type_id' => ['required', 'exists:car_types,id'],
-            'brand' => ['required', 'string', 'max:50'],
-            'plate_number' => ['required', 'string', 'max:20', 'unique:cars,plate_number'],
-            'model_year' => ['required', 'integer', 'min:1990', 'max:'.($currentYear + 1)],
-            'transmission' => ['required', 'in:manual,automatic'],
-            'capacity' => ['required', 'integer', 'min:1', 'max:50'],
-            'price_per_day' => ['required', 'numeric', 'min:1'],
-            'status' => ['required', 'in:available,rented,maintenance'],
-            'maintenance_reason' => ['exclude_unless:status,maintenance', 'required', 'string', 'max:2000'],
-            'description' => ['nullable', 'string'],
-        ], [
-            'name.required' => 'Nama kendaraan wajib diisi.',
-            'car_type_id.required' => 'Kategori kendaraan wajib dipilih.',
-            'car_type_id.exists' => 'Kategori kendaraan tidak valid.',
-            'brand.required' => 'Merek kendaraan wajib diisi.',
-            'plate_number.required' => 'Nomor plat polisi wajib diisi.',
-            'plate_number.unique' => 'Nomor plat polisi sudah terdaftar.',
-            'model_year.required' => 'Tahun pembuatan wajib diisi.',
-            'model_year.min' => 'Tahun pembuatan minimal tahun 1990.',
-            'model_year.max' => 'Tahun pembuatan tidak valid.',
-            'transmission.required' => 'Transmisi wajib dipilih.',
-            'transmission.in' => 'Pilihan transmisi tidak valid.',
-            'capacity.required' => 'Kapasitas penumpang wajib diisi.',
-            'capacity.min' => 'Kapasitas minimal 1 penumpang.',
-            'price_per_day.required' => 'Tarif sewa per hari wajib diisi.',
-            'price_per_day.min' => 'Tarif sewa harus lebih dari 0.',
-            'status.required' => 'Status kendaraan wajib dipilih.',
-            'status.in' => 'Pilih status tersedia, sedang disewa, atau dalam perawatan.',
-        ]);
-
-        Car::create($validated);
+        // Operator + pada array menggabungkan hasil validasi dengan nilai default null
+        // untuk maintenance_reason saat status bukan 'maintenance' (aturan exclude_unless).
+        Car::create($validated + ['maintenance_reason' => null]);
 
         return redirect()->route('admin.cars.index')
             ->with('success', 'Kendaraan "'.$validated['name'].'" berhasil ditambahkan.');
@@ -123,45 +104,12 @@ class CarController extends Controller
      */
     public function update(Request $request, Car $car): RedirectResponse
     {
-        $currentYear = (int) date('Y');
+        $this->normalizePlateNumber($request);
+        $validated = $this->validateVehicle($request, $car);
 
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:100'],
-            'car_type_id' => ['required', 'exists:car_types,id'],
-            'brand' => ['required', 'string', 'max:50'],
-            'plate_number' => [
-                'required',
-                'string',
-                'max:20',
-                Rule::unique('cars', 'plate_number')->ignore($car->id),
-            ],
-            'model_year' => ['required', 'integer', 'min:1990', 'max:'.($currentYear + 1)],
-            'transmission' => ['required', 'in:manual,automatic'],
-            'capacity' => ['required', 'integer', 'min:1', 'max:50'],
-            'price_per_day' => ['required', 'numeric', 'min:1'],
-            'status' => ['required', 'in:available,rented,maintenance'],
-            'maintenance_reason' => ['exclude_unless:status,maintenance', 'required', 'string', 'max:2000'],
-            'description' => ['nullable', 'string'],
-        ], [
-            'name.required' => 'Nama kendaraan wajib diisi.',
-            'car_type_id.required' => 'Kategori kendaraan wajib dipilih.',
-            'car_type_id.exists' => 'Kategori kendaraan tidak valid.',
-            'brand.required' => 'Merek kendaraan wajib diisi.',
-            'plate_number.required' => 'Nomor plat polisi wajib diisi.',
-            'plate_number.unique' => 'Nomor plat polisi sudah terdaftar pada armada lain.',
-            'model_year.required' => 'Tahun pembuatan wajib diisi.',
-            'model_year.min' => 'Tahun pembuatan minimal tahun 1990.',
-            'model_year.max' => 'Tahun pembuatan tidak valid.',
-            'transmission.required' => 'Transmisi wajib dipilih.',
-            'transmission.in' => 'Pilihan transmisi tidak valid.',
-            'capacity.required' => 'Kapasitas penumpang wajib diisi.',
-            'capacity.min' => 'Kapasitas minimal 1 penumpang.',
-            'price_per_day.required' => 'Tarif sewa per hari wajib diisi.',
-            'price_per_day.min' => 'Tarif sewa harus lebih dari 0.',
-            'status.required' => 'Status kendaraan wajib dipilih.',
-            'status.in' => 'Pilih status tersedia, sedang disewa, atau dalam perawatan.',
-        ]);
-
+        // Ketika unit keluar dari status maintenance, exclude_unless menghapus
+        // maintenance_reason dari $validated sehingga + ['maintenance_reason' => null]
+        // otomatis membersihkan alasan perawatan lama di database.
         $car->update($validated + ['maintenance_reason' => null]);
 
         return redirect()->route('admin.cars.index')
@@ -174,8 +122,8 @@ class CarController extends Controller
     public function destroy(Car $car): RedirectResponse
     {
         $name = $car->name;
-        // exists() cukup memeriksa apakah ada histori untuk ID kendaraan ini.
-        // Jika ada, simpan waktu arsip tanpa menghapus baris yang dirujuk rental.
+        // DB::transaction() dan lockForUpdate() memastikan pemeriksaan riwayat rental
+        // dan keputusan arsip/hapus berjalan atomik tanpa race condition.
         $archived = DB::transaction(function () use ($car): bool {
             $lockedCar = Car::query()->lockForUpdate()->findOrFail($car->id);
             if (DB::table('rentals')->where('car_id', $lockedCar->id)->exists()) {
@@ -192,5 +140,74 @@ class CarController extends Controller
 
         return redirect()->route('admin.cars.index')
             ->with('success', 'Kendaraan "'.$name.'" berhasil '.($archived ? 'diarsipkan.' : 'dihapus dari sistem.'));
+    }
+
+    /**
+     * Normalize plate_number to uppercase trimmed format before validation.
+     */
+    private function normalizePlateNumber(Request $request): void
+    {
+        // Str::upper(trim(...)) menyeragamkan huruf besar dan menghapus spasi berlebih
+        // agar constraint unik PostgreSQL menolak duplikasi plat beda kapitalisasi.
+        if (is_string($request->input('plate_number'))) {
+            $request->merge([
+                'plate_number' => Str::upper(trim($request->input('plate_number'))),
+            ]);
+        }
+    }
+
+    /**
+     * Validate vehicle attributes consistently across create and update operations.
+     *
+     * @return array<string, mixed>
+     */
+    private function validateVehicle(Request $request, ?Car $car = null): array
+    {
+        $currentYear = (int) date('Y');
+
+        // Rule::unique('cars', 'plate_number')->ignore($car?->id) memeriksa keunikan
+        // plat nomor dengan batas panjang 15 karakter sesuai kolom database.
+        return $request->validate([
+            'name' => ['required', 'string', 'max:100'],
+            'car_type_id' => ['required', 'exists:car_types,id'],
+            'brand' => ['required', 'string', 'max:50'],
+            'plate_number' => [
+                'required',
+                'string',
+                'max:15',
+                Rule::unique('cars', 'plate_number')->ignore($car?->id),
+            ],
+            'model_year' => ['required', 'integer', 'min:1990', 'max:'.($currentYear + 1)],
+            'transmission' => ['required', 'in:manual,automatic'],
+            'capacity' => ['required', 'integer', 'min:1', 'max:50'],
+            'price_per_day' => ['required', 'numeric', 'min:1'],
+            'status' => ['required', 'in:available,rented,maintenance'],
+            'maintenance_reason' => ['exclude_unless:status,maintenance', 'required', 'string', 'max:2000'],
+            'description' => ['nullable', 'string'],
+        ], [
+            'name.required' => 'Nama kendaraan wajib diisi.',
+            'car_type_id.required' => 'Kategori kendaraan wajib dipilih.',
+            'car_type_id.exists' => 'Kategori kendaraan tidak valid.',
+            'brand.required' => 'Merek kendaraan wajib diisi.',
+            'plate_number.required' => 'Nomor plat polisi wajib diisi.',
+            'plate_number.max' => 'Nomor plat polisi maksimal 15 karakter.',
+            'plate_number.unique' => $car === null
+                ? 'Nomor plat polisi sudah terdaftar.'
+                : 'Nomor plat polisi sudah terdaftar pada armada lain.',
+            'model_year.required' => 'Tahun pembuatan wajib diisi.',
+            'model_year.min' => 'Tahun pembuatan minimal tahun 1990.',
+            'model_year.max' => 'Tahun pembuatan tidak valid.',
+            'transmission.required' => 'Transmisi wajib dipilih.',
+            'transmission.in' => 'Pilihan transmisi tidak valid.',
+            'capacity.required' => 'Kapasitas penumpang wajib diisi.',
+            'capacity.min' => 'Kapasitas minimal 1 penumpang.',
+            'price_per_day.required' => 'Tarif sewa per hari wajib diisi.',
+            'price_per_day.numeric' => 'Tarif sewa per hari harus berupa angka.',
+            'price_per_day.min' => 'Tarif sewa harus lebih dari 0.',
+            'status.required' => 'Status kendaraan wajib dipilih.',
+            'status.in' => 'Pilih status tersedia, sedang disewa, atau dalam perawatan.',
+            'maintenance_reason.required' => 'Alasan perawatan wajib diisi saat status kendaraan dalam perawatan.',
+            'maintenance_reason.max' => 'Alasan perawatan maksimal 2000 karakter.',
+        ]);
     }
 }

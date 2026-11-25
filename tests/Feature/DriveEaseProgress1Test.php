@@ -272,4 +272,123 @@ class DriveEaseProgress1Test extends TestCase
             'id' => $carToDelete->id,
         ]);
     }
+
+    /**
+     * Test 13: Fleet validation enforces 15-char case-insensitive unique plate and positive price.
+     */
+    public function test_vehicle_validation_enforces_plate_length_case_insensitive_uniqueness_and_positive_price(): void
+    {
+        $admin = $this->getAdminUser();
+        $existingCar = Car::firstOrFail();
+
+        // Plat lebih dari 15 karakter harus ditolak oleh validasi tanpa error SQL.
+        $this->actingAs($admin)->post('/admin/cars', [
+            'name' => 'Mobil Plat Panjang',
+            'car_type_id' => $existingCar->car_type_id,
+            'brand' => 'Toyota',
+            'plate_number' => 'B 123456789012345',
+            'model_year' => 2024,
+            'transmission' => 'automatic',
+            'capacity' => 5,
+            'price_per_day' => 500000,
+            'status' => 'available',
+        ])->assertSessionHasErrors(['plate_number']);
+
+        // Duplikasi plat beda huruf besar/kecil harus dinormalisasi lalu ditolak.
+        $this->post('/admin/cars', [
+            'name' => 'Mobil Plat Huruf Kecil',
+            'car_type_id' => $existingCar->car_type_id,
+            'brand' => 'Toyota',
+            'plate_number' => strtolower($existingCar->plate_number),
+            'model_year' => 2024,
+            'transmission' => 'automatic',
+            'capacity' => 5,
+            'price_per_day' => 500000,
+            'status' => 'available',
+        ])->assertSessionHasErrors(['plate_number']);
+
+        // Tarif nol atau negatif harus ditolak validasi.
+        foreach ([0, -50000] as $invalidPrice) {
+            $this->post('/admin/cars', [
+                'name' => 'Mobil Tarif Tidak Valid',
+                'car_type_id' => $existingCar->car_type_id,
+                'brand' => 'Toyota',
+                'plate_number' => 'B 8899 VAL',
+                'model_year' => 2024,
+                'transmission' => 'automatic',
+                'capacity' => 5,
+                'price_per_day' => $invalidPrice,
+                'status' => 'available',
+            ])->assertSessionHasErrors(['price_per_day']);
+        }
+    }
+
+    /**
+     * Test 14: Admin fleet filter isolates archived cars and car readiness helper checks active status.
+     */
+    public function test_admin_fleet_filters_and_readiness_helper_distinguish_archived_and_maintenance_units(): void
+    {
+        $admin = $this->getAdminUser();
+        $carType = CarType::firstOrFail();
+
+        $activeAvailable = Car::create([
+            'name' => 'Unit Siap Jalan Uji',
+            'car_type_id' => $carType->id,
+            'brand' => 'Toyota',
+            'plate_number' => 'B 5101 RDY',
+            'model_year' => 2024,
+            'transmission' => 'automatic',
+            'capacity' => 5,
+            'price_per_day' => 500000,
+            'status' => 'available',
+        ]);
+
+        $maintenanceCar = Car::create([
+            'name' => 'Unit Perawatan Uji',
+            'car_type_id' => $carType->id,
+            'brand' => 'Honda',
+            'plate_number' => 'B 5102 MNT',
+            'model_year' => 2024,
+            'transmission' => 'automatic',
+            'capacity' => 5,
+            'price_per_day' => 500000,
+            'status' => 'maintenance',
+            'maintenance_reason' => 'Ganti kampas rem',
+        ]);
+
+        $archivedCar = Car::create([
+            'name' => 'Unit Arsip Terfilter',
+            'car_type_id' => $carType->id,
+            'brand' => 'Suzuki',
+            'plate_number' => 'B 5103 ARC',
+            'model_year' => 2022,
+            'transmission' => 'manual',
+            'capacity' => 7,
+            'price_per_day' => 400000,
+            'status' => 'available',
+        ]);
+        $archivedCar->archived_at = now();
+        $archivedCar->save();
+
+        $this->assertTrue($activeAvailable->isReadyForRental());
+        $this->assertFalse($maintenanceCar->isReadyForRental());
+        $this->assertTrue($maintenanceCar->isInMaintenance());
+        $this->assertFalse($archivedCar->isReadyForRental());
+        $this->assertTrue($archivedCar->isArchived());
+
+        // Filter status=available tidak boleh menampilkan unit yang diarsipkan.
+        $this->actingAs($admin)->get(route('admin.cars.index', ['status' => 'available']))
+            ->assertOk()
+            ->assertSee($activeAvailable->name)
+            ->assertDontSee($archivedCar->name);
+
+        // Filter status=archived menampilkan unit arsip tanpa error.
+        $this->get(route('admin.cars.index', ['status' => 'archived']))
+            ->assertOk()
+            ->assertSee($archivedCar->name)
+            ->assertDontSee($activeAvailable->name);
+
+        // Nilai car_type_id non-numerik pada query tidak boleh memicu error 500 PostgreSQL.
+        $this->get(route('admin.cars.index', ['car_type_id' => 'abc']))->assertOk();
+    }
 }

@@ -19,7 +19,8 @@
                 </svg>
                 Ubah Data
             </a>
-            <form action="{{ route('admin.cars.destroy', $car) }}" 
+            @unless ($car->isArchived())
+            <form action="{{ route('admin.cars.destroy', $car) }}"
                   method="POST" 
                   onsubmit="return confirm('Apakah Anda yakin ingin menghapus armada {{ $car->name }}?');">
                 @csrf
@@ -31,6 +32,7 @@
                     Hapus
                 </button>
             </form>
+            @endunless
         </div>
     </div>
 
@@ -40,9 +42,11 @@
             <div>
                 <div class="flex items-center gap-3">
                     <h2 class="text-2xl font-bold text-ink">{{ $car->name }}</h2>
-                    @if ($car->archived_at)
-<span class="text-xs font-semibold text-subtle">Diarsipkan</span>
-@elseif ($car->status === 'available')
+                    @if ($car->isArchived())
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-surface-hover text-subtle border border-line">
+                            Diarsipkan
+                        </span>
+                    @elseif ($car->status === 'available')
                         <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-success-surface text-success">
                             Tersedia
                         </span>
@@ -93,6 +97,13 @@
                 {{ $car->description ?: 'Tidak ada catatan tambahan untuk armada ini.' }}
             </div>
 
+            @if ($car->maintenance_reason)
+                <div class="mt-6 p-4 rounded-lg bg-danger-surface border border-danger-line text-sm text-danger">
+                    <span class="text-xs font-bold uppercase tracking-wider block mb-1">Alasan Perawatan</span>
+                    <p>Alasan perawatan: {{ $car->maintenance_reason }}</p>
+                </div>
+            @endif
+
             <div class="mt-8 pt-6 border-t border-line text-xs text-muted flex items-center justify-between">
                 <span>Didaftarkan: {{ $car->created_at?->translatedFormat('d F Y H:i') ?? '-' }}</span>
                 <span>Terakhir diperbarui: {{ $car->updated_at?->translatedFormat('d F Y H:i') ?? '-' }}</span>
@@ -100,7 +111,4 @@
         </div>
     </div>
 </div>
-@if ($car->maintenance_reason)
-    <p class="mt-4 text-sm">Alasan perawatan: {{ $car->maintenance_reason }}</p>
-@endif
 @endsection

@@ -73,6 +73,13 @@ class DriveEaseProgress1ContinuationTest extends TestCase
         ]);
 
         $response->assertSessionHasErrors(['name']);
+
+        $lowercaseResponse = $this->actingAs($admin)->post(route('admin.car-types.store'), [
+            'name' => strtolower($existing->name),
+            'description' => 'Mencoba duplikasi huruf kecil',
+        ]);
+
+        $lowercaseResponse->assertSessionHasErrors(['name']);
     }
 
     public function test_admin_can_edit_car_type(): void
@@ -111,6 +118,35 @@ class DriveEaseProgress1ContinuationTest extends TestCase
         $this->assertDatabaseHas('car_types', [
             'id' => $usedCategory->id,
         ]);
+    }
+
+    public function test_category_referenced_by_archived_vehicle_cannot_be_deleted(): void
+    {
+        $admin = $this->getAdminUser();
+        $category = CarType::create([
+            'name' => 'Kategori Arsip '.rand(100, 999),
+            'description' => 'Kategori yang dipakai unit arsip',
+        ]);
+
+        $archivedCar = Car::create([
+            'car_type_id' => $category->id,
+            'name' => 'Mobil Arsip Kategori',
+            'brand' => 'Toyota',
+            'plate_number' => 'B '.rand(1000, 9999).' CAT',
+            'model_year' => 2021,
+            'transmission' => 'automatic',
+            'capacity' => 5,
+            'price_per_day' => 400000,
+            'status' => 'available',
+        ]);
+        $archivedCar->archived_at = now();
+        $archivedCar->save();
+
+        $this->actingAs($admin)->delete(route('admin.car-types.destroy', $category))
+            ->assertRedirect(route('admin.car-types.index'))
+            ->assertSessionHas('error');
+
+        $this->assertDatabaseHas('car_types', ['id' => $category->id]);
     }
 
     public function test_admin_can_delete_unused_category(): void

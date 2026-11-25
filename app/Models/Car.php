@@ -52,6 +52,42 @@ class Car extends Model
         $query->whereNull('archived_at');
     }
 
+    #[Scope]
+    protected function readyForRental(Builder $query): void
+    {
+        // Operator chaining whereNull()->where() menyaring hanya kendaraan aktif
+        // (archived_at bernilai null) yang berstatus available agar unit perawatan
+        // maupun arsip tidak muncul pada daftar siap disewa.
+        $query->whereNull('archived_at')->where('status', 'available');
+    }
+
+    /**
+     * Determine whether this vehicle has been archived to preserve rental history.
+     */
+    public function isArchived(): bool
+    {
+        // Operator !== mengecek secara ketat apakah timestamp archived_at sudah terisi.
+        return $this->archived_at !== null;
+    }
+
+    /**
+     * Determine whether this vehicle is currently under maintenance.
+     */
+    public function isInMaintenance(): bool
+    {
+        return $this->status === 'maintenance';
+    }
+
+    /**
+     * Determine whether this vehicle is active and ready to accept rentals.
+     */
+    public function isReadyForRental(): bool
+    {
+        // Operator && mewajibkan kedua kondisi bernilai true: tidak diarsipkan
+        // dan status operasional unit berada pada kondisi available.
+        return ! $this->isArchived() && $this->status === 'available';
+    }
+
     /**
      * Resolve the vehicle's display photo (unit photo or configured model fallback).
      *
