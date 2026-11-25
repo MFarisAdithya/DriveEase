@@ -35,7 +35,7 @@
                            value="{{ old('name') }}" 
                            required 
                            autofocus
-                           placeholder="Contoh: Budi Santoso"
+                           placeholder="Contoh: M. Faris Adithya"
                            class="w-full px-3.5 py-2.5 rounded-lg border {{ $errors->has('name') ? 'border-danger-line focus:ring-danger-line' : 'border-field-line focus:border-focus focus:ring-focus' }} text-sm focus:outline-none focus:ring-2 transition-colors">
                     @error('name')
                         <p class="mt-1.5 text-xs text-danger font-medium">{{ $message }}</p>
