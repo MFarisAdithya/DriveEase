@@ -158,17 +158,24 @@ class BackupRestoreDrillTest extends TestCase
 
             $this->recreateIsolatedDatabase($postgresPdo, $restoreDbName);
 
-            // Jalankan restore nyata ke driveease_restore_test dan direktori storage privat terisolasi.
-            $this->artisan('driveease:verify-restore', [
-                'path' => $backupDir,
-                '--rental-code' => $rental->rental_code,
-                '--target-db' => $restoreDbName,
-                '--target-storage' => $restoredStorageDir,
-            ])->assertExitCode(0);
+            // DB_URL menunjuk database sumber. Restore tetap harus memakai
+            // nama target eksplisit dan membuka kembali transaksi serta berkasnya di sana.
+            $basePgsql = config('database.connections.pgsql');
+            $sourceUrl = sprintf('pgsql://%s/driveease_test', $basePgsql['host']);
+            config(['database.connections.pgsql.url' => $sourceUrl]);
+            try {
+                $this->artisan('driveease:verify-restore', [
+                    'path' => $backupDir,
+                    '--rental-code' => $rental->rental_code,
+                    '--target-db' => $restoreDbName,
+                    '--target-storage' => $restoredStorageDir,
+                ])->assertExitCode(0);
+            } finally {
+                config(['database.connections.pgsql' => $basePgsql]);
+            }
 
             // Arahkan koneksi default Laravel dan disk privat sementara ke hasil pemulihan untuk membuktikan aplikasi
             // benar-benar dapat membuka satu transaksi hasil restore beserta seluruh berkas privat & dekripsi identitasnya.
-            $basePgsql = config('database.connections.pgsql');
             config([
                 'database.connections.restore_app' => array_merge($basePgsql, ['database' => $restoreDbName]),
                 'database.default' => 'restore_app',

@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Support\ConfigurationUrlParser;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
@@ -297,6 +298,15 @@ class VerifyBackupRestore extends Command
         $previousDefault = DB::getDefaultConnection();
 
         try {
+            // Parser Laravel mengubah DB_URL menjadi opsi koneksi. Terapkan nama
+            // target sesudah parsing agar URL sumber tidak mengganti database tujuan.
+            $basePgsql = (new ConfigurationUrlParser)->parseConfiguration($basePgsql);
+            if (strtolower((string) ($basePgsql['database'] ?? '')) === $targetDb) {
+                $this->error('Target pemulihan harus berbeda dari database pada konfigurasi PostgreSQL aktif.');
+
+                return false;
+            }
+
             config([
                 'database.connections.restore_verify' => array_merge($basePgsql, [
                     'database' => $targetDb,
@@ -309,12 +319,21 @@ class VerifyBackupRestore extends Command
 
                 return false;
             }
-            $restoreConn->getPdo();
+            // Argumen ketiga false memakai koneksi tulis yang juga dipakai migration.
+            // PostgreSQL mengembalikan nama database yang benar-benar menerima query.
+            $connectedDb = $restoreConn->selectOne('SELECT current_database() AS name', [], false)->name;
+            if ($connectedDb !== $targetDb) {
+                $this->error('Koneksi PostgreSQL tidak mengarah ke database target pemulihan.');
+
+                return false;
+            }
 
             // Periksa skema public sebelum migration: apabila sudah ada satu tabel saja, tolak proses
             // agar latihan restore tidak pernah menghapus atau menimpa data pada database yang sudah terisi.
             $existingTableCount = (int) ($restoreConn->selectOne(
-                "SELECT COUNT(*) AS total FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'"
+                "SELECT COUNT(*) AS total FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'",
+                [],
+                false,
             )->total ?? 0);
 
             if ($existingTableCount > 0) {

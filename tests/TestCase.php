@@ -12,7 +12,10 @@ abstract class TestCase extends BaseTestCase
     public function createApplication(): Application
     {
         $app = parent::createApplication();
-        if ($app['config']->get('database.default') !== 'pgsql' || $app['config']->get('database.connections.pgsql.database') !== 'driveease_test') {
+        // Nama di Connection sudah diproses Laravel, termasuk override dari DB_URL.
+        // Periksa sebelum test bisa membuka transaksi atau menjalankan migration.
+        if ($app['config']->get('database.default') !== 'pgsql'
+            || $app['db']->connection('pgsql')->getDatabaseName() !== 'driveease_test') {
             throw new RuntimeException('Pengujian hanya boleh memakai PostgreSQL driveease_test.');
         }
         Storage::fake('local');
