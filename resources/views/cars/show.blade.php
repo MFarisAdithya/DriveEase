@@ -108,79 +108,54 @@
             <!-- Period Availability Checker (G-03, C-04) -->
             <div class="rounded-xl border border-line bg-surface-raised p-6 space-y-4">
                 <div>
-                    <h2 class="text-sm font-bold text-ink">Cek Ketersediaan &amp; Estimasi Biaya (WIB)</h2>
+                    <h2 class="text-sm font-bold text-ink">Ketersediaan &amp; Estimasi Sewa</h2>
                     <p class="text-xs text-muted mt-0.5">Durasi sewa 1 hari = 24 jam sejak jadwal pengambilan dengan jeda persiapan 1 jam antarpenyewaan.</p>
                 </div>
 
-                <form method="GET" action="{{ route('cars.show', $car) }}" class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
-                    @foreach (['search', 'car_type_id', 'transmission', 'page'] as $filterKey)
-                        @if (request()->filled($filterKey))
-                            <input type="hidden" name="{{ $filterKey }}" value="{{ request($filterKey) }}">
-                        @endif
-                    @endforeach
-                    <div class="sm:col-span-6">
+                <form method="GET" action="{{ route('cars.show', $car) }}" data-availability-form data-availability-url="{{ route('api.v1.availability') }}" data-car-id="{{ $car->id }}" class="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+                    <div>
                         <label for="detail_pickup_at" class="block text-xs font-semibold text-ink mb-1">Waktu Pengambilan (WIB)</label>
                         <input id="detail_pickup_at" name="pickup_at" type="datetime-local" value="{{ request('pickup_at') }}" required class="w-full rounded-lg border border-field-line bg-surface p-2.5 text-sm">
                     </div>
-                    <div class="sm:col-span-3">
+                    <div>
                         <label for="detail_total_days" class="block text-xs font-semibold text-ink mb-1">Jumlah Hari</label>
                         <input id="detail_total_days" name="total_days" type="number" min="1" max="365" value="{{ request('total_days', 1) }}" required class="w-full rounded-lg border border-field-line bg-surface p-2.5 text-sm">
                     </div>
-                    <div class="sm:col-span-3">
-                        <button type="submit" class="w-full rounded-lg bg-action hover:bg-action-hover px-4 py-2.5 text-xs font-bold text-ink shadow-xs transition-colors">Periksa Jadwal</button>
-                    </div>
                 </form>
 
-                @if ($periodErrors->any())
-                    <ul role="alert" class="rounded-lg border border-danger-line bg-danger-surface p-3 text-xs text-danger space-y-1">
-                        @foreach ($periodErrors->all() as $error)
-                            <li>{{ $error }}</li>
-                        @endforeach
-                    </ul>
-                @elseif ($periodCheck)
-                    <div class="rounded-lg border p-4 text-xs sm:text-sm space-y-2 {{ $periodCheck['available'] ? 'border-success-line bg-success-surface text-success' : 'border-danger-line bg-danger-surface text-danger' }}">
-                        <p class="font-bold">
-                            {{ $periodCheck['available'] ? 'Tersedia untuk periode yang dipilih' : 'Tidak tersedia pada periode yang dipilih' }}
-                        </p>
-                        @if ($periodCheck['reason'])
-                            <p>{{ $periodCheck['reason'] }}</p>
+                <div class="rounded-lg border border-line p-4 space-y-3 text-xs sm:text-sm" data-availability-result>
+                    <p role="status" data-availability-status>
+                        @if ($periodErrors->any())
+                            {{ $periodErrors->first() }}
+                        @elseif ($periodCheck && $periodCheck['available'])
+                            Tersedia untuk periode yang dipilih.
+                            Kembali {{ $periodCheck['pricing']['return_at']->format('d M Y H:i') }} WIB
+                            · Tarif Rp {{ number_format($periodCheck['pricing']['daily_price'], 0, ',', '.') }}/hari
+                            · Total Rp {{ number_format($periodCheck['pricing']['total_amount'], 0, ',', '.') }}.
+                        @elseif ($periodCheck)
+                            Tidak tersedia pada periode yang dipilih.
+                        @else
+                            Isi waktu pengambilan dan jumlah hari.
                         @endif
-                        <p>
-                            Jadwal: <strong>{{ $periodCheck['pricing']['pickup_at']->format('d M Y H:i') }} WIB</strong>
-                            s.d. <strong>{{ $periodCheck['pricing']['return_at']->format('d M Y H:i') }} WIB</strong>
-                            ({{ $periodCheck['pricing']['total_days'] }} hari &times; Rp {{ number_format($periodCheck['pricing']['daily_price'], 0, ',', '.') }})
-                            &mdash; Total: <strong>Rp {{ number_format($periodCheck['pricing']['total_amount'], 0, ',', '.') }}</strong>
-                        </p>
-
-                        @if ($periodCheck['available'])
-                            <div class="pt-2">
-                                @auth
-                                    @if (auth()->user()->isCustomer())
-                                        @if (auth()->user()->canMakeReservation())
-                                            @if (Route::has('customer.bookings.create'))
-                                                <a href="{{ route('customer.bookings.create', ['car_id' => $car->id, 'pickup_at' => request('pickup_at'), 'total_days' => request('total_days')]) }}" class="inline-flex items-center rounded-lg bg-action hover:bg-action-hover px-4 py-2 text-xs font-bold text-ink shadow-xs">
-                                                    Pesan Kendaraan Ini &rarr;
-                                                </a>
-                                            @endif
-                                        @else
-                                            <a href="{{ route('customer.verification.create') }}" class="inline-flex items-center rounded-lg border border-warning-line bg-warning-surface px-4 py-2 text-xs font-bold text-warning">
-                                                Lengkapi Verifikasi Identitas untuk Memesan &rarr;
-                                            </a>
-                                        @endif
-                                    @elseif (auth()->user()->isAdmin() && Route::has('admin.bookings.create'))
-                                        <a href="{{ route('admin.bookings.create', ['car_id' => $car->id, 'pickup_at' => request('pickup_at'), 'total_days' => request('total_days')]) }}" class="inline-flex items-center rounded-lg bg-action hover:bg-action-hover px-4 py-2 text-xs font-bold text-ink shadow-xs">
-                                            Buat Pemesanan Langsung &rarr;
-                                        </a>
+                    </p>
+                    <div data-availability-action @if (! ($periodCheck['available'] ?? false)) hidden @endif>
+                        <div class="flex justify-end">
+                            @auth
+                                @if (auth()->user()->isCustomer())
+                                    @if (auth()->user()->canMakeReservation())
+                                        <a data-availability-booking href="{{ route('customer.bookings.create', ['car_id' => $car->id, 'pickup_at' => request('pickup_at'), 'total_days' => request('total_days')]) }}" class="ui-button">Pesan Kendaraan Ini</a>
+                                    @else
+                                        <a href="{{ route('customer.verification.create') }}" class="ui-button ui-secondary">Lengkapi Identitas untuk Memesan</a>
                                     @endif
-                                @else
-                                    <a href="{{ route('login') }}" class="inline-flex items-center rounded-lg bg-action hover:bg-action-hover px-4 py-2 text-xs font-bold text-ink shadow-xs">
-                                        Masuk untuk Memesan &rarr;
-                                    </a>
-                                @endauth
-                            </div>
-                        @endif
+                                @elseif (auth()->user()->isAdmin())
+                                    <a data-availability-booking href="{{ route('admin.bookings.create', ['car_id' => $car->id, 'pickup_at' => request('pickup_at'), 'total_days' => request('total_days')]) }}" class="ui-button">Buat Pemesanan Langsung</a>
+                                @endif
+                            @else
+                                <a href="{{ route('login') }}" class="ui-button">Masuk untuk Memesan</a>
+                            @endauth
+                        </div>
                     </div>
-                @endif
+                </div>
             </div>
         </div>
     </div>

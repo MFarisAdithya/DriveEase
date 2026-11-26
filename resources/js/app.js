@@ -1,3 +1,5 @@
+import './availability';
+
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const activeMotion = new Set();
 

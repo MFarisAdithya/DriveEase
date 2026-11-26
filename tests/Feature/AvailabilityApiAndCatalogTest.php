@@ -124,14 +124,27 @@ class AvailabilityApiAndCatalogTest extends TestCase
             ->assertOk()
             ->assertSee(e(route('cars.index', $filters)), false)
             ->assertSee('Tersedia untuk periode yang dipilih')
+            ->assertSee('data-availability-form', false)
+            ->assertDontSee('Periksa Jadwal')
             ->assertSee(number_format($car->price_per_day * 2, 0, ',', '.'));
+
+        $previewEndpoint = route('api.v1.availability', ['car_id' => $car->id] + $filters);
+        $this->getJson($previewEndpoint)
+            ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $car->id);
 
         // Setelah dipesan, halaman detail menampilkan status tidak tersedia pada periode yang sama.
         app(RentalBookingService::class)->createBooking($customer, $car->id, $pickupAt, 2, true);
 
         $this->get(route('cars.show', ['car' => $car] + $filters))
             ->assertOk()
-            ->assertSee('Tidak tersedia pada periode yang dipilih');
+            ->assertSee('Tidak tersedia pada periode yang dipilih')
+            ->assertDontSee('Total Rp '.number_format($car->price_per_day * 2, 0, ',', '.'));
+
+        $this->getJson($previewEndpoint)->assertOk()->assertJsonCount(0, 'data');
+        $this->actingAs($customer)->get(route('customer.bookings.create', ['car_id' => $car->id] + $filters))
+            ->assertOk()
+            ->assertSee('Tidak tersedia pada periode yang dipilih')
+            ->assertDontSee('Total Rp '.number_format($car->price_per_day * 2, 0, ',', '.'));
 
         // Periode lampau di katalog dan detail ditangani dengan pesan kesalahan yang jelas (bukan 500).
         $pastFilters = ['pickup_at' => CarbonImmutable::now('Asia/Jakarta')->subHours(2)->format('Y-m-d\TH:i'), 'total_days' => '1'];

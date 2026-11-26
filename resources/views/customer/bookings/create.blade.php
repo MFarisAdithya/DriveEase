@@ -26,7 +26,7 @@
         </ul>
     @endif
 
-    <form method="POST" action="{{ route('customer.bookings.store') }}" class="bg-surface rounded-xl border border-line p-6 sm:p-8 shadow-sm space-y-5">
+    <form method="POST" action="{{ route('customer.bookings.store') }}" data-availability-form data-availability-url="{{ route('api.v1.availability') }}" class="bg-surface rounded-xl border border-line p-6 sm:p-8 shadow-sm space-y-5">
         @csrf
         <input type="hidden" name="idempotency_key" value="{{ old('idempotency_key', $idempotencyKey) }}">
 
@@ -36,9 +36,8 @@
                 <option value="">-- Pilih Armada Siap Sewa --</option>
                 @foreach ($cars as $car)
                     <option value="{{ $car->id }}"
-                            data-price="{{ (int) $car->price_per_day }}"
                             @selected((int) old('car_id', $selectedCarId) === $car->id)>
-                        {{ $car->name }} ({{ $car->carType?->name ?? 'Mobil' }} &middot; Rp {{ number_format((float) $car->price_per_day, 0, ',', '.') }}/hari)
+                        {{ $car->name }} ({{ $car->carType?->name ?? 'Mobil' }})
                     </option>
                 @endforeach
             </select>
@@ -65,14 +64,16 @@
         </div>
 
         <div class="rounded-xl border border-info-line bg-info-surface p-4 text-xs text-info space-y-1">
-            <p class="font-bold">Ringkasan Jadwal &amp; Perkiraan Biaya</p>
-            <p id="booking-summary-text">
-                @if ($preview)
-                    Jadwal kembali: <strong>{{ $preview['return_at']->format('d M Y H:i') }} WIB</strong>
-                    &middot; Tarif: Rp {{ number_format($preview['daily_price'], 0, ',', '.') }}/hari
-                    &middot; Estimasi Total: <strong>Rp {{ number_format($preview['total_amount'], 0, ',', '.') }}</strong>
+            <p class="font-bold">Ketersediaan &amp; Estimasi Sewa</p>
+            <p role="status" data-availability-status>
+                @if ($preview && ! $preview['available'])
+                    Tidak tersedia pada periode yang dipilih.
+                @elseif ($preview)
+                    Jadwal kembali {{ $preview['return_at']->format('d M Y H:i') }} WIB
+                    · Tarif Rp {{ number_format($preview['daily_price'], 0, ',', '.') }}/hari
+                    · Total Rp {{ number_format($preview['total_amount'], 0, ',', '.') }}.
                 @else
-                    Pilih armada, waktu pengambilan, dan jumlah hari untuk menghitung batas kembali dan total biaya.
+                    Pilih kendaraan, waktu pengambilan, dan jumlah hari.
                 @endif
             </p>
             <p class="text-[11px]">Batas unggah bukti pembayaran transfer adalah 2 jam sejak pemesanan (tidak melewati waktu pengambilan).</p>
@@ -97,46 +98,11 @@
 
         <div class="flex items-center justify-end gap-3 pt-2">
             <a href="{{ route('cars.index') }}" class="rounded-lg px-4 py-2 text-xs font-semibold text-ink hover:bg-surface-hover">Batal</a>
-            <button type="submit" class="rounded-lg bg-action hover:bg-action-hover px-6 py-2.5 text-xs font-bold text-ink shadow-sm transition-colors">
+            <button type="submit" data-availability-submit @disabled(! $hasValidPaymentAccount) class="rounded-lg bg-action hover:bg-action-hover px-6 py-2.5 text-xs font-bold text-ink shadow-sm transition-colors disabled:opacity-60">
                 Buat Pemesanan Sekarang
             </button>
         </div>
     </form>
 </div>
 
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        const carSelect = document.getElementById('car_id');
-        const pickupInput = document.getElementById('pickup_at');
-        const daysInput = document.getElementById('total_days');
-        const summaryEl = document.getElementById('booking-summary-text');
-
-        function updateEstimate() {
-            const option = carSelect?.options[carSelect.selectedIndex];
-            const dailyPrice = Number(option?.dataset?.price || 0);
-            const days = parseInt(daysInput?.value || '0', 10);
-            const pickupRaw = pickupInput?.value;
-
-            if (!dailyPrice || !days || days < 1 || !pickupRaw) {
-                return;
-            }
-
-            const total = dailyPrice * days;
-            const pickupDate = new Date(pickupRaw);
-            let returnInfo = '';
-            if (!Number.isNaN(pickupDate.getTime())) {
-                const returnDate = new Date(pickupDate.getTime() + days * 24 * 60 * 60 * 1000);
-                returnInfo = 'Jadwal kembali: ' + returnDate.toLocaleString('id-ID', {
-                    day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
-                }) + ' WIB · ';
-            }
-
-            summaryEl.textContent = returnInfo + 'Tarif: Rp ' + dailyPrice.toLocaleString('id-ID') + '/hari · Total: Rp ' + total.toLocaleString('id-ID');
-        }
-
-        carSelect?.addEventListener('change', updateEstimate);
-        pickupInput?.addEventListener('input', updateEstimate);
-        daysInput?.addEventListener('input', updateEstimate);
-    });
-</script>
 @endsection

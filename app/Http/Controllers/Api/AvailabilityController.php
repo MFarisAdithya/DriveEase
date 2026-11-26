@@ -24,6 +24,7 @@ class AvailabilityController extends Controller
         $validator = Validator::make($request->query(), [
             'pickup_at' => ['required', 'date'],
             'total_days' => ['required', 'integer', 'min:1', 'max:'.RentalScheduleService::MAX_DAYS],
+            'car_id' => ['nullable', 'integer', 'min:1'],
             'search' => ['nullable', 'string', 'max:100'],
             'car_type_id' => ['nullable', 'integer', 'exists:car_types,id'],
             'transmission' => ['nullable', 'in:manual,automatic'],
@@ -57,7 +58,7 @@ class AvailabilityController extends Controller
 
         // Lepaskan pesanan belum dibayar yang kedaluwarsa sebelum memfilter ketersediaan,
         // lalu pakai query builder bersama availableCarsQuery() agar hasil API identik dengan web.
-        $scheduleService->releaseExpiredHolds();
+        $scheduleService->releaseExpiredHolds($validated['car_id'] ?? null);
 
         $cars = $scheduleService->availableCarsQuery(
             $pickupAt,
@@ -67,7 +68,11 @@ class AvailabilityController extends Controller
                 'car_type_id' => $validated['car_type_id'] ?? null,
                 'transmission' => $validated['transmission'] ?? null,
             ]
-        )->latest()->get();
+        )
+            // Pratinjau satu kendaraan memakai kueri yang sama dan tidak mengirim
+            // tarif kendaraan yang gagal melewati filter ketersediaan.
+            ->when(isset($validated['car_id']), fn ($query) => $query->whereKey($validated['car_id']))
+            ->latest()->get();
 
         return response()->json([
             'period' => [

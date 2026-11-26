@@ -138,19 +138,9 @@ class PublicCarController extends Controller
                 $pricing = $scheduleService->calculatePricing($car, $pickupAt, $totalDays);
                 $isAvailable = $scheduleService->isCarAvailableForPeriod($car, $pricing['pickup_at'], $pricing['return_at']);
 
-                $reason = null;
-                if (! $isAvailable) {
-                    $reason = $car->isInMaintenance()
-                        ? 'Unit sedang dalam perawatan dan belum dapat dipesan.'
-                        : ($car->isReadyForRental()
-                            ? 'Kendaraan tidak tersedia pada periode ini karena bentrok jadwal atau jeda persiapan 1 jam antarpenyewaan.'
-                            : 'Kendaraan saat ini belum siap untuk disewa.');
-                }
-
                 $periodCheck = [
                     'available' => $isAvailable,
-                    'reason' => $reason,
-                    'pricing' => $pricing,
+                    'pricing' => $isAvailable ? $pricing : null,
                 ];
             }
         }

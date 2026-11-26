@@ -99,7 +99,7 @@ class BookingController extends Controller
         $defaultDays = max(1, min(RentalScheduleService::MAX_DAYS, $request->integer('total_days', 1)));
 
         $preview = null;
-        if ($selectedCarId !== null) {
+        if ($selectedCarId !== null && ! $request->session()->hasOldInput()) {
             $selectedCar = $cars->firstWhere('id', $selectedCarId);
             if ($selectedCar !== null) {
                 try {
