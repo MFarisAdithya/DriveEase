@@ -39,8 +39,19 @@ class BookingController extends Controller
     {
         $user = $request->user();
 
+        // Simpan pilihan saja. Setelah unggah, formulir membaca ulang harga dan
+        // ketersediaan dari database, dan POST tetap memeriksa bentrok jadwal.
+        $request->session()->forget('booking.selection');
         // Pelanggan tanpa dokumen lengkap diarahkan ke halaman identitas (C-03).
         if (! $user->canMakeReservation()) {
+            if ($request->integer('car_id') > 0) {
+                $request->session()->put('booking.selection', [
+                    'car_id' => $request->integer('car_id'),
+                    'pickup_at' => is_string($request->query('pickup_at')) ? $request->query('pickup_at') : null,
+                    'total_days' => $request->integer('total_days', 1),
+                ]);
+            }
+
             return redirect()->route('customer.verification.create')
                 ->with('error', 'Lengkapi dokumen KTP dan SIM sebelum membuat pemesanan.');
         }

@@ -105,7 +105,7 @@ class AuthController extends Controller
         Auth::login($user);
         $request->session()->regenerate();
 
-        return redirect()->route('customer.dashboard')
+        return $this->redirectBasedOnRole($user)
             ->with('success', 'Pendaftaran berhasil! Selamat datang di DriveEase, '.$user->name.'.');
     }
 
@@ -129,6 +129,23 @@ class AuthController extends Controller
 
     protected function redirectBasedOnRole($user): RedirectResponse
     {
+        // Middleware auth menyimpan halaman yang diminta sebelum login. Hanya rute
+        // pemesanan lokal yang boleh dilanjutkan, termasuk setelah pendaftaran.
+        // Bangun ulang URL dari pilihan yang valid agar parameter lain tidak terbawa.
+        $intended = session()->pull('url.intended');
+        if ($user->isCustomer() && is_string($intended)
+            && strtok($intended, '?') === route('customer.bookings.create')) {
+            parse_str((string) parse_url($intended, PHP_URL_QUERY), $selection);
+            $validator = validator($selection, [
+                'car_id' => ['required', 'integer', 'min:1'],
+                'pickup_at' => ['required', 'date_format:Y-m-d\TH:i'],
+                'total_days' => ['required', 'integer', 'between:1,365'],
+            ]);
+            if ($validator->passes()) {
+                return redirect()->route('customer.bookings.create', $validator->validated());
+            }
+        }
+
         return match ($user->role?->name) {
             'admin' => redirect()->route('admin.dashboard'),
             'staff' => redirect()->route('staff.dashboard'),

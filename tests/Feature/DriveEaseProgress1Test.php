@@ -111,6 +111,26 @@ class DriveEaseProgress1Test extends TestCase
         $dashboardResponse->assertSee('id="pesanan"', false)->assertSee('Katalog mobil')->assertSee('Buat Pemesanan');
     }
 
+    public function test_registration_resumes_selected_car_through_identity_form(): void
+    {
+        $selection = ['car_id' => Car::firstOrFail()->id, 'pickup_at' => now()->addDays(3)->format('Y-m-d\TH:i'), 'total_days' => 2];
+        $booking = route('customer.bookings.create', $selection);
+        $this->get($booking)->assertRedirect(route('login'));
+        $this->post('/register', [
+            'name' => 'Pelanggan', 'email' => 'pilihan@example.test', 'phone' => '081234567890',
+            'password' => 'password123', 'password_confirmation' => 'password123',
+        ])->assertRedirect($booking);
+        $this->get($booking)->assertRedirect(route('customer.verification.create'))
+            ->assertSessionHas('booking.selection', $selection);
+    }
+
+    public function test_external_booking_destination_uses_customer_dashboard(): void
+    {
+        $this->withSession(['url.intended' => 'https://example.test/customer/bookings/create?car_id=1'])
+            ->post('/login', ['email' => $this->getCustomerUser()->email, 'password' => 'password123'])
+            ->assertRedirect(route('customer.dashboard'));
+    }
+
     /**
      * Test 6: Customer cannot access admin routes (HTTP 403).
      */

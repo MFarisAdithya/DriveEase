@@ -140,13 +140,13 @@
                                     @if (auth()->user()->canMakeReservation())
                                         <a data-availability-booking href="{{ route('customer.bookings.create', ['car_id' => $car->id, 'pickup_at' => request('pickup_at'), 'total_days' => request('total_days')]) }}" class="ui-button">Pesan Kendaraan Ini</a>
                                     @else
-                                        <a href="{{ route('customer.verification.create') }}" class="ui-button ui-secondary">Lengkapi Identitas untuk Memesan</a>
+                                        <a data-availability-booking href="{{ route('customer.bookings.create', ['car_id' => $car->id, 'pickup_at' => request('pickup_at'), 'total_days' => request('total_days')]) }}" class="ui-button">Lengkapi Identitas untuk Memesan</a>
                                     @endif
                                 @elseif (auth()->user()->isAdmin())
                                     <a data-availability-booking href="{{ route('admin.bookings.create', ['car_id' => $car->id, 'pickup_at' => request('pickup_at'), 'total_days' => request('total_days')]) }}" class="ui-button">Buat Pemesanan Langsung</a>
                                 @endif
                             @else
-                                <a href="{{ route('login') }}" class="ui-button">Masuk untuk Memesan</a>
+                                <a data-availability-booking href="{{ route('customer.bookings.create', ['car_id' => $car->id, 'pickup_at' => request('pickup_at'), 'total_days' => request('total_days')]) }}" class="ui-button">Masuk untuk Memesan</a>
                             @endauth
                         </div>
                     </div>

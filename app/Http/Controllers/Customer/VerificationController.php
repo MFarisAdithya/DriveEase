@@ -107,7 +107,10 @@ class VerificationController extends Controller
             return back()->withInput()->with('error', 'Dokumen belum dapat disimpan. Data sebelumnya tetap aman. Silakan coba kembali.');
         }
 
-        return redirect()->route('customer.dashboard')
-            ->with('success', 'Dokumen identitas berhasil dikirim dan sedang menunggu verifikasi dari tim admin.');
+        // pull() mengambil pilihan sekali setelah penyimpanan dokumen berhasil.
+        $selection = $request->session()->pull('booking.selection');
+        $next = $selection ? redirect()->route('customer.bookings.create', $selection) : redirect()->route('customer.dashboard');
+
+        return $next->with('success', 'Dokumen identitas berhasil dikirim dan sedang menunggu verifikasi dari tim admin.');
     }
 }
