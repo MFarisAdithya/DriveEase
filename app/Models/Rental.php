@@ -559,7 +559,9 @@ class Rental extends Model
     {
         return $this->rental_status === self::STATUS_PENDING
             && $this->payment_status === self::PAYMENT_UNPAID
-            && $this->payment_proof === null;
+            && $this->payment_proof === null
+            && ! $this->isPaymentExpired()
+            && ! $this->isIdentityExpired(now('Asia/Jakarta'));
     }
 
     /**

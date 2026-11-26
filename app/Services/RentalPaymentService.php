@@ -50,6 +50,9 @@ class RentalPaymentService
                 $this->scheduleService->releaseExpiredHolds($rental->car_id, $nowWib);
 
                 $lockedRental = Rental::query()->lockForUpdate()->findOrFail($rental->id);
+                if ($lockedRental->car_id !== $rental->car_id) {
+                    throw ValidationException::withMessages(['payment_proof' => 'Unit pesanan baru berubah. Muat ulang lalu kirim bukti kembali.']);
+                }
 
                 if ($lockedRental->rental_status !== Rental::STATUS_PENDING) {
                     throw ValidationException::withMessages([
@@ -155,6 +158,11 @@ class RentalPaymentService
             Car::query()->lockForUpdate()->findOrFail($carId);
             $this->scheduleService->releaseExpiredHolds($carId, $nowWib);
             $lockedRental = Rental::query()->lockForUpdate()->findOrFail($payment->rental_id);
+            // Perubahan jadwal dapat memindahkan unit sebelum lock kendaraan
+            // didapat. Tolak permintaan yang memakai unit lama untuk percobaan ulang.
+            if ($lockedRental->car_id !== $carId) {
+                throw ValidationException::withMessages(['payment' => 'Unit pesanan baru berubah. Muat ulang dan periksa bukti kembali.']);
+            }
             $lockedPayment = RentalPayment::query()->lockForUpdate()->findOrFail($payment->id);
 
             if (! $lockedPayment->isPendingApproval()) {
@@ -295,6 +303,11 @@ class RentalPaymentService
             Car::query()->lockForUpdate()->findOrFail($carId);
             $this->scheduleService->releaseExpiredHolds($carId, $nowWib);
             $lockedRental = Rental::query()->lockForUpdate()->findOrFail($payment->rental_id);
+            // Perubahan jadwal dapat memindahkan unit sebelum lock kendaraan
+            // didapat. Tolak permintaan yang memakai unit lama untuk percobaan ulang.
+            if ($lockedRental->car_id !== $carId) {
+                throw ValidationException::withMessages(['payment' => 'Unit pesanan baru berubah. Muat ulang dan periksa bukti kembali.']);
+            }
             $lockedPayment = RentalPayment::query()->lockForUpdate()->findOrFail($payment->id);
 
             if (! $lockedPayment->isPendingApproval()) {

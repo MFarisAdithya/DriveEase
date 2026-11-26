@@ -190,6 +190,12 @@ class RentalFinancialService
                 ]);
             }
 
+            // Permintaan langsung tidak boleh mengganti alasan yang sudah
+            // ditentukan oleh tenggat identitas atau pembayaran.
+            if ($lockedRental->isPaymentExpired($nowWib) || $lockedRental->isIdentityExpired($nowWib)) {
+                throw ValidationException::withMessages(['rental_status' => 'Tenggat telah terlewati. Buka ulang detail untuk melihat status terbaru.']);
+            }
+
             if ($lockedRental->canBeCancelledUnpaid() && (float) $lockedRental->paid_amount <= 0) {
                 throw ValidationException::withMessages([
                     'rental_status' => 'Pesanan belum dibayar dapat dibatalkan langsung tanpa persetujuan admin.',
@@ -264,6 +270,12 @@ class RentalFinancialService
                 throw ValidationException::withMessages([
                     'rental_status' => 'Hanya pesanan berstatus menunggu atau terkonfirmasi yang dapat dibatalkan.',
                 ]);
+            }
+
+            // Permintaan langsung tidak boleh mengganti alasan yang sudah
+            // ditentukan oleh tenggat identitas atau pembayaran.
+            if ($lockedRental->isPaymentExpired($nowWib) || $lockedRental->isIdentityExpired($nowWib)) {
+                throw ValidationException::withMessages(['rental_status' => 'Tenggat telah terlewati. Buka ulang detail untuk melihat status terbaru.']);
             }
 
             if ($lockedRental->review_followup_at !== null && $cancellationType === Rental::CANCEL_CUSTOMER

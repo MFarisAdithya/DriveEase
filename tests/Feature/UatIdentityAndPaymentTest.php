@@ -134,6 +134,32 @@ class UatIdentityAndPaymentTest extends TestCase
         $this->assertEquals($rental->total_amount, $rental->fresh()->refund_amount);
     }
 
+    public function test_repeated_payment_rejection_keeps_first_repair_deadline(): void
+    {
+        [$admin, $customer, $car] = $this->prepare();
+        $rental = $this->book($customer, $car, now('Asia/Jakarta')->addDay());
+        $upload = route('customer.bookings.payments.store', $rental);
+
+        for ($attempt = 1; $attempt <= 2; $attempt++) {
+            $this->actingAs($customer)->post($upload, [
+                'payment_proof' => UploadedFile::fake()->image('proof.jpg'),
+            ])->assertSessionHasNoErrors();
+            $this->actingAs($admin)->patch(route('admin.payments.reject', $rental->payments()->latest('id')->firstOrFail()), [
+                'rejection_reason' => 'Bukti tidak dapat dicocokkan.',
+                'received_amount' => 0,
+            ])->assertSessionHasNoErrors();
+            $this->assertSame('10:00', $rental->fresh()->payment_deadline_at->format('H:i'));
+            $this->travel(15)->minutes();
+        }
+
+        $this->travelTo($rental->fresh()->payment_deadline_at);
+        $this->actingAs($customer)->post($upload, [
+            'payment_proof' => UploadedFile::fake()->image('late.jpg'),
+        ])->assertSessionHasErrors('payment_proof');
+        app(RentalScheduleService::class)->releaseExpiredHolds($car->id);
+        $this->assertSame(Rental::STATUS_EXPIRED, $rental->fresh()->rental_status);
+    }
+
     public function test_equal_expiry_uses_identity_reason_but_earlier_payment_expiry_keeps_payment_reason(): void
     {
         [$admin, $customer, $car] = $this->prepare();
@@ -144,6 +170,10 @@ class UatIdentityAndPaymentTest extends TestCase
         ])->assertSessionHas('success');
 
         $this->travelTo($same->pickup_at);
+        $this->patch(route('admin.bookings.cancel-with-refund', $same), [
+            'cancellation_type' => Rental::CANCEL_RENTAL_FAULT,
+            'cancellation_reason' => 'Percobaan mengganti alasan yang sudah jatuh tempo.',
+        ])->assertSessionHasErrors('rental_status');
         app(RentalScheduleService::class)->releaseExpiredHolds($car->id);
         $this->assertSame(Rental::CANCEL_IDENTITY, $same->fresh()->cancellation_type);
         $this->assertSame(Rental::CANCEL_PAYMENT_EXPIRED, $later->fresh()->cancellation_type);

@@ -227,8 +227,10 @@ class RentalReportService
             ? CarbonImmutable::instance($nowWib)->timezone(RentalScheduleService::TIMEZONE)
             : CarbonImmutable::now(RentalScheduleService::TIMEZONE);
 
+        // Bukti pada pesanan terminal masih perlu diperiksa sebelum refund.
+        $reviewableStatuses = [Rental::STATUS_PENDING, Rental::STATUS_CANCELLED, Rental::STATUS_EXPIRED];
         $pendingMainPayments = Rental::query()
-            ->where('rental_status', Rental::STATUS_PENDING)
+            ->whereIn('rental_status', $reviewableStatuses)
             ->where('payment_status', Rental::PAYMENT_PENDING_APPROVAL)
             ->count();
 
@@ -263,11 +265,12 @@ class RentalReportService
 
         $actionableBookings = Rental::query()
             ->with(['user', 'car', 'extensions', 'changeRequests'])
-            ->where(function ($query): void {
-                $query->where(function ($pq): void {
-                    $pq->where('rental_status', Rental::STATUS_PENDING)
+            ->where(function ($query) use ($reviewableStatuses): void {
+                $query->where(function ($pq) use ($reviewableStatuses): void {
+                    $pq->whereIn('rental_status', $reviewableStatuses)
                         ->where('payment_status', Rental::PAYMENT_PENDING_APPROVAL);
                 })
+                    ->orWhere(fn ($review) => $review->where('rental_status', Rental::STATUS_PENDING)->whereNotNull('review_followup_at'))
                     ->orWhere('refund_status', Rental::REFUND_PENDING)
                     ->orWhere('rental_status', Rental::STATUS_RETURNED)
                     ->orWhere(function ($cq): void {
