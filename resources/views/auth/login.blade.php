@@ -82,7 +82,7 @@
                 <!-- Submit Button -->
                 <div class="pt-2">
                     <button type="submit" class="w-full py-2.5 px-4 bg-action hover:bg-action-hover text-ink font-semibold text-sm rounded-lg shadow-sm hover:shadow transition-colors">
-                        Masuk ke Dasbor
+                        Masuk
                     </button>
                 </div>
             </form>
