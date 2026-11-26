@@ -1,7 +1,7 @@
 @extends('layouts.admin')
 
-@section('title', 'Laporan Keuangan Berbasis Kas - DriveEase Admin')
-@section('page_title', 'Laporan Transaksi & Arus Kas Rental (Berbasis Kas)')
+@section('title', 'Laporan Keuangan - DriveEase Admin')
+@section('page_title', 'Laporan Transaksi & Arus Kas Rental')
 
 @section('content')
 <div class="space-y-6">
