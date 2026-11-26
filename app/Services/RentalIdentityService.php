@@ -80,7 +80,7 @@ class RentalIdentityService
                 // perbaikan tidak memulai enam jam lagi, meski pesanan berbeda jadwalnya.
                 $rental->identity_deadline_at ??= $fullWindow->min($rental->pickup_at);
                 $late = $rental->identity_deadline_at->lte($now)
-                    || ($rental->identity_deadline_at->lt($fullWindow)
+                    || ($rental->identity_deadline_at->equalTo($rental->pickup_at)
                         && RentalScheduleService::reviewOverdue($locked->identity_submitted_at, $now));
 
                 $rental->identity_status = $late ? Rental::IDENTITY_FOLLOWUP : Rental::IDENTITY_REJECTED;

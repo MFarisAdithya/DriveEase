@@ -43,6 +43,7 @@ class DashboardController extends Controller
             'active_bookings' => Rental::holdingSchedule()->count(),
             'overdue_trips' => $overdueTripsCount,
             'impacted_bookings' => $impactedNextBookings->count(),
+            'review_followups' => Rental::query()->needsReviewFollowup()->count(),
             'pending_payments' => $reportMetrics['pending_payments'],
             'pending_refunds_count' => $reportMetrics['pending_refunds_count'],
             'pending_extensions' => $reportMetrics['pending_extensions'],

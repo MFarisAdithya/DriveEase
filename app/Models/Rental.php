@@ -356,6 +356,15 @@ class Rental extends Model
             });
     }
 
+    #[Scope]
+    protected function needsReviewFollowup(Builder $query): void
+    {
+        // Antrean adalah pekerjaan admin, terpisah dari scope holdingSchedule().
+        // Pesanan yang periodenya berakhir masih perlu penjadwalan ulang atau refund.
+        $query->whereIn('rental_status', [self::STATUS_PENDING, self::STATUS_CONFIRMED])
+            ->whereNotNull('review_followup_at');
+    }
+
     /**
      * Panggil setelah mengunci baris Rental. Pembayaran dan verifikasi identitas
      * dapat menyimpan hasilnya sendiri, tetapi hanya hasil lengkap mengubah status sewa.

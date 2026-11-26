@@ -1,0 +1,164 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Car;
+use App\Models\Rental;
+use App\Models\RentalChangeRequest;
+use App\Models\RentalSetting;
+use App\Models\Role;
+use App\Models\User;
+use Carbon\CarbonInterface;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Http\UploadedFile;
+use Tests\TestCase;
+
+class WalkInLifecycleTest extends TestCase
+{
+    use DatabaseTransactions;
+
+    public function test_late_identity_rejection_gets_one_new_window_after_manual_reschedule(): void
+    {
+        [$admin, $staff, $customer, $car] = $this->prepare();
+        $rental = $this->book($customer, $car, now('Asia/Jakarta')->addHours(2));
+        $this->uploadMainProof($rental);
+
+        $this->travelTo($rental->pickup_at);
+        $this->patch(route('admin.verifications.reject', $customer), [
+            'rejection_reason' => 'Dokumen belum bisa dibaca.',
+        ])->assertSessionHas('success');
+
+        // Saat penahanan berakhir, pesanan harus tetap ada pada daftar tindak lanjut.
+        $this->travelTo($rental->return_at);
+        $this->assertFalse($rental->fresh()->isHoldingSchedule());
+        $this->get(route('admin.bookings.index', ['filter' => 'review_followup']))
+            ->assertOk()->assertSee($rental->rental_code);
+        $this->get(route('admin.dashboard'))->assertOk()->assertSee('tindak lanjut pemeriksaan');
+
+        $pickup = now('Asia/Jakarta')->addHours(4);
+        $change = $this->propose($rental, $pickup);
+        $response = route('admin.change-requests.walk-in-response', $change);
+        $this->actingAs($staff)->patch($response, $this->confirmation())->assertForbidden();
+        $this->actingAs($admin)->patch($response, ['decision' => 'approve'])->assertSessionHasErrors('confirmation_method');
+        $this->patch($response, $this->confirmation() + ['decision' => 'approve'])->assertSessionHas('success');
+        $this->patch($response, $this->confirmation() + ['decision' => 'approve'])->assertSessionHasErrors('decision');
+
+        $rental->refresh();
+        $this->assertSame(Rental::IDENTITY_REJECTED, $rental->identity_status);
+        $this->assertTrue($pickup->equalTo($rental->identity_deadline_at));
+        $this->assertTrue($rental->isHoldingSchedule());
+        $this->assertNull($rental->review_followup_at);
+        $history = $rental->histories()->where('action', 'change_approved')->sole();
+        $this->assertSame($admin->id, $history->actor_id);
+        $this->assertSame('phone', $history->metadata['confirmation_method']);
+
+        $this->patch(route('admin.verifications.correct-walk-in', $customer), [
+            'ktp_image' => UploadedFile::fake()->image('corrected.jpg'),
+        ])->assertSessionHas('success');
+        $this->patch(route('admin.verifications.reject', $customer), [
+            'rejection_reason' => 'Foto perbaikan belum jelas.',
+        ])->assertSessionHas('success');
+        $this->assertTrue($pickup->equalTo($rental->fresh()->identity_deadline_at));
+        $this->assertSame(Rental::IDENTITY_REJECTED, $rental->fresh()->identity_status);
+    }
+
+    public function test_manual_response_cannot_override_online_customer_and_checks_conflicts_again(): void
+    {
+        [$admin, , $customer, $car] = $this->prepare();
+        $rental = $this->book($customer, $car, now('Asia/Jakarta')->addDays(2));
+        $pickup = now('Asia/Jakarta')->addDays(5);
+        $change = $this->propose($rental, $pickup);
+
+        // Unit belum diblokir oleh usulan. Pesanan lain yang sah bisa masuk
+        // sebelum persetujuan; server wajib mengecek ulang dan tidak mengubah jadwal.
+        $other = $this->book($customer, $car, $pickup);
+        $this->patch(route('admin.change-requests.walk-in-response', $change), $this->confirmation() + [
+            'decision' => 'approve',
+        ])->assertSessionHasErrors('decision');
+        $this->assertSame(RentalChangeRequest::STATUS_PENDING_CUSTOMER, $change->fresh()->status);
+        $this->assertFalse($pickup->equalTo($rental->fresh()->pickup_at));
+        $this->assertTrue($other->fresh()->isHoldingSchedule());
+
+        $online = User::factory()->for(Role::where('name', 'customer')->sole())->create(['verification_status' => 'verified']);
+        $this->actingAs($online)->post(route('customer.bookings.store'), [
+            'car_id' => $car->id, 'pickup_at' => $pickup->copy()->addDays(3)->format('Y-m-d\TH:i'),
+            'total_days' => 1, 'accept_terms' => '1',
+        ])->assertSessionHasNoErrors();
+        $onlineRental = $online->rentals()->sole();
+        $this->actingAs($admin);
+        $onlineChange = $this->propose($onlineRental, $pickup->copy()->addDays(6));
+        $this->patch(route('admin.change-requests.walk-in-response', $onlineChange), $this->confirmation() + [
+            'decision' => 'approve',
+        ])->assertForbidden();
+        $this->actingAs($online)->patch(route('customer.change-requests.respond', $onlineChange), [
+            'decision' => 'approve',
+        ])->assertSessionHasNoErrors();
+    }
+
+    /** @return array{User, User, User, Car} */
+    private function prepare(): array
+    {
+        $this->travelTo(now('Asia/Jakarta')->setTime(9, 0));
+        RentalSetting::updateOrCreate(['id' => 1], [
+            'bank_name' => 'Bank Uji',
+            'account_number' => '123456789',
+            'account_holder' => 'DriveEase Uji',
+        ] + (array) RentalSetting::defaultPublicInfo());
+        $admin = User::factory()->for(Role::where('name', 'admin')->sole())->create();
+        $staff = User::factory()->for(Role::where('name', 'staff')->sole())->create();
+        $response = $this->actingAs($admin)->post(route('admin.bookings.register-customer'), [
+            'name' => 'Penyewa Walk-in Uji',
+            'phone' => '081234567899',
+            'ktp_number' => '3578012304950001',
+            'sim_number' => '12345678901234',
+            'ktp_image' => UploadedFile::fake()->image('ktp.jpg'),
+            'sim_image' => UploadedFile::fake()->image('sim.png'),
+        ]);
+        $customer = User::where('name', 'Penyewa Walk-in Uji')->latest('id')->firstOrFail();
+        $response->assertRedirect(route('admin.verifications.show', $customer));
+        $this->assertNull($customer->email);
+        $this->assertNull($customer->password);
+
+        return [$admin, $staff, $customer, Car::bookableForSchedule()->firstOrFail()];
+    }
+
+    private function book(User $customer, Car $car, CarbonInterface $pickup): Rental
+    {
+        $this->post(route('admin.bookings.store'), [
+            'customer_id' => $customer->id,
+            'confirmation_method' => 'in_person',
+            'car_id' => $car->id,
+            'pickup_at' => $pickup->format('Y-m-d\TH:i'),
+            'total_days' => 1,
+            'accept_terms' => '1',
+        ])->assertSessionHasNoErrors();
+
+        return $customer->rentals()->latest('id')->firstOrFail();
+    }
+
+    private function uploadMainProof(Rental $rental): void
+    {
+        $this->post(route('admin.bookings.payments.store', $rental), [
+            'payment_proof' => UploadedFile::fake()->image('main.jpg'),
+        ])->assertSessionHasNoErrors();
+    }
+
+    private function propose(Rental $rental, CarbonInterface $pickup, ?Car $replacement = null): RentalChangeRequest
+    {
+        $this->post(route('admin.bookings.change-requests.propose', $rental), [
+            'request_type' => $replacement ? 'car_replacement' : 'reschedule',
+            'proposed_car_id' => $replacement?->id,
+            'proposed_pickup_at' => $pickup->format('Y-m-d\TH:i'),
+            'waive_price_difference' => '1',
+            'reason' => 'Perubahan jadwal atau unit disampaikan kepada penyewa.',
+        ])->assertSessionHasNoErrors();
+
+        return $rental->changeRequests()->latest('id')->firstOrFail();
+    }
+
+    /** @return array{confirmation_method: string, confirmed_at: string} */
+    private function confirmation(): array
+    {
+        return ['confirmation_method' => 'phone', 'confirmed_at' => now('Asia/Jakarta')->format('Y-m-d\TH:i')];
+    }
+}

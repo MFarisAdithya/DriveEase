@@ -124,6 +124,7 @@
             <span class="text-xs font-semibold uppercase tracking-wider text-muted">Sewa Aktif &amp; Terjadwal</span>
             <p class="text-2xl font-bold text-ink mt-2">{{ $stats['active_bookings'] ?? 0 }}</p>
             <p class="text-xs text-muted mt-1">{{ $stats['pending_payments'] ?? 0 }} pembayaran menunggu verifikasi</p>
+            <a href="{{ route('admin.bookings.index', ['filter' => 'review_followup']) }}" class="text-xs font-semibold text-link underline">{{ $stats['review_followups'] ?? 0 }} tindak lanjut pemeriksaan</a>
         </a>
         <a href="{{ route('admin.bookings.index') }}" class="bg-surface rounded-xl p-5 border border-line shadow-sm hover:border-warning-line transition-colors block">
             <span class="text-xs font-semibold uppercase tracking-wider text-warning">Antrean Perubahan &amp; Refund</span>

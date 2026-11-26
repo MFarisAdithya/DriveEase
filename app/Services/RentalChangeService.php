@@ -303,7 +303,7 @@ class RentalChangeService
      *
      * @throws ValidationException
      */
-    public function respond(RentalChangeRequest $changeRequest, User $actor, string $decision, ?string $notes = null): RentalChangeRequest
+    public function respond(RentalChangeRequest $changeRequest, User $actor, string $decision, ?string $notes = null, ?WalkInConfirmation $confirmation = null): RentalChangeRequest
     {
         if (! in_array($decision, ['approve', 'reject'], true)) {
             throw ValidationException::withMessages([
@@ -320,7 +320,7 @@ class RentalChangeService
 
         $nowWib = CarbonImmutable::now(RentalScheduleService::TIMEZONE);
 
-        return DB::transaction(function () use ($changeRequest, $actor, $decision, $trimmedNotes, $nowWib): RentalChangeRequest {
+        return DB::transaction(function () use ($changeRequest, $actor, $decision, $trimmedNotes, $nowWib, $confirmation): RentalChangeRequest {
             // Muat car_id awal terlebih dahulu lalu kunci Car (urutan ID menaik) -> Rental -> RentalChangeRequest
             // agar urutan penguncian database konsisten di seluruh layanan transaksi (bebas deadlock).
             $initialRental = Rental::query()->findOrFail($changeRequest->rental_id);
@@ -336,6 +336,21 @@ class RentalChangeService
             $lockedRental = Rental::query()->lockForUpdate()->findOrFail($changeRequest->rental_id);
             $lockedRequest = RentalChangeRequest::query()->lockForUpdate()->findOrFail($changeRequest->id);
 
+            if (! in_array($lockedRental->car_id, $carIdsToLock, true)) {
+                throw ValidationException::withMessages(['decision' => 'Unit pesanan berubah. Muat ulang sebelum mencatat keputusan.']);
+            }
+
+            // Persetujuan manual hanya berlaku untuk usulan admin pada walk-in.
+            // Pelaku histori tetap admin yang mencatat, bukan akun penyewa.
+            if ($confirmation !== null && (! $actor->isAdmin()
+                || $lockedRental->booking_channel !== Rental::CHANNEL_WALK_IN
+                || $lockedRequest->status !== RentalChangeRequest::STATUS_PENDING_CUSTOMER)) {
+                throw ValidationException::withMessages(['decision' => 'Konfirmasi manual hanya tersedia untuk usulan walk-in yang masih menunggu jawaban.']);
+            }
+            if ($confirmation !== null && $confirmation->occurredAt()->lt($lockedRequest->created_at)) {
+                throw ValidationException::withMessages(['confirmed_at' => 'Waktu jawaban tidak boleh mendahului usulan.']);
+            }
+
             if ($lockedRequest->status === RentalChangeRequest::STATUS_PENDING_ADMIN) {
                 if (! $actor->isAdmin()) {
                     throw ValidationException::withMessages([
@@ -343,7 +358,7 @@ class RentalChangeService
                     ]);
                 }
             } elseif ($lockedRequest->status === RentalChangeRequest::STATUS_PENDING_CUSTOMER) {
-                if ($lockedRental->user_id !== $actor->id) {
+                if ($lockedRental->user_id !== $actor->id && $confirmation === null) {
                     throw ValidationException::withMessages([
                         'decision' => 'Hanya pelanggan pemilik pesanan yang dapat menyetujui atau menolak usulan admin.',
                     ]);
@@ -375,7 +390,7 @@ class RentalChangeService
                     [
                         'change_request_id' => $lockedRequest->id,
                         'request_type' => $lockedRequest->request_type,
-                    ]
+                    ] + ($confirmation?->metadata() ?? [])
                 );
 
                 return $lockedRequest->refresh();
@@ -390,7 +405,7 @@ class RentalChangeService
 
             $targetCarId = (int) ($lockedRequest->proposed_car_id ?: $lockedRental->car_id);
             if (! in_array($targetCarId, $carIdsToLock, true)) {
-                Car::query()->whereKey($targetCarId)->lockForUpdate()->get();
+                throw ValidationException::withMessages(['decision' => 'Unit usulan berubah. Muat ulang sebelum mencatat keputusan.']);
             }
 
             $targetCar = Car::query()->find($targetCarId);
@@ -440,11 +455,20 @@ class RentalChangeService
                 }
             }
 
-            // Persetujuan jadwal baru mengganti masa penahanan yang tertunda.
-            // Hanya bukti yang diblokir karena kendala admin mendapat tenggat baru;
-            // unggah ulang biasa tidak pernah memulai ulang tenggat.
+            $previousIdentityDeadline = $lockedRental->identity_deadline_at;
+            // Jadwal baru yang disetujui membuka kesempatan perbaikan hanya
+            // jika pemeriksaan admin menyebabkan kesempatan awal hilang. Tenggat
+            // penolakan biasa tidak diperpanjang oleh usulan atau unggah ulang.
             if ($lockedRental->review_followup_at !== null && $proposedPickupAt->ne($lockedRental->pickup_at)) {
                 $lockedRental->review_followup_at = null;
+                if ($lockedRental->identity_status === Rental::IDENTITY_FOLLOWUP
+                    || ($lockedRental->identity_status === Rental::IDENTITY_PENDING
+                        && $previousIdentityDeadline?->lte($nowWib))) {
+                    $lockedRental->identity_deadline_at = $nowWib->addHours(6)->min($proposedPickupAt);
+                    if ($lockedRental->identity_status === Rental::IDENTITY_FOLLOWUP) {
+                        $lockedRental->identity_status = Rental::IDENTITY_REJECTED;
+                    }
+                }
                 if ($lockedRental->payment_review_blocked) {
                     $newDeadline = $nowWib->addHour()->min($proposedPickupAt);
                     $lockedRental->payment_review_blocked = false;
@@ -486,6 +510,8 @@ class RentalChangeService
                     'change_request_id' => $lockedRequest->id,
                     'request_type' => $lockedRequest->request_type,
                     'waive_price_difference' => $lockedRequest->waive_price_difference,
+                    'previous_identity_deadline_at' => $previousIdentityDeadline?->toIso8601String(),
+                    'identity_deadline_at' => $lockedRental->identity_deadline_at?->toIso8601String(),
                     'before' => $previousSnapshot,
                     'after' => [
                         'car_id' => $targetCar->id,
@@ -494,7 +520,7 @@ class RentalChangeService
                         'total_days' => $proposedTotalDays,
                         'total_amount' => (float) $lockedRequest->proposed_total_amount,
                     ],
-                ]
+                ] + ($confirmation?->metadata() ?? [])
             );
 
             return $lockedRequest->refresh();

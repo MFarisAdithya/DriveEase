@@ -9,6 +9,7 @@ use App\Models\RentalExtension;
 use App\Services\RentalChangeService;
 use App\Services\RentalExtensionService;
 use App\Services\RentalScheduleService;
+use App\Services\WalkInConfirmation;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -65,6 +66,25 @@ class BookingChangeController extends Controller
         return redirect()
             ->route('admin.bookings.show', $changeRequest->rental_id)
             ->with('success', $message);
+    }
+
+    public function recordWalkInResponse(Request $request, RentalChangeRequest $changeRequest): RedirectResponse
+    {
+        abort_unless($changeRequest->rental?->booking_channel === Rental::CHANNEL_WALK_IN, 403);
+        $validated = $request->validate([
+            'decision' => ['required', 'in:approve,reject'],
+            'response_notes' => ['nullable', 'required_if:decision,reject', 'string', 'max:500'],
+        ]);
+        $this->changeService->respond(
+            $changeRequest,
+            $request->user(),
+            $validated['decision'],
+            $validated['response_notes'] ?? null,
+            WalkInConfirmation::fromInput($request->only('confirmation_method', 'confirmed_at')),
+        );
+
+        return redirect()->route('admin.bookings.show', $changeRequest->rental_id)
+            ->with('success', 'Jawaban penyewa walk-in berhasil dicatat.');
     }
 
     /**

@@ -24,7 +24,7 @@
         </div>
     @endif
 
-    @if ($rental->rental_status === \App\Models\Rental::STATUS_PENDING && $rental->review_followup_at)
+    @if (in_array($rental->rental_status, [\App\Models\Rental::STATUS_PENDING, \App\Models\Rental::STATUS_CONFIRMED], true) && $rental->review_followup_at)
         <div role="alert" class="rounded-xl border border-warning-line bg-warning-surface p-4 text-xs text-warning">
             Hubungi pelanggan segera untuk menyelesaikan pemeriksaan, menawarkan jadwal baru dengan persetujuan, atau membatalkan dengan refund penuh. Jangan gunakan status tidak hadir.
             <form method="POST" action="{{ route('admin.bookings.review-contact', $rental) }}" class="mt-3 grid gap-2 sm:grid-cols-2">
@@ -291,6 +291,23 @@
                                     </button>
                                 </form>
                             </div>
+                        @elseif ($rental->booking_channel === \App\Models\Rental::CHANNEL_WALK_IN && $changeRequest->status === \App\Models\RentalChangeRequest::STATUS_PENDING_CUSTOMER)
+                            <form method="POST" action="{{ route('admin.change-requests.walk-in-response', $changeRequest) }}" class="grid gap-2 border-t border-line pt-3 sm:grid-cols-2">
+                                @csrf
+                                @method('PATCH')
+                                @include('admin.bookings.confirmation-fields')
+                                <label>Jawaban penyewa
+                                    <select name="decision" required class="mt-1 block w-full rounded border border-field-line p-2">
+                                        <option value="">Pilih jawaban</option>
+                                        <option value="approve">Setuju</option>
+                                        <option value="reject">Menolak</option>
+                                    </select>
+                                </label>
+                                <label>Catatan jawaban (wajib jika menolak)
+                                    <input name="response_notes" maxlength="500" class="mt-1 block w-full rounded border border-field-line p-2">
+                                </label>
+                                <div class="flex justify-end sm:col-span-2"><button class="rounded-lg bg-action px-4 py-2 font-bold">Catat Jawaban Penyewa</button></div>
+                            </form>
                         @endif
                     </div>
                 @endforeach
@@ -336,7 +353,7 @@
                         </label>
                         <div>
                             <button type="submit" class="rounded-lg bg-action hover:bg-action-hover px-4 py-2 font-bold text-ink">
-                                Kirim Usulan ke Pelanggan
+                                {{ $rental->booking_channel === \App\Models\Rental::CHANNEL_WALK_IN ? 'Simpan Usulan untuk Dikonfirmasi' : 'Kirim Usulan ke Pelanggan' }}
                             </button>
                         </div>
                     </form>

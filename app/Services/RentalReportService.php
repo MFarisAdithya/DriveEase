@@ -270,7 +270,7 @@ class RentalReportService
                     $pq->whereIn('rental_status', $reviewableStatuses)
                         ->where('payment_status', Rental::PAYMENT_PENDING_APPROVAL);
                 })
-                    ->orWhere(fn ($review) => $review->where('rental_status', Rental::STATUS_PENDING)->whereNotNull('review_followup_at'))
+                    ->orWhere(fn ($review) => $review->needsReviewFollowup())
                     ->orWhere('refund_status', Rental::REFUND_PENDING)
                     ->orWhere('rental_status', Rental::STATUS_RETURNED)
                     ->orWhere(function ($cq): void {

@@ -84,7 +84,7 @@ class BookingController extends Controller
                 ->whereNotNull('payment_submitted_at')
                 ->where('payment_submitted_at', '<=', RentalScheduleService::reviewCutoff(now('Asia/Jakarta'))->format('Y-m-d H:i:s'));
         } elseif ($activeFilter === 'review_followup') {
-            $query->where('rental_status', Rental::STATUS_PENDING)->whereNotNull('review_followup_at');
+            $query->needsReviewFollowup();
         } elseif ($activeFilter === 'pending_changes') {
             $query->whereHas('changeRequests', function ($cq): void {
                 $cq->whereIn('status', ['pending_admin', 'pending_customer']);
