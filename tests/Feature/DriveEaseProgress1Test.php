@@ -108,7 +108,7 @@ class DriveEaseProgress1Test extends TestCase
 
         $dashboardResponse = $this->actingAs($customer)->get('/customer/dashboard');
         $dashboardResponse->assertStatus(200);
-        $dashboardResponse->assertSee('Armada Siap Disewa');
+        $dashboardResponse->assertSee('id="pesanan"', false)->assertSee('Katalog mobil')->assertSee('Buat Pemesanan');
     }
 
     /**
