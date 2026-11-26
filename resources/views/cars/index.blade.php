@@ -39,7 +39,7 @@
             <label class="ui-label" for="car-total-days">Hari</label>
             <input id="car-total-days" name="total_days" type="number" min="1" max="365" value="{{ request('total_days') }}" placeholder="1" class="ui-field">
         </div>
-        <button class="ui-button col-span-2 lg:col-span-2">Cari mobil</button>
+        <button class="ui-button col-span-2 justify-self-end lg:col-span-2">Cari mobil</button>
     </form>
 
     <p role="status" data-catalog-status class="text-sm text-muted"></p>

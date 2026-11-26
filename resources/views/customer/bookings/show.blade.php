@@ -122,7 +122,7 @@
             <div class="rounded-xl border border-success-line bg-success-surface p-5 text-xs space-y-2">
                 <div class="flex flex-wrap items-center justify-between gap-2">
                     <h2 class="text-sm font-bold text-success">{{ in_array($rental->rental_status, ['pending', 'cancelled', 'expired'], true) ? 'Bukti Pembayaran Diterima' : 'Bukti Transaksi Terkonfirmasi' }}</h2>
-                    <button type="button" onclick="window.print()" class="rounded-lg border border-success-line bg-surface px-3 py-1.5 font-semibold text-ink hover:bg-surface-hover print:hidden">
+                    <button type="button" onclick="window.print()" class="ml-auto rounded-lg border border-success-line bg-surface px-3 py-1.5 font-semibold text-ink hover:bg-surface-hover print:hidden">
                         Cetak Bukti Transaksi
                     </button>
                 </div>
@@ -218,9 +218,11 @@
                     <label for="cancellation_request_reason" class="block text-xs font-semibold text-ink mb-1">Alasan Pengajuan Pembatalan</label>
                     <input id="cancellation_request_reason" name="cancellation_request_reason" required minlength="5" placeholder="Jelaskan alasan pembatalan pesanan Anda" class="w-full rounded-lg border border-field-line bg-surface p-2 text-xs">
                 </div>
-                <button type="submit" class="rounded-lg border border-danger-line bg-danger-surface px-4 py-2 text-xs font-bold text-danger">
-                    Kirim Pengajuan Pembatalan
-                </button>
+                <div class="flex justify-end">
+                    <button type="submit" class="rounded-lg border border-danger-line bg-danger-surface px-4 py-2 text-xs font-bold text-danger">
+                        Kirim Pengajuan Pembatalan
+                    </button>
+                </div>
             </form>
         @endif
 
@@ -261,7 +263,7 @@
                         @endif
 
                         @if ($changeRequest->status === \App\Models\RentalChangeRequest::STATUS_PENDING_CUSTOMER)
-                            <div class="pt-2 flex flex-col sm:flex-row gap-3">
+                            <div class="pt-2 flex flex-wrap justify-end gap-3">
                                 <form method="POST" action="{{ route('customer.change-requests.respond', $changeRequest) }}">
                                     @csrf
                                     @method('PATCH')
@@ -270,11 +272,11 @@
                                         Setujui Usulan Admin
                                     </button>
                                 </form>
-                                <form method="POST" action="{{ route('customer.change-requests.respond', $changeRequest) }}" class="flex-1 flex flex-col sm:flex-row gap-2">
+                                <form method="POST" action="{{ route('customer.change-requests.respond', $changeRequest) }}" class="flex min-w-0 flex-1 flex-wrap justify-end gap-2">
                                     @csrf
                                     @method('PATCH')
                                     <input type="hidden" name="decision" value="reject">
-                                    <input name="response_notes" required placeholder="Alasan menolak usulan admin" class="flex-1 rounded-lg border border-field-line bg-surface p-2 text-xs">
+                                    <input name="response_notes" aria-label="Alasan menolak usulan" required placeholder="Alasan menolak usulan admin" class="min-w-0 flex-auto rounded-lg border border-field-line bg-surface p-2 text-xs">
                                     <button type="submit" class="rounded-lg border border-danger-line bg-danger-surface px-4 py-2 text-xs font-bold text-danger shrink-0">
                                         Tolak Usulan
                                     </button>
@@ -363,8 +365,8 @@
                                     Tenggat pembayaran perpanjangan: <strong class="text-ink">{{ $extension->payment_deadline_at?->timezone('Asia/Jakarta')->format('d M Y H:i') }} WIB</strong>.
                                     Jadwal baru aktif setelah admin memverifikasi pembayaran tambahan Anda.
                                 </p>
-                                <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                                    <input name="payment_proof" type="file" required accept=".jpg,.jpeg,.png,.pdf" class="flex-1 rounded-lg border border-field-line bg-surface p-2 text-xs">
+                                <div class="flex flex-wrap items-center justify-end gap-2">
+                                    <input name="payment_proof" aria-label="Bukti pembayaran perpanjangan" type="file" required accept=".jpg,.jpeg,.png,.pdf" class="min-w-0 max-w-full flex-auto rounded-lg border border-field-line bg-surface p-2 text-xs">
                                     <button type="submit" class="rounded-lg bg-action hover:bg-action-hover px-4 py-2 text-xs font-bold text-ink shrink-0">
                                         Unggah Bukti Perpanjangan
                                     </button>
@@ -389,9 +391,11 @@
                                 <input id="extension_notes" name="notes" placeholder="Alasan atau catatan perpanjangan" class="w-full rounded-lg border border-field-line bg-surface p-2">
                             </div>
                         </div>
-                        <button type="submit" class="rounded-lg bg-action hover:bg-action-hover px-4 py-2 font-bold text-ink">
-                            Ajukan Perpanjangan Sewa
-                        </button>
+                        <div class="flex justify-end">
+                            <button type="submit" class="rounded-lg bg-action hover:bg-action-hover px-4 py-2 font-bold text-ink">
+                                Ajukan Perpanjangan Sewa
+                            </button>
+                        </div>
                     </form>
                 @endif
             </div>
@@ -460,8 +464,8 @@
                     <form method="POST" action="{{ route('customer.bookings.additional-charges.proof', $rental) }}" enctype="multipart/form-data" class="rounded-xl border border-line bg-surface-raised p-4 space-y-2 text-xs">
                         @csrf
                         <p class="text-muted">Transfer sisa tagihan tambahan Rp <strong class="text-ink">{{ number_format($rental->remainingAdditionalChargeBalance(), 0, ',', '.') }}</strong> ke rekening <strong class="text-ink">{{ $rental->additional_charge_bank_name ?? $rental->payment_bank_name }} {{ $rental->additional_charge_account_number ?? $rental->payment_account_number }}</strong> (a.n. {{ $rental->additional_charge_account_holder ?? $rental->payment_account_holder }}).</p>
-                        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                            <input name="additional_charge_proof" type="file" required accept=".jpg,.jpeg,.png" class="flex-1 rounded-lg border border-field-line bg-surface p-2">
+                        <div class="flex flex-wrap items-center justify-end gap-2">
+                            <input name="additional_charge_proof" aria-label="Bukti pembayaran tambahan" type="file" required accept=".jpg,.jpeg,.png" class="min-w-0 max-w-full flex-auto rounded-lg border border-field-line bg-surface p-2">
                             <button type="submit" class="rounded-lg bg-action hover:bg-action-hover px-4 py-2 font-bold text-ink shrink-0">
                                 Kirim Bukti Pembayaran Tambahan
                             </button>

@@ -292,7 +292,7 @@
                 </div>
 
                 <!-- Submit Button -->
-                <div class="flex items-center justify-end gap-3 pt-3">
+                <div class="flex flex-wrap items-center justify-end gap-3 pt-3">
                     <a href="{{ route('customer.dashboard') }}" class="px-4 py-2 text-xs font-semibold text-ink hover:bg-surface-hover rounded-lg transition-colors">
                         Batal
                     </a>

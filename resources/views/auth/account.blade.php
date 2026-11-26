@@ -8,7 +8,7 @@
     <div class="relative z-10 mx-auto max-w-2xl space-y-6">
         <div class="flex flex-wrap items-center justify-between gap-3">
             <a href="{{ route('home') }}" class="inline-flex items-center gap-1.5 text-sm font-semibold text-ink underline hover:text-focus">
-                &larr; Kembali ke dasbor
+                &larr; {{ $account->isCustomer() ? 'Kembali ke Beranda' : 'Kembali ke dasbor' }}
             </a>
             @unless ($account->isCustomer())
                 <span class="inline-flex items-center rounded-full border border-field-line bg-surface px-3 py-1 text-xs font-semibold text-ink">
@@ -68,7 +68,9 @@
                         <p class="mt-1 text-xs font-medium text-danger">{{ $message }}</p>
                     @enderror
                 </div>
-                <button type="submit" class="rounded-lg bg-action hover:bg-action-hover px-5 py-2.5 text-sm font-semibold text-ink shadow-sm transition-colors">Simpan Profil</button>
+                <div @class(['flex justify-end' => $account->isCustomer()])>
+                    <button type="submit" class="rounded-lg bg-action hover:bg-action-hover px-5 py-2.5 text-sm font-semibold text-ink shadow-sm transition-colors">Simpan Profil</button>
+                </div>
             </form>
 
             <form method="POST" action="{{ route('account.password') }}" class="space-y-4 border-t border-line pt-6">
@@ -93,7 +95,9 @@
                     <label for="password_confirmation" class="block text-xs font-semibold text-ink mb-1">Ulangi kata sandi baru</label>
                     <input id="password_confirmation" name="password_confirmation" type="password" autocomplete="new-password" required class="w-full rounded-lg border border-field-line bg-surface-raised p-2.5 text-sm">
                 </div>
-                <button type="submit" class="rounded-lg bg-action hover:bg-action-hover px-5 py-2.5 text-sm font-semibold text-ink shadow-sm transition-colors">Simpan Kata Sandi</button>
+                <div @class(['flex justify-end' => $account->isCustomer()])>
+                    <button type="submit" class="rounded-lg bg-action hover:bg-action-hover px-5 py-2.5 text-sm font-semibold text-ink shadow-sm transition-colors">Simpan Kata Sandi</button>
+                </div>
             </form>
 
             <div class="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-6">

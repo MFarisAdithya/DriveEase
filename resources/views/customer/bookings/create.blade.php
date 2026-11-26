@@ -96,7 +96,7 @@
             @enderror
         </div>
 
-        <div class="flex items-center justify-end gap-3 pt-2">
+        <div class="flex flex-wrap items-center justify-end gap-3 pt-2">
             <a href="{{ route('cars.index') }}" class="rounded-lg px-4 py-2 text-xs font-semibold text-ink hover:bg-surface-hover">Batal</a>
             <button type="submit" data-availability-submit @disabled(! $hasValidPaymentAccount) class="rounded-lg bg-action hover:bg-action-hover px-6 py-2.5 text-xs font-bold text-ink shadow-sm transition-colors disabled:opacity-60">
                 Buat Pemesanan Sekarang
