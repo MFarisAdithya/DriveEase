@@ -190,6 +190,73 @@ class WalkInLifecycleTest extends TestCase
         $this->assertNull($customer->fresh()->password);
     }
 
+    public function test_walk_in_cancellation_and_extension_refund_keep_actual_customer_time_and_cash_history(): void
+    {
+        [$admin, $staff, $customer, $car] = $this->prepare();
+        $pickup = now('Asia/Jakarta')->addHours(36);
+        $rental = $this->book($customer, $car, $pickup);
+        $this->patch(route('admin.bookings.cancel', $rental))->assertSessionHasErrors('cancellation_type');
+        $this->patch(route('admin.verifications.approve', $customer))->assertSessionHas('success');
+        $this->uploadMainProof($rental);
+        $this->patch(route('admin.payments.approve', $rental->payments()->sole()), [
+            'verified_amount' => $rental->total_amount,
+            'received_at' => now('Asia/Jakarta')->format('Y-m-d\TH:i'),
+        ])->assertSessionHasNoErrors();
+
+        // Jika dana perpanjangan masuk sebelum bukti sempat disimpan, menu
+        // pembatalan perpanjangan tetap dapat merekonsiliasi dan mencatat refund.
+        $this->post(route('admin.bookings.walk-in-extensions.store', $rental), $this->confirmation() + [
+            'additional_days' => 1,
+        ])->assertSessionHas('success');
+        $extension = $rental->extensions()->sole();
+        $this->patch(route('admin.extensions.approve', $extension))->assertSessionHas('success');
+        $this->get(route('admin.bookings.show', $rental))->assertOk()->assertSee('Batalkan Perpanjangan');
+        $this->patch(route('admin.extensions.payment.reject', $extension), [
+            'rejection_reason' => 'Perpanjangan dibatalkan atas permintaan penyewa.',
+            'received_amount' => 25000,
+            'received_at' => now('Asia/Jakarta')->format('Y-m-d\TH:i'),
+            'cancel_extension' => 1,
+        ])->assertSessionHas('success');
+        $this->assertEquals(25000, $extension->fresh()->refund_amount);
+        $this->patch(route('admin.extensions.refund', $extension), [
+            'transfer_amount' => 25000,
+            'transferred_at' => now('Asia/Jakarta')->format('Y-m-d\TH:i'),
+            'refund_reference' => 'WALK-EXT-REFUND',
+        ])->assertSessionHas('success');
+        $this->assertSame(RentalExtension::REFUND_PROCESSED, $extension->fresh()->refund_status);
+
+        $this->travel(1)->hour();
+        $consent = $this->confirmation();
+        $this->travel(13)->hours();
+        $cancel = route('admin.bookings.cancel-with-refund', $rental);
+        $cancellation = [
+            'cancellation_type' => Rental::CANCEL_CUSTOMER,
+            'cancellation_reason' => 'Penyewa meminta pembatalan melalui telepon.',
+        ];
+        $this->actingAs($staff)->patch($cancel, $cancellation + $consent)->assertForbidden();
+        $this->actingAs($admin)->patch($cancel, $cancellation)->assertSessionHasErrors('confirmation_method');
+        $this->patch($cancel, $cancellation + $consent)->assertSessionHas('success');
+        $rental->refresh();
+        $this->assertSame(Rental::STATUS_CANCELLED, $rental->rental_status);
+        $this->assertSame(75, (int) $rental->refund_percentage);
+        $this->assertSame($consent['confirmed_at'], $rental->cancellation_requested_at->format('Y-m-d\TH:i'));
+        $history = $rental->histories()->where('action', 'booking_cancelled_with_refund')->sole();
+        $this->assertSame($admin->id, $history->actor_id);
+        $this->assertSame('phone', $history->metadata['confirmation_method']);
+
+        $refund = route('admin.bookings.refund', $rental);
+        $transfer = [
+            'transfer_amount' => $rental->refund_amount,
+            'transferred_at' => now('Asia/Jakarta')->format('Y-m-d\TH:i'),
+            'refund_reference' => 'WALK-MAIN-REFUND',
+        ];
+        $this->patch($refund, $transfer)->assertSessionHas('success');
+        $this->patch($refund, $transfer)->assertSessionHasErrors('refund');
+        $this->assertSame(Rental::REFUND_PROCESSED, $rental->fresh()->refund_status);
+        $this->assertSame(4, $rental->cashFlows()->count());
+        $this->assertNull($customer->fresh()->email);
+    }
+
     /** @return array{User, User, User, Car} */
     private function prepare(): array
     {

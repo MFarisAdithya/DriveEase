@@ -13,6 +13,7 @@ use App\Services\RentalBookingService;
 use App\Services\RentalFinancialService;
 use App\Services\RentalOperationService;
 use App\Services\RentalScheduleService;
+use App\Services\WalkInConfirmation;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -323,6 +324,12 @@ class BookingController extends Controller
      */
     public function cancel(Request $request, Rental $rental): RedirectResponse
     {
+        // Pembatalan walk-in memakai formulir berkategori agar alasan dan
+        // jawaban manual tersimpan walaupun tagihan belum dibayar.
+        if ($rental->booking_channel === Rental::CHANNEL_WALK_IN) {
+            return back()->withErrors(['cancellation_type' => 'Gunakan pembatalan walk-in dengan kategori dan konfirmasi penyewa jika diperlukan.']);
+        }
+
         $validated = $request->validate([
             'cancellation_reason' => ['nullable', 'string', 'max:500'],
         ]);
@@ -351,12 +358,19 @@ class BookingController extends Controller
             'contact_attempted' => ['nullable', 'boolean'],
         ]);
 
+        $confirmation = $rental->booking_channel === Rental::CHANNEL_WALK_IN
+            && $validated['cancellation_type'] === Rental::CANCEL_CUSTOMER
+            && $rental->cancellation_requested_at === null
+            ? WalkInConfirmation::fromInput($request->only('confirmation_method', 'confirmed_at'))
+            : null;
+
         $financialService->cancelWithRefund(
             rental: $rental,
             admin: $request->user(),
             cancellationType: (string) $validated['cancellation_type'],
             reason: (string) $validated['cancellation_reason'],
             contactAttempted: (bool) ($validated['contact_attempted'] ?? false),
+            confirmation: $confirmation,
         );
 
         return redirect()->route('admin.bookings.show', $rental)

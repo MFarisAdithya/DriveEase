@@ -207,7 +207,7 @@
             </div>
         @endif
 
-        @if (! $rental->canBeCancelledUnpaid() && in_array($rental->rental_status, [\App\Models\Rental::STATUS_PENDING, \App\Models\Rental::STATUS_CONFIRMED], true))
+        @if ((! $rental->canBeCancelledUnpaid() || $rental->booking_channel === \App\Models\Rental::CHANNEL_WALK_IN) && in_array($rental->rental_status, [\App\Models\Rental::STATUS_PENDING, \App\Models\Rental::STATUS_CONFIRMED], true))
             <form method="POST" action="{{ route('admin.bookings.cancel-with-refund', $rental) }}" class="rounded-xl border border-danger-line bg-danger-surface/30 p-5 space-y-3 text-xs">
                 @csrf
                 @method('PATCH')
@@ -226,6 +226,12 @@
                         <input id="admin_cancel_reason" name="cancellation_reason" required minlength="5" placeholder="Alasan pembatalan resmi" class="w-full rounded-lg border border-field-line bg-surface p-2">
                     </div>
                 </div>
+                @if ($rental->booking_channel === \App\Models\Rental::CHANNEL_WALK_IN && $rental->cancellation_requested_at === null)
+                    <p class="text-muted">Isi konfirmasi berikut untuk kategori Permintaan Pelanggan.</p>
+                    <div class="grid gap-2 sm:grid-cols-2">
+                        @include('admin.bookings.confirmation-fields', ['confirmationRequired' => false])
+                    </div>
+                @endif
                 <label class="inline-flex items-center gap-2 text-ink">
                     <input type="checkbox" name="contact_attempted" value="1" class="rounded border-field-line">
                     <span>Admin telah mencoba menghubungi pelanggan (wajib sebelum menetapkan tidak hadir / no-show)</span>
@@ -431,6 +437,21 @@
                                     <input type="file" name="payment_proof" accept=".jpg,.jpeg,.png,.pdf" required class="mt-1 block w-full rounded border border-field-line p-2">
                                 </label>
                                 <div class="flex justify-end"><button class="rounded-lg bg-action px-4 py-2 font-bold">Unggah Bukti Walk-in</button></div>
+                            </form>
+                            <form method="POST" action="{{ route('admin.extensions.payment.reject', $extension) }}" class="grid gap-2 border-t border-line pt-3 sm:grid-cols-2">
+                                @csrf
+                                @method('PATCH')
+                                <input type="hidden" name="cancel_extension" value="1">
+                                <label class="sm:col-span-2">Alasan pembatalan perpanjangan
+                                    <input name="rejection_reason" required maxlength="500" class="mt-1 block w-full rounded border border-field-line p-2">
+                                </label>
+                                <label>Nominal diterima (Rp, jika ada)
+                                    <input type="number" name="received_amount" min="0" step="0.01" class="mt-1 block w-full rounded border border-field-line p-2">
+                                </label>
+                                <label>Tanggal dana diterima (WIB, jika ada)
+                                    <input type="datetime-local" name="received_at" class="mt-1 block w-full rounded border border-field-line p-2">
+                                </label>
+                                <div class="flex justify-end sm:col-span-2"><button class="rounded border border-danger-line px-4 py-2 font-bold text-danger">Batalkan Perpanjangan</button></div>
                             </form>
                         @elseif ($extension->status === \App\Models\RentalExtension::STATUS_PAYMENT_SUBMITTED)
                             <div class="pt-2 space-y-3 border-t border-line">
@@ -718,7 +739,7 @@
         @endif
 
 
-        @if ($rental->canBeCancelledUnpaid())
+        @if ($rental->canBeCancelledUnpaid() && $rental->booking_channel !== \App\Models\Rental::CHANNEL_WALK_IN)
             <form method="POST" action="{{ route('admin.bookings.cancel', $rental) }}" class="pt-4 border-t border-line flex flex-col sm:flex-row items-stretch sm:items-end justify-between gap-3">
                 @csrf
                 @method('PATCH')

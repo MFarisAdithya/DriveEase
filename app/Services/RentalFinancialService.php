@@ -244,8 +244,13 @@ class RentalFinancialService
         User $admin,
         string $cancellationType,
         string $reason,
-        bool $contactAttempted = false
+        bool $contactAttempted = false,
+        ?WalkInConfirmation $confirmation = null,
     ): Rental {
+        if (! $admin->isAdmin()) {
+            throw ValidationException::withMessages(['cancellation_type' => 'Hanya admin yang dapat menetapkan pembatalan ini.']);
+        }
+
         if (! in_array($cancellationType, [Rental::CANCEL_CUSTOMER, Rental::CANCEL_RENTAL_FAULT, Rental::CANCEL_NO_SHOW], true)) {
             throw ValidationException::withMessages([
                 'cancellation_type' => 'Jenis pembatalan tidak valid.',
@@ -261,7 +266,7 @@ class RentalFinancialService
 
         $nowWib = CarbonImmutable::now(RentalScheduleService::TIMEZONE);
 
-        return DB::transaction(function () use ($rental, $admin, $cancellationType, $trimmedReason, $contactAttempted, $nowWib): Rental {
+        return DB::transaction(function () use ($rental, $admin, $cancellationType, $trimmedReason, $contactAttempted, $nowWib, $confirmation): Rental {
             // Ikuti urutan kunci global: Car -> Rental.
             Car::query()->lockForUpdate()->findOrFail($rental->car_id);
             $lockedRental = Rental::query()->lockForUpdate()->findOrFail($rental->id);
@@ -278,9 +283,20 @@ class RentalFinancialService
                 throw ValidationException::withMessages(['rental_status' => 'Tenggat telah terlewati. Buka ulang detail untuk melihat status terbaru.']);
             }
 
+            $requestedAt = $lockedRental->cancellation_requested_at;
+            if ($cancellationType === Rental::CANCEL_CUSTOMER
+                && $lockedRental->booking_channel === Rental::CHANNEL_WALK_IN && $requestedAt === null) {
+                if ($confirmation === null) {
+                    throw ValidationException::withMessages(['confirmation_method' => 'Catat konfirmasi permintaan pembatalan penyewa walk-in.']);
+                }
+                if ($confirmation->occurredAt()->lt($lockedRental->created_at->copy()->startOfMinute())) {
+                    throw ValidationException::withMessages(['confirmed_at' => 'Permintaan tidak boleh mendahului pemesanan.']);
+                }
+                $requestedAt = $confirmation->occurredAt();
+            }
+
             if ($lockedRental->review_followup_at !== null && $cancellationType === Rental::CANCEL_CUSTOMER
-                && ($lockedRental->cancellation_requested_at === null
-                    || $lockedRental->cancellation_requested_at->gte($lockedRental->review_followup_at))) {
+                && ($requestedAt === null || $requestedAt->gte($lockedRental->review_followup_at))) {
                 throw ValidationException::withMessages(['cancellation_type' => 'Gunakan kendala pihak rental jika pembatalan disebabkan pemeriksaan yang terlambat.']);
             }
 
@@ -309,9 +325,10 @@ class RentalFinancialService
                 }
             }
 
-            $policyReference = $cancellationType === Rental::CANCEL_CUSTOMER && $lockedRental->cancellation_requested_at !== null
-                ? $lockedRental->cancellation_requested_at
-                : $nowWib;
+            // Refund walk-in memakai waktu penyewa meminta pembatalan, sama
+            // seperti kanal online. Simpan tanggalnya agar rekonsiliasi bukti
+            // yang datang belakangan memakai kebijakan dan waktu yang sama.
+            $policyReference = $cancellationType === Rental::CANCEL_CUSTOMER ? ($requestedAt ?? $nowWib) : $nowWib;
 
             // Hak pengembalian dana selalu ditetapkan tepat sesuai rumus kebijakan SKPL tanpa override sepihak,
             // lalu digabungkan dengan nominal refund yang sebelumnya sudah terealisasi (mis. kelebihan bayar awal).
@@ -333,6 +350,10 @@ class RentalFinancialService
             );
             $lockedRental->cancelled_at = $nowWib;
             $lockedRental->cancellation_type = $cancellationType;
+            if ($cancellationType === Rental::CANCEL_CUSTOMER && $lockedRental->cancellation_requested_at === null && $requestedAt !== null) {
+                $lockedRental->cancellation_requested_at = $requestedAt;
+                $lockedRental->cancellation_request_reason = $trimmedReason;
+            }
             $lockedRental->cancellation_reason = $trimmedReason;
             $lockedRental->refund_percentage = $policy['percentage'];
             $lockedRental->refund_amount = $totalRefundEntitlement;
@@ -352,7 +373,7 @@ class RentalFinancialService
                     'new_refund_obligation' => $newObligation,
                     'refund_amount' => $totalRefundEntitlement,
                     'refund_status' => $refundStatus,
-                ]
+                ] + ($confirmation?->metadata() ?? [])
             );
 
             return $lockedRental;
