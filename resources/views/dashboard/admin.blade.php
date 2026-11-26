@@ -31,8 +31,8 @@
                 <span class="text-xs text-muted">{{ $stats['incomplete_verifications'] }} menunggu kelengkapan</span>
             </a>
             <a href="{{ route('admin.bookings.index', ['filter' => 'review_followup']) }}" class="rounded-xl border border-line bg-surface p-3 hover:border-warning-line">
-                <span class="block text-sm font-semibold text-ink">Tindak lanjut pemeriksaan</span>
-                <strong class="mt-1 block text-lg text-warning">{{ $stats['review_followups'] ?? 0 }} pesanan</strong>
+                <span class="block text-sm font-semibold text-ink">Pemeriksaan tertunda</span>
+                <strong class="mt-1 block text-lg text-warning">{{ $stats['review_followups'] ?? 0 }} tindak lanjut pemeriksaan</strong>
             </a>
             <a href="{{ route('admin.bookings.index', ['filter' => 'active_rentals']) }}" class="rounded-xl border border-line bg-surface p-3 hover:border-action">
                 <span class="block text-sm font-semibold text-ink">Sewa aktif dan terjadwal</span>

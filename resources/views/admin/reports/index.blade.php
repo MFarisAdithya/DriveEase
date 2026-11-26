@@ -49,13 +49,13 @@
                     <option value="walk_in" @selected($bookingChannel === 'walk_in')>Langsung (Admin)</option>
                 </select>
             </div>
-            <div class="flex items-center gap-2">
-                <button type="submit" class="rounded-lg bg-action hover:bg-action-hover px-4 py-2 text-xs font-bold text-ink shadow-xs">
-                    Tampilkan Laporan
-                </button>
+            <div class="flex flex-wrap items-center justify-end gap-2 self-end sm:col-span-2 lg:col-span-1">
                 <a href="{{ route('admin.reports.index') }}" class="rounded-lg border border-line px-3 py-2 text-xs font-semibold text-muted hover:text-ink">
                     Reset
                 </a>
+                <button type="submit" class="rounded-lg bg-action hover:bg-action-hover px-4 py-2 text-xs font-bold text-ink shadow-xs">
+                    Tampilkan Laporan
+                </button>
             </div>
         </form>
     </div>
@@ -96,18 +96,18 @@
             </div>
         </div>
 
-        <div class="overflow-x-auto">
+        <div role="region" aria-label="Rincian arus kas" tabindex="0" class="overflow-x-auto">
             <table class="w-full text-left border-collapse">
                 <thead>
                     <tr class="bg-surface-raised text-[11px] font-semibold text-muted uppercase tracking-wider border-b border-line">
-                        <th class="py-3 px-4">Tanggal Kas (WIB)</th>
-                        <th class="py-3 px-4">Kode</th>
-                        <th class="py-3 px-4">Pelanggan &amp; Unit</th>
-                        <th class="py-3 px-4">Jenis Arus Kas</th>
-                        <th class="py-3 px-4">Jadwal Sewa (Operasional)</th>
-                        <th class="py-3 px-4">Referensi</th>
-                        <th class="py-3 px-4 text-right">Kas Masuk</th>
-                        <th class="py-3 px-4 text-right">Kas Keluar (Refund)</th>
+                        <th scope="col" class="py-3 px-4">Tanggal Kas (WIB)</th>
+                        <th scope="col" class="py-3 px-4">Kode</th>
+                        <th scope="col" class="py-3 px-4">Pelanggan &amp; Unit</th>
+                        <th scope="col" class="py-3 px-4">Jenis Arus Kas</th>
+                        <th scope="col" class="py-3 px-4">Jadwal Sewa (Operasional)</th>
+                        <th scope="col" class="py-3 px-4">Referensi</th>
+                        <th scope="col" class="py-3 px-4 text-right">Kas Masuk</th>
+                        <th scope="col" class="py-3 px-4 text-right">Kas Keluar (Refund)</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-line text-xs">
@@ -175,14 +175,14 @@
             <h2 class="text-base font-bold text-ink">Kewajiban Refund Tertunda (Belum Ditransfer)</h2>
             <p class="text-xs text-muted">Daftar kewajiban pengembalian dana aktif. Nilai ini baru mengurangi kas setelah admin mencatat tanggal realisasi transfer.</p>
         </div>
-        <div class="overflow-x-auto">
+        <div role="region" aria-label="Kewajiban refund tertunda" tabindex="0" class="overflow-x-auto">
             <table class="w-full text-left border-collapse">
                 <thead>
                     <tr class="bg-surface-raised text-[11px] font-semibold text-muted uppercase tracking-wider border-b border-line">
-                        <th class="py-3 px-4">Kode</th>
-                        <th class="py-3 px-4">Pelanggan &amp; Unit</th>
-                        <th class="py-3 px-4">Sumber Kewajiban</th>
-                        <th class="py-3 px-4 text-right">Nominal Tertunda</th>
+                        <th scope="col" class="py-3 px-4">Kode</th>
+                        <th scope="col" class="py-3 px-4">Pelanggan &amp; Unit</th>
+                        <th scope="col" class="py-3 px-4">Sumber Kewajiban</th>
+                        <th scope="col" class="py-3 px-4 text-right">Nominal Tertunda</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-line text-xs">

@@ -21,7 +21,7 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                 </svg>
             </div>
-            <button type="submit" class="px-4 py-2 bg-surface-hover hover:bg-line text-ink text-xs font-semibold rounded-lg transition-colors">
+            <button type="submit" class="ml-auto min-h-10 shrink-0 px-4 py-2 bg-surface-hover hover:bg-line text-ink text-xs font-semibold rounded-lg transition-colors">
                 Cari
             </button>
             @if(request('search'))
@@ -30,7 +30,7 @@
         </form>
 
         <!-- Add Button -->
-        <a href="{{ route('admin.car-types.create') }}" class="inline-flex items-center gap-2 px-4 py-2 bg-action hover:bg-action-hover text-ink text-xs font-semibold rounded-lg shadow-sm transition-colors shrink-0">
+        <a href="{{ route('admin.car-types.create') }}" class="inline-flex min-h-10 items-center gap-2 self-end px-4 py-2 bg-action hover:bg-action-hover text-ink text-xs font-semibold rounded-lg shadow-sm transition-colors shrink-0">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
             </svg>
@@ -40,14 +40,14 @@
 
     <!-- Category Table -->
     <div class="bg-surface rounded-xl border border-line shadow-sm overflow-hidden">
-        <div class="overflow-x-auto">
+        <div role="region" aria-label="Daftar kategori kendaraan" tabindex="0" class="overflow-x-auto">
             <table class="w-full text-left border-collapse">
                 <thead>
                     <tr class="bg-surface-raised text-[11px] font-semibold text-muted uppercase tracking-wider border-b border-line">
-                        <th class="py-3 px-6">Nama Kategori</th>
-                        <th class="py-3 px-6">Deskripsi</th>
-                        <th class="py-3 px-6">Jumlah Armada Terkait</th>
-                        <th class="py-3 px-6 text-right">Aksi</th>
+                        <th scope="col" class="py-3 px-6">Nama Kategori</th>
+                        <th scope="col" class="py-3 px-6">Deskripsi</th>
+                        <th scope="col" class="py-3 px-6">Jumlah Armada Terkait</th>
+                        <th scope="col" class="py-3 px-6 text-right">Aksi</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-line text-sm">

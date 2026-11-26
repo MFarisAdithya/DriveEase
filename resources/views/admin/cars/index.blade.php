@@ -10,7 +10,7 @@
         <!-- Search & Filter Form -->
         <form action="{{ route('admin.cars.index') }}" method="GET" class="flex flex-wrap items-center gap-3 flex-1">
             <!-- Search input -->
-            <div class="relative min-w-[200px] flex-1">
+            <div class="relative w-full sm:min-w-[200px] sm:flex-1">
                 <label for="admin_car_search" class="sr-only">Cari nama, merek, atau plat kendaraan</label>
                 <input type="text" id="admin_car_search" 
                        name="search" 
@@ -43,7 +43,7 @@
                 <option value="archived" {{ request('status') == 'archived' ? 'selected' : '' }}>Diarsipkan</option>
             </select>
 
-            <button type="submit" class="px-4 py-2 bg-surface-hover hover:bg-line text-ink text-xs font-semibold rounded-lg transition-colors">
+            <button type="submit" class="ml-auto min-h-10 shrink-0 px-4 py-2 bg-surface-hover hover:bg-line text-ink text-xs font-semibold rounded-lg transition-colors">
                 Terapkan Filter
             </button>
 
@@ -53,7 +53,7 @@
         </form>
 
         <!-- Add Button -->
-        <a href="{{ route('admin.cars.create') }}" class="inline-flex items-center gap-2 px-4 py-2 bg-action hover:bg-action-hover text-ink text-xs font-semibold rounded-lg shadow-sm transition-colors shrink-0">
+        <a href="{{ route('admin.cars.create') }}" class="inline-flex min-h-10 items-center gap-2 self-end px-4 py-2 bg-action hover:bg-action-hover text-ink text-xs font-semibold rounded-lg shadow-sm transition-colors shrink-0">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
             </svg>
@@ -63,17 +63,17 @@
 
     <!-- Vehicles Table -->
     <div class="bg-surface rounded-xl border border-line shadow-sm overflow-hidden">
-        <div class="overflow-x-auto">
+        <div role="region" aria-label="Daftar kendaraan" tabindex="0" class="overflow-x-auto">
             <table class="w-full text-left border-collapse">
                 <thead>
                     <tr class="bg-surface-raised text-[11px] font-semibold text-muted uppercase tracking-wider border-b border-line">
-                        <th class="py-3 px-5">Nama Kendaraan</th>
-                        <th class="py-3 px-5">Kategori</th>
-                        <th class="py-3 px-5">Plat Nomor</th>
-                        <th class="py-3 px-5">Spesifikasi</th>
-                        <th class="py-3 px-5">Tarif Sewa / Hari</th>
-                        <th class="py-3 px-5">Status</th>
-                        <th class="py-3 px-5 text-right">Aksi</th>
+                        <th scope="col" class="py-3 px-5">Nama Kendaraan</th>
+                        <th scope="col" class="py-3 px-5">Kategori</th>
+                        <th scope="col" class="py-3 px-5">Plat Nomor</th>
+                        <th scope="col" class="py-3 px-5">Spesifikasi</th>
+                        <th scope="col" class="py-3 px-5">Tarif Sewa / Hari</th>
+                        <th scope="col" class="py-3 px-5">Status</th>
+                        <th scope="col" class="py-3 px-5 text-right">Aksi</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-line text-sm">

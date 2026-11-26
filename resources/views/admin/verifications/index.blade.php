@@ -37,11 +37,13 @@
                 <input type="hidden" name="status" value="{{ $status }}">
             @endif
             <label for="verification-search" class="sr-only">Cari nama atau email pelanggan</label>
-            <input id="verification-search" name="search" value="{{ $search ?? '' }}" placeholder="Cari nama atau email pelanggan..." class="min-w-[220px] flex-1 rounded-lg border border-field-line bg-surface-raised px-3 py-2 text-xs">
-            <button type="submit" class="rounded-lg bg-action hover:bg-action-hover px-4 py-2 text-xs font-semibold text-ink transition-colors">Cari Pelanggan</button>
-            @if (($search ?? '') !== '')
-                <a href="{{ route('admin.verifications.index', $status === 'all' ? [] : ['status' => $status]) }}" class="text-xs font-semibold text-danger hover:underline">Reset</a>
-            @endif
+            <input id="verification-search" name="search" value="{{ $search ?? '' }}" placeholder="Cari nama atau email pelanggan..." class="w-full min-w-0 rounded-lg sm:flex-1 border border-field-line bg-surface-raised px-3 py-2 text-xs">
+            <div class="ml-auto flex items-center justify-end gap-3">
+                @if (($search ?? '') !== '')
+                    <a href="{{ route('admin.verifications.index', $status === 'all' ? [] : ['status' => $status]) }}" class="text-xs font-semibold text-danger hover:underline">Reset</a>
+                @endif
+                <button type="submit" class="min-h-10 rounded-lg bg-action hover:bg-action-hover px-4 py-2 text-xs font-semibold text-ink transition-colors">Cari Pelanggan</button>
+            </div>
         </form>
         <p class="px-4 py-3 text-sm text-muted">{{ $customers->total() }} pelanggan pada daftar ini. Berkas lengkap belum berarti identitas disetujui.</p>
         <table class="queue-table w-full table-fixed text-left text-sm">
@@ -68,7 +70,7 @@
                             @endif
                         </td>
                         <td class="px-4 py-5 text-muted"><span class="mb-1 block text-xs xl:hidden">Diperbarui</span>{{ $customer->updated_at?->translatedFormat('d M Y, H:i') ?? 'Belum tersedia' }}</td>
-                        <td class="px-4 py-5"><a class="ui-button ui-secondary w-full" href="{{ route('admin.verifications.show', $customer) }}">Periksa dokumen<span class="sr-only"> {{ $customer->name }}</span></a></td>
+                        <td class="px-4 py-5 text-right"><a class="ui-button ui-secondary ml-auto" href="{{ route('admin.verifications.show', $customer) }}">Periksa dokumen<span class="sr-only"> {{ $customer->name }}</span></a></td>
                     </tr>
                 @empty
                     <tr><td colspan="5" class="p-8 text-center"><p class="font-semibold">Tidak ada pelanggan pada daftar ini</p><p class="mt-2 text-muted">Pilih status lain untuk melihat pengajuan yang tersedia.</p><a class="ui-button ui-secondary mt-4" href="{{ route('admin.verifications.index') }}">Lihat semua pelanggan</a></td></tr>

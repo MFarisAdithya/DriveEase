@@ -5,16 +5,14 @@
 
 @section('content')
 <div class="mx-auto max-w-5xl space-y-6">
-    <div>
-        <h2 class="text-xl font-bold text-ink">Manajemen Staf</h2>
-        <p class="mt-1 text-xs text-muted">Tambahkan akun staf operasional, perbarui profil, atau nonaktifkan akses akun staf.</p>
-    </div>
-
-    @include('admin.staff-fields')
+    <details class="rounded-xl border border-line bg-surface" @if ($errors->any()) open @endif>
+        <summary class="cursor-pointer px-5 py-4 text-sm font-bold text-ink">Tambah akun staf</summary>
+        @include('admin.staff-fields')
+    </details>
 
     <div class="bg-surface rounded-xl border border-line shadow-sm overflow-hidden">
         <div class="border-b border-line px-6 py-4">
-            <h3 class="text-sm font-bold text-ink">Daftar Akun Staf</h3>
+            <h2 class="text-base font-bold text-ink">Daftar akun staf</h2>
         </div>
         <ul class="divide-y divide-line">
             @forelse ($staff as $member)
@@ -28,8 +26,7 @@
                         </div>
                         <p class="text-xs text-muted">{{ $member->email }}{{ $member->phone ? ' · '.$member->phone : '' }}</p>
                     </div>
-                    <div class="flex flex-wrap items-center gap-3 text-xs font-semibold">
-                        <a class="rounded-lg border border-field-line bg-surface-raised px-3 py-2 text-ink hover:bg-surface-hover transition-colors" href="{{ route('admin.staff.edit', $member) }}">Ubah profil</a>
+                    <div class="flex flex-wrap items-center justify-end gap-2 text-xs font-semibold">
                         @if (!$member->isDeactivated())
                             <form method="POST" action="{{ route('admin.staff.deactivate', $member) }}" onsubmit="return confirm('Nonaktifkan akun staf {{ $member->name }}?');">
                                 @csrf
@@ -37,6 +34,7 @@
                                 <button type="submit" class="rounded-lg border border-danger-line bg-danger-surface px-3 py-2 text-danger hover:bg-danger-surface/80 transition-colors">Nonaktifkan akun</button>
                             </form>
                         @endif
+                        <a class="rounded-lg border border-field-line bg-action px-3 py-2 text-ink hover:bg-action-hover transition-colors" href="{{ route('admin.staff.edit', $member) }}">Ubah profil</a>
                     </div>
                 </li>
             @empty

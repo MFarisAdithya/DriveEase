@@ -48,5 +48,7 @@
             </div>
         </div>
     @endif
-    <button type="submit" class="rounded-lg bg-action hover:bg-action-hover px-5 py-2.5 text-xs font-semibold text-ink shadow-sm transition-colors">{{ isset($member) ? 'Simpan Profil' : 'Tambah Staf' }}</button>
+    <div class="flex justify-end">
+        <button type="submit" class="rounded-lg bg-action hover:bg-action-hover px-5 py-2.5 text-xs font-semibold text-ink shadow-sm transition-colors">{{ isset($member) ? 'Simpan Profil' : 'Tambah Staf' }}</button>
+    </div>
 </form>
