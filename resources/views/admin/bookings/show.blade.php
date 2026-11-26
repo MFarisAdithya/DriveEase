@@ -647,25 +647,6 @@
             </div>
         @endif
 
-        @if ($rental->histories->isNotEmpty())
-            <div class="space-y-2 border-t border-line pt-4">
-                <h3 class="text-sm font-bold text-ink">Jejak Audit Transaksi</h3>
-                <ul class="space-y-1.5 text-xs text-muted">
-                    @foreach ($rental->histories as $history)
-                        <li>
-                            <strong class="text-ink">{{ $history->created_at?->timezone('Asia/Jakarta')->format('d M Y H:i') }} WIB</strong>
-                            &middot; {{ $history->action }}
-                            @if ($history->actor)
-                                (oleh {{ $history->actor->name }})
-                            @endif
-                            @if ($history->reason)
-                                &mdash; {{ $history->reason }}
-                            @endif
-                        </li>
-                    @endforeach
-                </ul>
-            </div>
-        @endif
 
         @if ($rental->canBeCancelledUnpaid())
             <form method="POST" action="{{ route('admin.bookings.cancel', $rental) }}" class="pt-4 border-t border-line flex flex-col sm:flex-row items-stretch sm:items-end justify-between gap-3">
