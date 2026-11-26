@@ -95,8 +95,19 @@ class VerifyBackupRestore extends Command
             return self::FAILURE;
         }
 
+        // array_diff membandingkan daftar tabel wajib dengan nama yang ada di manifest.
+        // Ketiadaan entri berarti tabel belum diverifikasi, meski berkas JSON masih ada.
+        $manifestTables = $manifest['tables'] ?? null;
+        $manifestFiles = $manifest['files'] ?? null;
+        if (! is_array($manifestTables) || array_diff(self::RESTORE_ORDER, array_keys($manifestTables)) !== [] || ! is_array($manifestFiles)) {
+            $this->error('Manifest cadangan tidak memuat daftar lengkap tabel atau inventaris berkas privat.');
+
+            return self::FAILURE;
+        }
+
         $tables = [];
-        foreach (($manifest['tables'] ?? []) as $tableName => $meta) {
+        foreach (self::RESTORE_ORDER as $tableName) {
+            $meta = $manifestTables[$tableName];
             $relativeJson = str_replace('/', DIRECTORY_SEPARATOR, (string) ($meta['file'] ?? ''));
             $fullJsonPath = $backupDir.DIRECTORY_SEPARATOR.$relativeJson;
 
@@ -123,7 +134,7 @@ class VerifyBackupRestore extends Command
             $tables[$tableName] = $decodedRows;
         }
 
-        foreach (($manifest['files'] ?? []) as $relativePath => $meta) {
+        foreach ($manifestFiles as $relativePath => $meta) {
             $backupFileRel = str_replace('/', DIRECTORY_SEPARATOR, (string) ($meta['backup_file'] ?? ''));
             $fullBackupFile = $backupDir.DIRECTORY_SEPARATOR.$backupFileRel;
 
@@ -209,7 +220,9 @@ class VerifyBackupRestore extends Command
             $normalized = str_replace('\\', '/', (string) $relFile);
             $expectedBackupFile = $backupDir.DIRECTORY_SEPARATOR.'files'.DIRECTORY_SEPARATOR.str_replace('/', DIRECTORY_SEPARATOR, $normalized);
 
-            if (! File::exists($expectedBackupFile)) {
+            // Restore menyalin entri yang ada dalam manifest. Periksa kedua sumber
+            // sebelum menulis database agar berkas yang lolos pemeriksaan ikut disalin.
+            if (! array_key_exists($normalized, $manifestFiles) || ! File::exists($expectedBackupFile)) {
                 $this->error("Berkas privat transaksi {$targetRental['rental_code']} ({$normalized}) tidak tersedia dalam paket cadangan.");
 
                 return self::FAILURE;
@@ -234,7 +247,7 @@ class VerifyBackupRestore extends Command
         }
 
         if ($targetStorage !== '') {
-            if (! $this->performIsolatedStorageRestore($targetStorage, $backupDir, $manifest['files'] ?? [], $uniqueReferencedFiles)) {
+            if (! $this->performIsolatedStorageRestore($targetStorage, $backupDir, $manifestFiles, $uniqueReferencedFiles)) {
                 return self::FAILURE;
             }
         }

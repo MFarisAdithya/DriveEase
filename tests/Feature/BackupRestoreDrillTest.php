@@ -237,6 +237,39 @@ class BackupRestoreDrillTest extends TestCase
         }
     }
 
+    public function test_verify_restore_rejects_incomplete_manifest_even_when_files_exist(): void
+    {
+        $customer = $this->createVerifiedCustomer();
+        $identityPath = 'identities/ktp-manifest.jpg';
+        Storage::disk('local')->put($identityPath, 'private-test-image');
+        $customer->forceFill(['ktp_image' => $identityPath])->saveOrFail();
+        $car = $this->createBookableCar(450000);
+        $pickup = CarbonImmutable::now('Asia/Jakarta')->addHours(4)->startOfHour();
+        $rental = app(RentalBookingService::class)->createBooking($customer, $car->id, $pickup, 1, true);
+        $backupDir = storage_path('framework/testing/backup_manifest_'.uniqid());
+        $manifestPath = $backupDir.DIRECTORY_SEPARATOR.'manifest.json';
+
+        try {
+            $this->artisan('driveease:backup', ['--output' => $backupDir])->assertExitCode(0);
+            $manifest = json_decode(File::get($manifestPath), true, 512, JSON_THROW_ON_ERROR);
+
+            // Hapus entri satu per satu dari manifest. Berkas asli sengaja tetap ada
+            // agar uji membedakan inventaris yang belum lengkap dari berkas yang hilang.
+            foreach (['tables' => 'rental_cash_flows', 'files' => $identityPath] as $section => $entry) {
+                $incomplete = $manifest;
+                unset($incomplete[$section][$entry]);
+                File::put($manifestPath, json_encode($incomplete, JSON_THROW_ON_ERROR));
+
+                $this->artisan('driveease:verify-restore', [
+                    'path' => $backupDir,
+                    '--rental-code' => $rental->rental_code,
+                ])->assertExitCode(1);
+            }
+        } finally {
+            File::deleteDirectory($backupDir);
+        }
+    }
+
     /**
      * Memastikan target restore nyata tidak dapat menghapus atau menimpa data di luar lingkungan testing yang kosong.
      */
