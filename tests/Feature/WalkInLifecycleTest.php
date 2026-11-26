@@ -54,6 +54,15 @@ class WalkInLifecycleTest extends TestCase
         $this->assertSame($admin->id, $history->actor_id);
         $this->assertSame('phone', $history->metadata['confirmation_method']);
 
+        // Rincian admin membaca histori yang sudah disimpan tanpa membuka akses staf.
+        $this->get(route('admin.bookings.show', $rental))->assertOk()
+            ->assertSee('Histori transaksi')
+            ->assertSee('Perubahan disetujui')
+            ->assertSee('Metode konfirmasi Telepon')
+            ->assertSee($history->actor->name);
+        $this->actingAs($staff)->get(route('admin.bookings.show', $rental))->assertForbidden();
+        $this->actingAs($admin);
+
         $this->patch(route('admin.verifications.correct-walk-in', $customer), [
             'ktp_image' => UploadedFile::fake()->image('corrected.jpg'),
         ])->assertSessionHas('success');

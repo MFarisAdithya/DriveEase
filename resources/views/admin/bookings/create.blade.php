@@ -1,7 +1,7 @@
 @extends('layouts.admin')
 
 @section('title', 'Pemesanan Langsung - DriveEase Admin')
-@section('page_title', 'Pemesanan Langsung Pelanggan (Walk-In)')
+@section('page_title', 'Pemesanan langsung')
 
 @section('content')
 <div class="mx-auto max-w-5xl space-y-6">
@@ -23,14 +23,56 @@
         </ul>
     @endif
 
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <form method="POST" action="{{ route('admin.bookings.store') }}" class="lg:col-span-7 bg-surface rounded-xl border border-line p-6 shadow-sm space-y-4">
+    <div class="grid grid-cols-1 items-start gap-4 lg:grid-cols-12">
+        {{-- Form identitas berada sebelum pemesanan dalam urutan tab.
+             Pesan validasi pada kolom identitas membuka kembali form ini. --}}
+        <details class="rounded-xl border border-line bg-surface shadow-sm lg:col-span-5"
+                 @if ($errors->hasAny(['name', 'phone', 'address', 'ktp_number', 'ktp_image', 'sim_number', 'sim_image'])) open @endif>
+            <summary class="cursor-pointer rounded-xl px-4 py-3 text-base font-bold text-ink">Catat Identitas Walk-in</summary>
+            <form method="POST" action="{{ route('admin.bookings.register-customer') }}" enctype="multipart/form-data" class="space-y-4 border-t border-line p-4 sm:p-5">
+                @csrf
+                <p class="text-sm text-muted">Untuk pelanggan baru, catat KTP dan SIM agar admin dapat memeriksa identitas. Pelanggan tidak perlu membuat akun login.</p>
+
+                <div>
+                    <label for="reg_name" class="block text-xs font-semibold text-ink mb-1">Nama Lengkap</label>
+                    <input id="reg_name" name="name" value="{{ old('name') }}" required class="w-full rounded-lg border border-field-line bg-surface-raised p-2.5 text-sm">
+                </div>
+                <div>
+                    <label for="reg_phone" class="block text-xs font-semibold text-ink mb-1">Nomor Telepon / WhatsApp</label>
+                    <input id="reg_phone" name="phone" type="tel" value="{{ old('phone') }}" required class="w-full rounded-lg border border-field-line bg-surface-raised p-2.5 text-sm">
+                </div>
+                <div>
+                    <label for="reg_address" class="block text-xs font-semibold text-ink mb-1">Alamat (Opsional)</label>
+                    <input id="reg_address" name="address" value="{{ old('address') }}" class="w-full rounded-lg border border-field-line bg-surface-raised p-2.5 text-sm">
+                </div>
+                {{-- Setiap label menunjuk ke input dengan id yang sama. Atribut accept
+                    memandu pemilihan berkas; validasi format juga berjalan di server. --}}
+                @foreach (['ktp' => 16, 'sim' => 14] as $type => $digits)
+                    <div>
+                        <label for="reg_{{ $type }}_number" class="block text-xs font-semibold text-ink mb-1">Nomor {{ strtoupper($type) }} ({{ $digits }} digit)</label>
+                        <input id="reg_{{ $type }}_number" name="{{ $type }}_number" type="text" inputmode="numeric" pattern="{{ '[0-9]{'.$digits.'}' }}" maxlength="{{ $digits }}" required class="w-full rounded-lg border border-field-line bg-surface-raised p-2.5 text-sm">
+                    </div>
+                    <div>
+                        <label for="reg_{{ $type }}_image" class="block text-xs font-semibold text-ink mb-1">Foto {{ strtoupper($type) }} (JPG/JPEG/PNG, maks 2 MB)</label>
+                        <input id="reg_{{ $type }}_image" name="{{ $type }}_image" type="file" accept=".jpg,.jpeg,.png" required class="w-full rounded-lg border border-field-line bg-surface-raised p-2.5 text-sm">
+                    </div>
+                @endforeach
+
+                <div class="flex justify-end">
+                    <button type="submit" class="min-h-10 rounded-lg bg-action px-4 py-2 text-sm font-bold text-ink hover:bg-action-hover">
+                        Simpan &amp; Lanjut ke Verifikasi
+                    </button>
+                </div>
+            </form>
+        </details>
+
+        <form method="POST" action="{{ route('admin.bookings.store') }}" class="lg:col-span-7 bg-surface rounded-xl border border-line p-4 shadow-sm space-y-4 sm:p-6">
             @csrf
             <input type="hidden" name="idempotency_key" value="{{ old('idempotency_key', $idempotencyKey) }}">
 
             <div class="border-b border-line pb-3">
                 <h2 class="text-base font-bold text-ink">Buat Pesanan Langsung</h2>
-                <p class="text-xs text-muted mt-0.5">Memakai aturan harga 24 jam (WIB), jeda 1 jam, persetujuan ketentuan, dan verifikasi identitas yang sama dengan pemesanan online.</p>
+                <p class="text-xs text-muted mt-0.5">Pilih pelanggan dengan KTP dan SIM lengkap, lalu tentukan kendaraan dan jadwal (WIB). Tarif berlaku per 24 jam dengan jeda 1 jam antar pesanan.</p>
             </div>
 
             <div>
@@ -80,62 +122,31 @@
             </div>
 
             <div class="rounded-lg border border-line bg-surface-raised p-4 space-y-2">
-                <p class="text-xs font-bold text-ink">Ketentuan Rental</p>
-                <p class="whitespace-pre-line text-xs text-muted">{{ $terms }}</p>
+                <details>
+                    <summary class="w-fit cursor-pointer rounded py-1 text-sm font-bold text-link">Baca ketentuan rental</summary>
+                    <p class="mt-2 whitespace-pre-line text-sm text-muted">{{ $terms }}</p>
+                </details>
                 <label class="flex items-start gap-2 pt-1 text-xs font-semibold text-ink">
                     <input id="accept_terms" name="accept_terms" type="checkbox" value="1" @checked(old('accept_terms')) required class="mt-0.5 rounded border-field-line">
-                    <span>Pelanggan menyetujui ketentuan pembayaran transfer, pembatalan, dan denda DriveEase.</span>
+                    <span>Pelanggan telah menyetujui ketentuan pembayaran transfer, pembatalan, dan denda DriveEase.</span>
                 </label>
             </div>
 
             <label for="confirmation_method" class="block text-xs font-semibold">Metode Persetujuan Penyewa</label>
-            <select id="confirmation_method" name="confirmation_method" class="w-full rounded-lg border border-field-line p-2 text-sm">
+            <select id="confirmation_method" name="confirmation_method" aria-describedby="walk-in-confirmation-help" class="w-full rounded-lg border border-field-line bg-surface-raised p-2 text-sm">
                 <option value="">Pilih untuk penyewa tanpa akun login</option>
                 @foreach (['in_person' => 'Tatap muka', 'phone' => 'Telepon', 'message' => 'Pesan'] as $value => $label)
                     <option value="{{ $value }}" @selected(old('confirmation_method') === $value)>{{ $label }}</option>
                 @endforeach
             </select>
-            <button type="submit" class="rounded-lg bg-action hover:bg-action-hover px-5 py-2.5 text-xs font-bold text-ink shadow-xs">
-                Buat Pemesanan Langsung
-            </button>
+            <p id="walk-in-confirmation-help" class="text-xs text-muted">Wajib untuk penyewa tanpa akun login. Waktu persetujuan dan petugas dicatat saat pesanan dibuat.</p>
+            <div class="flex justify-end">
+                <button type="submit" class="min-h-10 rounded-lg bg-action px-5 py-2.5 text-sm font-bold text-ink hover:bg-action-hover">
+                    Buat Pemesanan Langsung
+                </button>
+            </div>
         </form>
 
-        <form method="POST" action="{{ route('admin.bookings.register-customer') }}" enctype="multipart/form-data" class="lg:col-span-5 bg-surface rounded-xl border border-line p-6 shadow-sm space-y-4 self-start">
-            @csrf
-            <div class="border-b border-line pb-3">
-                <h2 class="text-base font-bold text-ink">Catat Identitas Walk-in</h2>
-                <p class="text-xs text-muted mt-0.5">Simpan identitas dan foto KTP/SIM untuk diperiksa admin. Pelanggan tidak perlu membuat akun login.</p>
-            </div>
-
-            <div>
-                <label for="reg_name" class="block text-xs font-semibold text-ink mb-1">Nama Lengkap</label>
-                <input id="reg_name" name="name" value="{{ old('name') }}" required class="w-full rounded-lg border border-field-line bg-surface-raised p-2.5 text-sm">
-            </div>
-            <div>
-                <label for="reg_phone" class="block text-xs font-semibold text-ink mb-1">Nomor Telepon / WhatsApp</label>
-                <input id="reg_phone" name="phone" type="tel" value="{{ old('phone') }}" required class="w-full rounded-lg border border-field-line bg-surface-raised p-2.5 text-sm">
-            </div>
-            <div>
-                <label for="reg_address" class="block text-xs font-semibold text-ink mb-1">Alamat (Opsional)</label>
-                <input id="reg_address" name="address" value="{{ old('address') }}" class="w-full rounded-lg border border-field-line bg-surface-raised p-2.5 text-sm">
-            </div>
-            {{-- Setiap label menunjuk ke input dengan id yang sama. Atribut accept
-                memandu pemilihan berkas; validasi format juga berjalan di server. --}}
-            @foreach (['ktp' => 16, 'sim' => 14] as $type => $digits)
-                <div>
-                    <label for="reg_{{ $type }}_number" class="block text-xs font-semibold text-ink mb-1">Nomor {{ strtoupper($type) }} ({{ $digits }} digit)</label>
-                    <input id="reg_{{ $type }}_number" name="{{ $type }}_number" type="text" inputmode="numeric" pattern="{{ '[0-9]{'.$digits.'}' }}" maxlength="{{ $digits }}" required class="w-full rounded-lg border border-field-line bg-surface-raised p-2.5 text-sm">
-                </div>
-                <div>
-                    <label for="reg_{{ $type }}_image" class="block text-xs font-semibold text-ink mb-1">Foto {{ strtoupper($type) }} (JPG/JPEG/PNG, maks 2 MB)</label>
-                    <input id="reg_{{ $type }}_image" name="{{ $type }}_image" type="file" accept=".jpg,.jpeg,.png" required class="w-full rounded-lg border border-field-line bg-surface-raised p-2.5 text-sm">
-                </div>
-            @endforeach
-
-            <button type="submit" class="w-full rounded-lg border border-field-line bg-surface-raised hover:bg-surface-hover px-4 py-2.5 text-xs font-bold text-ink">
-                Simpan &amp; Lanjut ke Verifikasi
-            </button>
-        </form>
     </div>
 </div>
 @endsection

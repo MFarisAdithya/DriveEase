@@ -1,7 +1,7 @@
 @extends('layouts.admin')
 
 @section('title', 'Detail Pemesanan ' . $rental->rental_code . ' - DriveEase Admin')
-@section('page_title', 'Detail Pemesanan ' . $rental->rental_code)
+@section('page_title', 'Detail pemesanan')
 
 @section('content')
 <div class="mx-auto max-w-5xl space-y-6">
@@ -26,11 +26,12 @@
 
     @if (in_array($rental->rental_status, [\App\Models\Rental::STATUS_PENDING, \App\Models\Rental::STATUS_CONFIRMED], true) && $rental->review_followup_at)
         <div role="alert" class="rounded-xl border border-warning-line bg-warning-surface p-4 text-xs text-warning">
+            <h2 class="mb-1 text-sm font-bold">Tindak lanjut pemeriksaan</h2>
             Hubungi pelanggan segera untuk menyelesaikan pemeriksaan, menawarkan jadwal baru dengan persetujuan, atau membatalkan dengan refund penuh. Jangan gunakan status tidak hadir.
             <form method="POST" action="{{ route('admin.bookings.review-contact', $rental) }}" class="mt-3 grid gap-2 sm:grid-cols-2">
                 @csrf
                 <label>Waktu Kontak (WIB)
-                    <input type="datetime-local" name="contacted_at" required class="block w-full rounded border border-field-line p-2">
+                    <input type="datetime-local" name="contacted_at" value="{{ old('contacted_at') }}" required class="block w-full rounded border border-field-line p-2">
                 </label>
                 <label>Metode Konfirmasi
                     <select name="confirmation_method" required class="block w-full rounded border border-field-line p-2">
@@ -40,14 +41,14 @@
                     </select>
                 </label>
                 <label class="sm:col-span-2">Hasil Kontak atau Persetujuan
-                    <textarea name="contact_notes" required maxlength="500" class="block w-full rounded border border-field-line p-2"></textarea>
+                    <textarea name="contact_notes" required maxlength="500" class="block w-full rounded border border-field-line p-2">{{ old('contact_notes') }}</textarea>
                 </label>
                 <div class="flex justify-end sm:col-span-2"><button class="rounded bg-action px-4 py-2 font-bold">Catat Kontak</button></div>
             </form>
         </div>
     @endif
 
-    <div class="bg-surface rounded-xl border border-line shadow-sm p-6 sm:p-8 space-y-6">
+    <div class="bg-surface rounded-xl border border-line shadow-sm p-4 sm:p-6 space-y-5">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-line pb-4">
             <div>
                 <h2 class="text-xl font-bold text-ink">{{ $rental->car?->name }} ({{ $rental->car?->plate_number }})</h2>
@@ -66,29 +67,21 @@
             </div>
         </div>
 
-        <dl class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
-            <div class="rounded-lg border border-line bg-surface-raised p-4">
-                <dt class="text-muted font-semibold uppercase">Pengambilan (WIB)</dt>
+        <dl class="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-3 text-xs">
+            <div class="rounded-lg bg-surface-raised p-3">
+                <dt class="text-muted font-semibold">Pengambilan</dt>
                 <dd class="mt-1 text-sm font-bold text-ink">{{ $rental->pickup_at?->timezone('Asia/Jakarta')->format('d M Y H:i') }} WIB</dd>
             </div>
-            <div class="rounded-lg border border-line bg-surface-raised p-4">
-                <dt class="text-muted font-semibold uppercase">Pengembalian (WIB)</dt>
+            <div class="rounded-lg bg-surface-raised p-3">
+                <dt class="text-muted font-semibold">Pengembalian</dt>
                 <dd class="mt-1 text-sm font-bold text-ink">{{ $rental->return_at?->timezone('Asia/Jakarta')->format('d M Y H:i') }} WIB</dd>
             </div>
-            <div class="rounded-lg border border-line bg-surface-raised p-4">
-                <dt class="text-muted font-semibold uppercase">Total / Dibayar / Sisa</dt>
-                <dd class="mt-1 text-sm font-extrabold text-ink">
-                    Rp {{ number_format((float) $rental->total_amount, 0, ',', '.') }}
-                    / Rp {{ number_format((float) $rental->paid_amount, 0, ',', '.') }}
-                    / <span class="text-danger">Rp {{ number_format($rental->remainingBalance(), 0, ',', '.') }}</span>
-                </dd>
-            </div>
-            <div class="rounded-lg border border-line bg-surface-raised p-4">
-                <dt class="text-muted font-semibold uppercase">Batas Pembayaran</dt>
+            <div class="col-span-2 rounded-lg bg-surface-raised p-3 lg:col-span-1">
+                <dt class="text-muted font-semibold">Batas Pembayaran</dt>
                 <dd class="mt-1 text-sm font-bold text-ink">{{ $rental->payment_deadline_at?->timezone('Asia/Jakarta')->format('d M Y H:i') ?? '-' }} WIB</dd>
             </div>
-            <div class="rounded-lg border border-line bg-surface-raised p-4 sm:col-span-2">
-                <dt class="text-muted font-semibold uppercase">Rekening Pembayaran</dt>
+            <div class="col-span-2 rounded-lg border border-line bg-surface-raised p-3 lg:col-span-3">
+                <dt class="text-muted font-semibold">Rekening Pembayaran</dt>
                 <dd class="mt-1 text-sm font-bold text-ink">
                     @if ($rental->payment_account_number)
                         {{ $rental->payment_bank_name }} &middot; {{ $rental->payment_account_number }} ({{ $rental->payment_account_holder }})
@@ -99,15 +92,32 @@
             </div>
         </dl>
 
+        {{-- Setiap jumlah memiliki label sendiri agar urutannya tetap jelas
+             saat nominal besar membungkus di layar kecil. --}}
+        <dl aria-label="Ringkasan tagihan" class="grid grid-cols-3 gap-2 rounded-lg border border-line p-3 text-xs">
+            <div>
+                <dt class="text-muted">Total</dt>
+                <dd class="mt-1 font-bold text-ink">Rp {{ number_format((float) $rental->total_amount, 0, ',', '.') }}</dd>
+            </div>
+            <div>
+                <dt class="text-muted">Dibayar</dt>
+                <dd class="mt-1 font-bold text-ink">Rp {{ number_format((float) $rental->paid_amount, 0, ',', '.') }}</dd>
+            </div>
+            <div>
+                <dt class="text-muted">Sisa tagihan</dt>
+                <dd class="mt-1 font-bold text-danger">Rp {{ number_format($rental->remainingBalance(), 0, ',', '.') }}</dd>
+            </div>
+        </dl>
+
         @if ($rental->booking_channel === \App\Models\Rental::CHANNEL_WALK_IN && $rental->canUploadPaymentProof())
             <form method="POST" action="{{ route('admin.bookings.payments.store', $rental) }}" enctype="multipart/form-data" class="rounded-xl border border-line bg-surface-raised p-5 space-y-3">
                 @csrf
                 <h3 class="text-sm font-bold text-ink">Unggah Bukti Transfer (Bantuan Walk-In)</h3>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <input name="payment_proof" type="file" accept=".jpg,.jpeg,.png" required class="rounded-lg border border-field-line bg-surface p-2 text-xs">
-                    <span>Sisa tagihan sistem Rp {{ number_format($rental->remainingBalance(), 0, ',', '.') }}</span>
+                <label for="walk-in-payment-proof" class="block text-xs font-semibold text-ink">Bukti transfer (JPG, JPEG, PNG)</label>
+                <input id="walk-in-payment-proof" name="payment_proof" type="file" accept=".jpg,.jpeg,.png" required class="block w-full rounded-lg border border-field-line bg-surface p-2 text-xs">
+                <div class="flex justify-end">
+                    <button type="submit" class="min-h-10 rounded-lg bg-action px-4 py-2 text-sm font-bold text-ink hover:bg-action-hover">Simpan Bukti Transfer</button>
                 </div>
-                <button type="submit" class="rounded-lg bg-surface-hover px-4 py-2 text-xs font-bold text-ink">Simpan Bukti Transfer</button>
             </form>
         @endif
 
@@ -139,7 +149,7 @@
                         </div>
 
                         @if ($payment->isPendingApproval())
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3 border-t border-line">
+                            <div class="grid items-start gap-3 border-t border-line pt-3 md:grid-cols-2">
                                 <form method="POST" action="{{ route('admin.payments.approve', $payment) }}" class="space-y-2 rounded-lg border border-success-line bg-success-surface/50 p-4">
                                     @csrf
                                     @method('PATCH')
@@ -147,20 +157,27 @@
                                     <input id="verified_amount_{{ $payment->id }}" name="verified_amount" type="number" min="1" value="{{ (int) $rental->remainingBalance() }}" required class="w-full rounded-lg border border-field-line bg-surface p-2 text-xs">
                                     <label for="received_at_{{ $payment->id }}" class="block font-semibold text-ink">Tanggal Dana Diterima (WIB)</label>
                                     <input id="received_at_{{ $payment->id }}" name="received_at" type="datetime-local" required class="w-full rounded-lg border border-field-line bg-surface p-2 text-xs">
-                                    <button type="submit" class="rounded-lg bg-success-action px-4 py-2 font-bold text-white">Catat Dana Masuk</button>
+                                    <div class="flex justify-end">
+                                        <button type="submit" class="rounded-lg bg-success-action px-4 py-2 font-bold text-white">Catat Dana Masuk</button>
+                                    </div>
                                 </form>
 
-                                <form method="POST" action="{{ route('admin.payments.reject', $payment) }}" class="space-y-2 rounded-lg border border-danger-line bg-danger-surface/50 p-4">
-                                    @csrf
-                                    @method('PATCH')
-                                    <label for="rejection_reason_{{ $payment->id }}" class="block font-bold text-danger">Tolak Bukti Pembayaran (Alasan Wajib)</label>
-                                    <input id="rejection_reason_{{ $payment->id }}" name="rejection_reason" required minlength="5" placeholder="Contoh: Nominal transfer kurang atau foto buram" class="w-full rounded-lg border border-field-line bg-surface p-2 text-xs">
-                                    <label for="received_amount_{{ $payment->id }}" class="block font-semibold text-ink">Nominal Masuk Sebagian (Opsional, 0 jika ditolak penuh)</label>
-                                    <input id="received_amount_{{ $payment->id }}" name="received_amount" type="number" min="0" value="0" class="w-full rounded-lg border border-field-line bg-surface p-2 text-xs">
-                                    <label for="reject_received_at_{{ $payment->id }}" class="block font-semibold text-ink">Tanggal Dana Sebagian Diterima (WIB, wajib bila &gt; 0)</label>
-                                    <input id="reject_received_at_{{ $payment->id }}" name="received_at" type="datetime-local" class="w-full rounded-lg border border-field-line bg-surface p-2 text-xs">
-                                    <button type="submit" class="rounded-lg bg-danger-action px-4 py-2 font-bold text-white">Tolak Bukti Pembayaran</button>
-                                </form>
+                                <details class="rounded-xl border border-line bg-surface-raised" @if ($errors->hasAny(['rejection_reason', 'received_amount', 'received_at'])) open @endif>
+                                    <summary class="cursor-pointer rounded-xl px-4 py-3 text-sm font-bold text-danger">Tolak bukti atau catat dana sebagian</summary>
+                                    <form method="POST" action="{{ route('admin.payments.reject', $payment) }}" class="space-y-2 p-4">
+                                        @csrf
+                                        @method('PATCH')
+                                        <label for="rejection_reason_{{ $payment->id }}" class="block font-bold text-danger">Tolak Bukti Pembayaran (Alasan Wajib)</label>
+                                        <input id="rejection_reason_{{ $payment->id }}" name="rejection_reason" required minlength="5" placeholder="Contoh: Nominal transfer kurang atau foto buram" class="w-full rounded-lg border border-field-line bg-surface p-2 text-xs">
+                                        <label for="received_amount_{{ $payment->id }}" class="block font-semibold text-ink">Nominal Masuk Sebagian (Opsional, 0 jika ditolak penuh)</label>
+                                        <input id="received_amount_{{ $payment->id }}" name="received_amount" type="number" min="0" value="0" class="w-full rounded-lg border border-field-line bg-surface p-2 text-xs">
+                                        <label for="reject_received_at_{{ $payment->id }}" class="block font-semibold text-ink">Tanggal Dana Sebagian Diterima (WIB, wajib bila &gt; 0)</label>
+                                        <input id="reject_received_at_{{ $payment->id }}" name="received_at" type="datetime-local" class="w-full rounded-lg border border-field-line bg-surface p-2 text-xs">
+                                        <div class="flex justify-end">
+                                            <button type="submit" class="rounded-lg bg-danger-action px-4 py-2 font-bold text-white">Tolak Bukti Pembayaran</button>
+                                        </div>
+                                    </form>
+                                </details>
                             </div>
                         @endif
                     </div>
@@ -201,45 +218,49 @@
                             <label for="refund_reference" class="block font-semibold mb-1">Nomor Referensi</label>
                             <input id="refund_reference" name="refund_reference" required placeholder="TRX-REF-001" class="w-full rounded-lg border border-field-line bg-surface p-2">
                         </div>
-                        <button type="submit" class="rounded-lg bg-action hover:bg-action-hover px-4 py-2 font-bold text-ink">Catat Transfer Refund</button>
+                        <button type="submit" class="justify-self-end rounded-lg bg-action hover:bg-action-hover px-4 py-2 font-bold text-ink">Catat Transfer Refund</button>
                     </form>
                 @endif
             </div>
         @endif
 
+        {{-- Opsi sekunder tetap memakai percabangan dan route lama. Summary menunda
+             tampilan form hingga dipilih; atribut open membantu admin kembali ke form yang gagal. --}}
         @if ((! $rental->canBeCancelledUnpaid() || $rental->booking_channel === \App\Models\Rental::CHANNEL_WALK_IN) && in_array($rental->rental_status, [\App\Models\Rental::STATUS_PENDING, \App\Models\Rental::STATUS_CONFIRMED], true))
-            <form method="POST" action="{{ route('admin.bookings.cancel-with-refund', $rental) }}" class="rounded-xl border border-danger-line bg-danger-surface/30 p-5 space-y-3 text-xs">
-                @csrf
-                @method('PATCH')
-                <h3 class="text-sm font-bold text-danger">Batalkan Pesanan &amp; Tetapkan Refund</h3>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                        <label for="cancellation_type" class="block font-semibold text-ink mb-1">Kategori Pembatalan</label>
-                        <select id="cancellation_type" name="cancellation_type" class="w-full rounded-lg border border-field-line bg-surface p-2">
-                            <option value="customer_request">Permintaan Pelanggan (Kebijakan Bertingkat)</option>
-                            <option value="rental_fault">Kesalahan / Kendala Rental (100%)</option>
-                            <option value="no_show">Pelanggan Tidak Hadir &ge; 1 Jam (0%)</option>
-                        </select>
+            <details class="rounded-xl border border-line bg-surface-raised" @if ($rental->cancellation_requested_at || $errors->any()) open @endif>
+                <summary class="cursor-pointer rounded-xl px-4 py-3 text-sm font-bold text-danger">Batalkan Pesanan &amp; Tetapkan Refund</summary>
+                <form method="POST" action="{{ route('admin.bookings.cancel-with-refund', $rental) }}" class="p-5 space-y-3 text-xs">
+                    @csrf
+                    @method('PATCH')
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label for="cancellation_type" class="block font-semibold text-ink mb-1">Kategori Pembatalan</label>
+                            <select id="cancellation_type" name="cancellation_type" class="w-full rounded-lg border border-field-line bg-surface p-2">
+                                <option value="customer_request">Permintaan Pelanggan (Kebijakan Bertingkat)</option>
+                                <option value="rental_fault">Kesalahan / Kendala Rental (100%)</option>
+                                <option value="no_show">Pelanggan Tidak Hadir &ge; 1 Jam (0%)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="admin_cancel_reason" class="block font-semibold text-ink mb-1">Alasan Pembatalan</label>
+                            <input id="admin_cancel_reason" name="cancellation_reason" required minlength="5" placeholder="Alasan pembatalan resmi" class="w-full rounded-lg border border-field-line bg-surface p-2">
+                        </div>
                     </div>
-                    <div>
-                        <label for="admin_cancel_reason" class="block font-semibold text-ink mb-1">Alasan Pembatalan</label>
-                        <input id="admin_cancel_reason" name="cancellation_reason" required minlength="5" placeholder="Alasan pembatalan resmi" class="w-full rounded-lg border border-field-line bg-surface p-2">
+                    @if ($rental->booking_channel === \App\Models\Rental::CHANNEL_WALK_IN && $rental->cancellation_requested_at === null)
+                        <p class="text-muted">Isi konfirmasi berikut untuk kategori Permintaan Pelanggan.</p>
+                        <div class="grid gap-2 sm:grid-cols-2">
+                            @include('admin.bookings.confirmation-fields', ['confirmationRequired' => false])
+                        </div>
+                    @endif
+                    <label class="inline-flex items-center gap-2 text-ink">
+                        <input type="checkbox" name="contact_attempted" value="1" class="rounded border-field-line">
+                        <span>Admin telah mencoba menghubungi pelanggan (wajib sebelum menetapkan tidak hadir / no-show)</span>
+                    </label>
+                    <div class="flex justify-end">
+                        <button type="submit" class="rounded-lg bg-danger-action px-4 py-2 font-bold text-white">Proses Pembatalan &amp; Refund</button>
                     </div>
-                </div>
-                @if ($rental->booking_channel === \App\Models\Rental::CHANNEL_WALK_IN && $rental->cancellation_requested_at === null)
-                    <p class="text-muted">Isi konfirmasi berikut untuk kategori Permintaan Pelanggan.</p>
-                    <div class="grid gap-2 sm:grid-cols-2">
-                        @include('admin.bookings.confirmation-fields', ['confirmationRequired' => false])
-                    </div>
-                @endif
-                <label class="inline-flex items-center gap-2 text-ink">
-                    <input type="checkbox" name="contact_attempted" value="1" class="rounded border-field-line">
-                    <span>Admin telah mencoba menghubungi pelanggan (wajib sebelum menetapkan tidak hadir / no-show)</span>
-                </label>
-                <div>
-                    <button type="submit" class="rounded-lg bg-danger-action px-4 py-2 font-bold text-white">Proses Pembatalan &amp; Refund</button>
-                </div>
-            </form>
+                </form>
+            </details>
         @endif
 
         @php
@@ -250,7 +271,7 @@
 
         @if ($rental->changeRequests->isNotEmpty() || in_array($rental->rental_status, [\App\Models\Rental::STATUS_PENDING, \App\Models\Rental::STATUS_CONFIRMED], true))
             <div class="space-y-4 border-t border-line pt-4">
-                <h3 class="text-sm font-bold text-ink">Perubahan Jadwal &amp; Penggantian Unit (A-06)</h3>
+                <h3 class="text-sm font-bold text-ink">Perubahan Jadwal &amp; Penggantian Unit</h3>
 
                 @foreach ($rental->changeRequests as $changeRequest)
                     <div class="rounded-xl border border-line bg-surface-raised p-4 text-xs space-y-2">
@@ -279,21 +300,21 @@
 
                         @if ($changeRequest->status === \App\Models\RentalChangeRequest::STATUS_PENDING_ADMIN)
                             <div class="pt-2 flex flex-col sm:flex-row gap-3">
-                                <form method="POST" action="{{ route('admin.change-requests.respond', $changeRequest) }}">
+                                <form method="POST" action="{{ route('admin.change-requests.respond', $changeRequest) }}" class="flex min-w-0 flex-1 flex-wrap justify-end gap-2">
+                                    @csrf
+                                    @method('PATCH')
+                                    <input type="hidden" name="decision" value="reject">
+                                    <input aria-label="Alasan penolakan perubahan" name="response_notes" required placeholder="Alasan penolakan perubahan" class="min-w-0 flex-1 basis-40 rounded-lg border border-field-line bg-surface p-2">
+                                    <button type="submit" class="rounded-lg border border-danger-line bg-danger-surface px-4 py-2 font-bold text-danger shrink-0">
+                                        Tolak Perubahan
+                                    </button>
+                                </form>
+                                <form method="POST" action="{{ route('admin.change-requests.respond', $changeRequest) }}" class="flex shrink-0 justify-end">
                                     @csrf
                                     @method('PATCH')
                                     <input type="hidden" name="decision" value="approve">
                                     <button type="submit" class="rounded-lg bg-action hover:bg-action-hover px-4 py-2 font-bold text-ink">
                                         Setujui Perubahan
-                                    </button>
-                                </form>
-                                <form method="POST" action="{{ route('admin.change-requests.respond', $changeRequest) }}" class="flex-1 flex flex-col sm:flex-row gap-2">
-                                    @csrf
-                                    @method('PATCH')
-                                    <input type="hidden" name="decision" value="reject">
-                                    <input name="response_notes" required placeholder="Alasan penolakan perubahan" class="flex-1 rounded-lg border border-field-line bg-surface p-2">
-                                    <button type="submit" class="rounded-lg border border-danger-line bg-danger-surface px-4 py-2 font-bold text-danger shrink-0">
-                                        Tolak Perubahan
                                     </button>
                                 </form>
                             </div>
@@ -319,50 +340,52 @@
                 @endforeach
 
                 @if (in_array($rental->rental_status, [\App\Models\Rental::STATUS_PENDING, \App\Models\Rental::STATUS_CONFIRMED], true) && ! $adminHasOpenChange)
-                    <form method="POST" action="{{ route('admin.bookings.change-requests.propose', $rental) }}" class="rounded-xl border border-line bg-surface-raised p-4 space-y-3 text-xs">
-                        @csrf
-                        <h4 class="font-bold text-ink">Usulkan Perubahan Jadwal / Penggantian Kendaraan kepada Pelanggan</h4>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div>
-                                <label for="admin_request_type" class="block font-semibold text-ink mb-1">Jenis Penyesuaian</label>
-                                <select id="admin_request_type" name="request_type" class="w-full rounded-lg border border-field-line bg-surface p-2">
-                                    <option value="car_replacement">Penggantian Kendaraan</option>
-                                    <option value="reschedule">Penjadwalan Ulang</option>
-                                </select>
+                    <details class="rounded-xl border border-line bg-surface-raised" @if ($rental->review_followup_at || $errors->any()) open @endif>
+                        <summary class="cursor-pointer rounded-xl px-4 py-3 text-sm font-bold text-ink">Usulkan perubahan jadwal atau kendaraan</summary>
+                        <form method="POST" action="{{ route('admin.bookings.change-requests.propose', $rental) }}" class="p-4 space-y-3 text-xs">
+                            @csrf
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                    <label for="admin_request_type" class="block font-semibold text-ink mb-1">Jenis Penyesuaian</label>
+                                    <select id="admin_request_type" name="request_type" class="w-full rounded-lg border border-field-line bg-surface p-2">
+                                        <option value="car_replacement">Penggantian Kendaraan</option>
+                                        <option value="reschedule">Penjadwalan Ulang</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label for="proposed_car_id" class="block font-semibold text-ink mb-1">Kendaraan Pengganti</label>
+                                    <select id="proposed_car_id" name="proposed_car_id" class="w-full rounded-lg border border-field-line bg-surface p-2">
+                                        @foreach ($availableReplacementCars as $carOption)
+                                            <option value="{{ $carOption->id }}" @selected($carOption->id === $rental->car_id)>
+                                                {{ $carOption->name }} ({{ $carOption->plate_number }}) &mdash; Rp {{ number_format((float) $carOption->price_per_day, 0, ',', '.') }}/hari
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div>
+                                    <label for="admin_proposed_pickup_at" class="block font-semibold text-ink mb-1">Waktu Ambil Usulan (WIB)</label>
+                                    <input id="admin_proposed_pickup_at" name="proposed_pickup_at" type="datetime-local" value="{{ $rental->pickup_at?->timezone('Asia/Jakarta')->format('Y-m-d\TH:i') }}" class="w-full rounded-lg border border-field-line bg-surface p-2">
+                                </div>
+                                <div>
+                                    <label for="admin_proposed_total_days" class="block font-semibold text-ink mb-1">Jumlah Hari Usulan</label>
+                                    <input id="admin_proposed_total_days" name="proposed_total_days" type="number" min="1" max="365" value="{{ $rental->total_days }}" class="w-full rounded-lg border border-field-line bg-surface p-2">
+                                </div>
                             </div>
                             <div>
-                                <label for="proposed_car_id" class="block font-semibold text-ink mb-1">Kendaraan Pengganti</label>
-                                <select id="proposed_car_id" name="proposed_car_id" class="w-full rounded-lg border border-field-line bg-surface p-2">
-                                    @foreach ($availableReplacementCars as $carOption)
-                                        <option value="{{ $carOption->id }}" @selected($carOption->id === $rental->car_id)>
-                                            {{ $carOption->name }} ({{ $carOption->plate_number }}) &mdash; Rp {{ number_format((float) $carOption->price_per_day, 0, ',', '.') }}/hari
-                                        </option>
-                                    @endforeach
-                                </select>
+                                <label for="admin_change_reason" class="block font-semibold text-ink mb-1">Alasan Resmi Penyesuaian</label>
+                                <input id="admin_change_reason" name="reason" required placeholder="Contoh: Unit sebelumnya terlambat kembali / perlu penggantian setara" class="w-full rounded-lg border border-field-line bg-surface p-2">
                             </div>
-                            <div>
-                                <label for="admin_proposed_pickup_at" class="block font-semibold text-ink mb-1">Waktu Ambil Usulan (WIB)</label>
-                                <input id="admin_proposed_pickup_at" name="proposed_pickup_at" type="datetime-local" value="{{ $rental->pickup_at?->timezone('Asia/Jakarta')->format('Y-m-d\TH:i') }}" class="w-full rounded-lg border border-field-line bg-surface p-2">
+                            <label class="inline-flex items-center gap-2 text-ink">
+                                <input type="checkbox" name="waive_price_difference" value="1" class="rounded border-field-line">
+                                <span>Bebaskan selisih biaya (biaya tambahan 0 untuk pesanan terdampak kendala rental)</span>
+                            </label>
+                            <div class="flex justify-end">
+                                <button type="submit" class="rounded-lg bg-action hover:bg-action-hover px-4 py-2 font-bold text-ink">
+                                    {{ $rental->booking_channel === \App\Models\Rental::CHANNEL_WALK_IN ? 'Simpan Usulan untuk Dikonfirmasi' : 'Kirim Usulan ke Pelanggan' }}
+                                </button>
                             </div>
-                            <div>
-                                <label for="admin_proposed_total_days" class="block font-semibold text-ink mb-1">Jumlah Hari Usulan</label>
-                                <input id="admin_proposed_total_days" name="proposed_total_days" type="number" min="1" max="365" value="{{ $rental->total_days }}" class="w-full rounded-lg border border-field-line bg-surface p-2">
-                            </div>
-                        </div>
-                        <div>
-                            <label for="admin_change_reason" class="block font-semibold text-ink mb-1">Alasan Resmi Penyesuaian</label>
-                            <input id="admin_change_reason" name="reason" required placeholder="Contoh: Unit sebelumnya terlambat kembali / perlu penggantian setara" class="w-full rounded-lg border border-field-line bg-surface p-2">
-                        </div>
-                        <label class="inline-flex items-center gap-2 text-ink">
-                            <input type="checkbox" name="waive_price_difference" value="1" class="rounded border-field-line">
-                            <span>Bebaskan selisih biaya (biaya tambahan 0 untuk pesanan terdampak kendala rental)</span>
-                        </label>
-                        <div>
-                            <button type="submit" class="rounded-lg bg-action hover:bg-action-hover px-4 py-2 font-bold text-ink">
-                                {{ $rental->booking_channel === \App\Models\Rental::CHANNEL_WALK_IN ? 'Simpan Usulan untuk Dikonfirmasi' : 'Kirim Usulan ke Pelanggan' }}
-                            </button>
-                        </div>
-                    </form>
+                        </form>
+                    </details>
                 @endif
             </div>
         @endif
@@ -370,25 +393,27 @@
         @if ($rental->booking_channel === \App\Models\Rental::CHANNEL_WALK_IN
             && in_array($rental->rental_status, [\App\Models\Rental::STATUS_CONFIRMED, \App\Models\Rental::STATUS_PICKED_UP], true)
             && ! $rental->extensions->contains(fn ($item) => in_array($item->status, ['pending_approval', 'awaiting_payment', 'payment_submitted'], true)))
-            <form method="POST" action="{{ route('admin.bookings.walk-in-extensions.store', $rental) }}" class="rounded-xl border border-line bg-surface-raised p-4 text-xs space-y-3">
-                @csrf
-                <h3 class="font-bold">Catat Permohonan Perpanjangan Walk-in</h3>
-                <div class="grid gap-2 sm:grid-cols-2">
-                    <label>Tambahan hari
-                        <input type="number" name="additional_days" min="1" max="30" required class="mt-1 block w-full rounded border border-field-line p-2">
-                    </label>
-                    <label>Catatan permohonan
-                        <input name="notes" maxlength="500" class="mt-1 block w-full rounded border border-field-line p-2">
-                    </label>
-                    @include('admin.bookings.confirmation-fields')
-                </div>
-                <div class="flex justify-end"><button class="rounded-lg bg-action px-4 py-2 font-bold">Simpan Permohonan</button></div>
-            </form>
+            <details class="rounded-xl border border-line bg-surface-raised" @if ($errors->any()) open @endif>
+                <summary class="cursor-pointer rounded-xl px-4 py-3 text-sm font-bold text-ink">Catat Permohonan Perpanjangan Walk-in</summary>
+                <form method="POST" action="{{ route('admin.bookings.walk-in-extensions.store', $rental) }}" class="p-4 text-xs space-y-3">
+                    @csrf
+                    <div class="grid gap-2 sm:grid-cols-2">
+                        <label>Tambahan hari
+                            <input type="number" name="additional_days" min="1" max="30" required class="mt-1 block w-full rounded border border-field-line p-2">
+                        </label>
+                        <label>Catatan permohonan
+                            <input name="notes" maxlength="500" class="mt-1 block w-full rounded border border-field-line p-2">
+                        </label>
+                        @include('admin.bookings.confirmation-fields')
+                    </div>
+                    <div class="flex justify-end"><button class="rounded-lg bg-action px-4 py-2 font-bold">Simpan Permohonan</button></div>
+                </form>
+            </details>
         @endif
 
         @if ($rental->extensions->isNotEmpty())
             <div class="space-y-4 border-t border-line pt-4">
-                <h3 class="text-sm font-bold text-ink">Pengajuan Perpanjangan Sewa (A-08)</h3>
+                <h3 class="text-sm font-bold text-ink">Pengajuan Perpanjangan Sewa</h3>
                 @foreach ($rental->extensions as $extension)
                     <div class="rounded-xl border border-line bg-surface-raised p-4 text-xs space-y-2">
                         <div class="flex flex-wrap items-center justify-between gap-2">
@@ -412,19 +437,19 @@
 
                         @if ($extension->status === \App\Models\RentalExtension::STATUS_PENDING_APPROVAL)
                             <div class="pt-2 flex flex-col sm:flex-row gap-3">
-                                <form method="POST" action="{{ route('admin.extensions.approve', $extension) }}">
+                                <form method="POST" action="{{ route('admin.extensions.reject', $extension) }}" class="flex min-w-0 flex-1 flex-wrap justify-end gap-2">
+                                    @csrf
+                                    @method('PATCH')
+                                    <input aria-label="Alasan penolakan perpanjangan" name="rejection_reason" required placeholder="Alasan penolakan perpanjangan" class="min-w-0 flex-1 basis-40 rounded-lg border border-field-line bg-surface p-2">
+                                    <button type="submit" class="rounded-lg border border-danger-line bg-danger-surface px-4 py-2 font-bold text-danger shrink-0">
+                                        Tolak Perpanjangan
+                                    </button>
+                                </form>
+                                <form method="POST" action="{{ route('admin.extensions.approve', $extension) }}" class="flex shrink-0 justify-end">
                                     @csrf
                                     @method('PATCH')
                                     <button type="submit" class="rounded-lg bg-action hover:bg-action-hover px-4 py-2 font-bold text-ink">
                                         Setujui Perpanjangan (Tunggu Bayar)
-                                    </button>
-                                </form>
-                                <form method="POST" action="{{ route('admin.extensions.reject', $extension) }}" class="flex-1 flex flex-col sm:flex-row gap-2">
-                                    @csrf
-                                    @method('PATCH')
-                                    <input name="rejection_reason" required placeholder="Alasan penolakan perpanjangan" class="flex-1 rounded-lg border border-field-line bg-surface p-2">
-                                    <button type="submit" class="rounded-lg border border-danger-line bg-danger-surface px-4 py-2 font-bold text-danger shrink-0">
-                                        Tolak Perpanjangan
                                     </button>
                                 </form>
                             </div>
@@ -518,7 +543,7 @@
                                     <label for="ext_refund_ref_{{ $extension->id }}" class="block font-semibold mb-1">Nomor Referensi</label>
                                     <input id="ext_refund_ref_{{ $extension->id }}" name="refund_reference" required placeholder="REF-EXT-001" class="w-full rounded-lg border border-field-line bg-surface p-2">
                                 </div>
-                                <button type="submit" class="rounded-lg bg-action hover:bg-action-hover px-4 py-2 font-bold text-ink">Catat Transfer Refund</button>
+                                <button type="submit" class="justify-self-end rounded-lg bg-action hover:bg-action-hover px-4 py-2 font-bold text-ink">Catat Transfer Refund</button>
                             </form>
                         @endif
                         @if ($extension->refund_status === \App\Models\RentalExtension::REFUND_PROCESSED)
@@ -544,7 +569,7 @@
 
         @if ($rental->inspections->isNotEmpty())
             <div class="space-y-3 border-t border-line pt-4">
-                <h3 class="text-sm font-bold text-ink">Hasil Inspeksi Pengambilan &amp; Pengembalian (S-03, S-04)</h3>
+                <h3 class="text-sm font-bold text-ink">Hasil Inspeksi Pengambilan &amp; Pengembalian</h3>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                     @foreach ($rental->inspections as $inspection)
                         <div class="rounded-xl border border-line bg-surface-raised p-4 space-y-1.5">
@@ -569,7 +594,7 @@
 
         @if (in_array($rental->rental_status, [\App\Models\Rental::STATUS_RETURNED, \App\Models\Rental::STATUS_COMPLETED], true))
             <div class="space-y-4 border-t border-line pt-4">
-                <h3 class="text-sm font-bold text-ink">Biaya Tambahan &amp; Penyelesaian Transaksi (A-09, SYS-12)</h3>
+                <h3 class="text-sm font-bold text-ink">Biaya Tambahan &amp; Penyelesaian Transaksi</h3>
 
                 <div class="rounded-xl border border-line bg-surface-raised p-4 text-xs space-y-2">
                     <div class="flex flex-wrap items-center justify-between gap-2">
@@ -695,10 +720,10 @@
                         @csrf
                         @method('PATCH')
                         <div class="flex-1">
-                            <label for="completion_notes" class="block font-semibold text-ink mb-1">Catatan Penyelesaian Transaksi (SYS-12)</label>
+                            <label for="completion_notes" class="block font-semibold text-ink mb-1">Catatan Penyelesaian Transaksi</label>
                             <input id="completion_notes" name="completion_notes" placeholder="Catatan penutupan transaksi (status kesiapan mobil tetap dicatat terpisah)" class="w-full rounded-lg border border-field-line bg-surface p-2">
                         </div>
-                        <button type="submit" class="rounded-lg bg-action hover:bg-action-hover px-5 py-2 font-bold text-ink shrink-0">
+                        <button type="submit" class="shrink-0 self-end rounded-lg bg-action px-5 py-2 font-bold text-ink hover:bg-action-hover">
                             Tutup &amp; Selesaikan Transaksi
                         </button>
                     </form>
@@ -709,15 +734,15 @@
         @if ($rental->cashFlows->isNotEmpty())
             <div class="space-y-3 border-t border-line pt-4">
                 <h3 class="text-sm font-bold text-ink">Buku Arus Kas Transaksi (Berbasis Kas WIB)</h3>
-                <div class="overflow-x-auto rounded-xl border border-line">
+                <div role="region" aria-label="Buku arus kas transaksi" tabindex="0" class="overflow-x-auto rounded-xl border border-line">
                     <table class="w-full text-left border-collapse text-xs">
                         <thead>
                             <tr class="bg-surface-raised text-[11px] font-semibold text-muted uppercase tracking-wider border-b border-line">
-                                <th class="py-2.5 px-4">Tanggal Kas (WIB)</th>
-                                <th class="py-2.5 px-4">Kategori</th>
-                                <th class="py-2.5 px-4">Arah</th>
-                                <th class="py-2.5 px-4">Referensi</th>
-                                <th class="py-2.5 px-4 text-right">Nominal</th>
+                                <th scope="col" class="py-2.5 px-4">Tanggal Kas (WIB)</th>
+                                <th scope="col" class="py-2.5 px-4">Kategori</th>
+                                <th scope="col" class="py-2.5 px-4">Arah</th>
+                                <th scope="col" class="py-2.5 px-4">Referensi</th>
+                                <th scope="col" class="py-2.5 px-4 text-right">Nominal</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-line">
@@ -740,17 +765,94 @@
 
 
         @if ($rental->canBeCancelledUnpaid() && $rental->booking_channel !== \App\Models\Rental::CHANNEL_WALK_IN)
-            <form method="POST" action="{{ route('admin.bookings.cancel', $rental) }}" class="pt-4 border-t border-line flex flex-col sm:flex-row items-stretch sm:items-end justify-between gap-3">
-                @csrf
-                @method('PATCH')
-                <div class="flex-1">
-                    <label for="cancellation_reason" class="block text-xs font-semibold text-ink mb-1">Alasan Pembatalan (Opsional)</label>
-                    <input id="cancellation_reason" name="cancellation_reason" class="w-full rounded-lg border border-field-line bg-surface-raised p-2 text-xs" placeholder="Contoh: Pelanggan membatalkan pesanan sebelum transfer">
-                </div>
-                <button type="submit" class="rounded-lg border border-danger-line bg-danger-surface px-4 py-2 text-xs font-bold text-danger">
-                    Batalkan Pesanan
-                </button>
-            </form>
+            <details class="rounded-xl border border-line bg-surface-raised" @if ($errors->any()) open @endif>
+                <summary class="cursor-pointer rounded-xl px-4 py-3 text-sm font-bold text-danger">Batalkan pesanan belum dibayar</summary>
+                <form method="POST" action="{{ route('admin.bookings.cancel', $rental) }}" class="p-4 flex flex-col sm:flex-row items-stretch sm:items-end justify-end gap-3">
+                    @csrf
+                    @method('PATCH')
+                    <div class="flex-1">
+                        <label for="cancellation_reason" class="block text-xs font-semibold text-ink mb-1">Alasan Pembatalan (Opsional)</label>
+                        <input id="cancellation_reason" name="cancellation_reason" class="w-full rounded-lg border border-field-line bg-surface-raised p-2 text-xs" placeholder="Contoh: Pelanggan membatalkan pesanan sebelum transfer">
+                    </div>
+                    <button type="submit" class="self-end rounded-lg border border-danger-line bg-danger-surface px-4 py-2 text-xs font-bold text-danger">
+                        Batalkan Pesanan
+                    </button>
+                </form>
+            </details>
+        @endif
+        @if ($rental->histories->isNotEmpty())
+            {{-- Controller sudah memuat histori dan relasi actor. Array ini
+                 memberi nama pada tindakan yang biasa dicatat saat membantu walk-in.
+                 Hanya metode dan waktu konfirmasi yang dibaca dari metadata. --}}
+            @php
+                $historyLabels = [
+                    'booking_created' => 'Pemesanan dibuat',
+                    'identity_approved' => 'Identitas disetujui',
+                    'identity_rejected' => 'Identitas ditolak',
+                    'identity_resubmitted' => 'Dokumen identitas diperbarui',
+                    'admin_review_followup' => 'Pemeriksaan perlu ditindaklanjuti',
+                    'admin_review_contact' => 'Kontak pelanggan dicatat',
+                    'payment_proof_submitted' => 'Bukti pembayaran diunggah',
+                    'payment_approved' => 'Pembayaran disetujui',
+                    'payment_rejected' => 'Bukti pembayaran ditolak',
+                    'payment_reconciled' => 'Dana masuk direkonsiliasi',
+                    'change_requested' => 'Perubahan diminta',
+                    'change_proposed_by_admin' => 'Perubahan diusulkan admin',
+                    'change_rejected' => 'Perubahan ditolak',
+                    'change_approved' => 'Perubahan disetujui',
+                    'cancellation_requested' => 'Pembatalan diminta',
+                    'booking_cancelled_with_refund' => 'Pemesanan dibatalkan dengan refund',
+                    'booking_cancelled_unpaid' => 'Pemesanan belum dibayar dibatalkan',
+                    'booking_identity_cancelled' => 'Pemesanan dibatalkan karena identitas',
+                    'booking_expired' => 'Pemesanan kedaluwarsa',
+                    'refund_realized' => 'Transfer refund dicatat',
+                    'extension_requested' => 'Perpanjangan diminta',
+                    'extension_approved' => 'Perpanjangan disetujui',
+                    'extension_rejected' => 'Perpanjangan ditolak',
+                    'extension_payment_submitted' => 'Bukti bayar perpanjangan diunggah',
+                    'extension_activated' => 'Perpanjangan aktif',
+                    'extension_cancelled_with_refund' => 'Perpanjangan dibatalkan dengan refund',
+                    'extension_payment_rejected' => 'Bukti bayar perpanjangan ditolak',
+                    'extension_expired' => 'Perpanjangan kedaluwarsa',
+                    'extension_expired_on_return' => 'Perpanjangan berakhir saat unit dikembalikan',
+                    'extension_refund_realized' => 'Transfer refund perpanjangan dicatat',
+                    'vehicle_picked_up' => 'Kendaraan diserahkan',
+                    'vehicle_returned' => 'Kendaraan dikembalikan',
+                    'next_booking_impacted' => 'Jadwal pemesanan terdampak',
+                    'additional_charges_assessed' => 'Biaya tambahan ditetapkan',
+                    'additional_charge_proof_submitted' => 'Bukti bayar biaya tambahan diunggah',
+                    'additional_charge_paid' => 'Biaya tambahan lunas',
+                    'additional_charge_rejected' => 'Bukti bayar biaya tambahan ditolak',
+                    'rental_completed' => 'Transaksi selesai',
+                ];
+                $confirmationLabels = ['in_person' => 'Tatap muka', 'phone' => 'Telepon', 'message' => 'Pesan'];
+            @endphp
+            <details class="rounded-xl border border-line bg-surface-raised">
+                <summary class="cursor-pointer rounded-xl px-4 py-3 text-sm font-bold text-ink">Histori transaksi ({{ $rental->histories->count() }})</summary>
+                <ol class="divide-y divide-line border-t border-line">
+                    @foreach ($rental->histories as $entry)
+                        @php
+                            $confirmationMethod = $confirmationLabels[$entry->metadata['confirmation_method'] ?? ''] ?? null;
+                            $confirmationTime = $entry->metadata['confirmed_at'] ?? $entry->metadata['contacted_at'] ?? $entry->metadata['terms_accepted_at'] ?? null;
+                        @endphp
+                        <li class="space-y-1 px-4 py-3 text-sm">
+                            <p class="font-semibold text-ink">{{ $historyLabels[$entry->action] ?? \Illuminate\Support\Str::headline($entry->action) }}</p>
+                            <p class="text-xs text-muted">{{ $entry->created_at?->timezone('Asia/Jakarta')->format('d M Y H:i') }} WIB &middot; {{ $entry->actor?->name ?? 'Sistem' }}</p>
+                            @if ($entry->reason)
+                                <p class="wrap-anywhere text-muted">{{ $entry->reason }}</p>
+                            @endif
+                            @if ($confirmationMethod)
+                                <p class="text-xs text-muted">
+                                    Metode konfirmasi {{ $confirmationMethod }}
+                                    @if ($confirmationTime)
+                                        &middot; {{ \Illuminate\Support\Carbon::parse($confirmationTime)->timezone('Asia/Jakarta')->format('d M Y H:i') }} WIB
+                                    @endif
+                                </p>
+                            @endif
+                        </li>
+                    @endforeach
+                </ol>
+            </details>
         @endif
     </div>
 </div>
