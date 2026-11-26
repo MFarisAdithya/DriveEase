@@ -347,7 +347,7 @@ class RentalChangeService
                 || $lockedRequest->status !== RentalChangeRequest::STATUS_PENDING_CUSTOMER)) {
                 throw ValidationException::withMessages(['decision' => 'Konfirmasi manual hanya tersedia untuk usulan walk-in yang masih menunggu jawaban.']);
             }
-            if ($confirmation !== null && $confirmation->occurredAt()->lt($lockedRequest->created_at)) {
+            if ($confirmation !== null && $confirmation->occurredAt()->lt($lockedRequest->created_at->copy()->startOfMinute())) {
                 throw ValidationException::withMessages(['confirmed_at' => 'Waktu jawaban tidak boleh mendahului usulan.']);
             }
 

@@ -31,16 +31,11 @@ class RentalExtensionService
      */
     public function requestExtension(
         Rental $rental,
-        User $customer,
+        User $actor,
         int $additionalDays,
-        ?string $notes = null
+        ?string $notes = null,
+        ?WalkInConfirmation $confirmation = null,
     ): RentalExtension {
-        if ($rental->user_id !== $customer->id) {
-            throw ValidationException::withMessages([
-                'additional_days' => 'Anda tidak berhak mengajukan perpanjangan untuk pesanan milik orang lain.',
-            ]);
-        }
-
         if ($additionalDays < 1 || $additionalDays > 30) {
             throw ValidationException::withMessages([
                 'additional_days' => 'Tambahan hari perpanjangan harus antara 1 sampai 30 hari.',
@@ -50,12 +45,24 @@ class RentalExtensionService
         $nowWib = CarbonImmutable::now(RentalScheduleService::TIMEZONE);
         $trimmedNotes = trim((string) $notes);
 
-        return DB::transaction(function () use ($rental, $customer, $additionalDays, $trimmedNotes, $nowWib): RentalExtension {
+        return DB::transaction(function () use ($rental, $actor, $additionalDays, $trimmedNotes, $nowWib, $confirmation): RentalExtension {
             // Ikuti urutan kunci global: Car -> Rental -> RentalExtension.
             $car = Car::query()->lockForUpdate()->findOrFail($rental->car_id);
             $this->releaseExpiredExtensions($car->id, $nowWib);
 
             $lockedRental = Rental::query()->lockForUpdate()->findOrFail($rental->id);
+
+            // Portal pelanggan memakai pemilik transaksi. Admin boleh mewakili
+            // penyewa hanya pada kanal walk-in dengan jawaban manual yang tercatat.
+            $canRequest = $actor->isAdmin()
+                ? $lockedRental->booking_channel === Rental::CHANNEL_WALK_IN && $confirmation !== null
+                : $lockedRental->user_id === $actor->id && $confirmation === null;
+            if (! $canRequest || $lockedRental->car_id !== $car->id) {
+                throw ValidationException::withMessages(['additional_days' => 'Pengajuan tidak diizinkan atau unit berubah. Muat ulang pesanan.']);
+            }
+            if ($confirmation?->occurredAt()->lt($lockedRental->created_at->copy()->startOfMinute())) {
+                throw ValidationException::withMessages(['confirmed_at' => 'Waktu konfirmasi tidak boleh mendahului pemesanan.']);
+            }
 
             // Perpanjangan hanya diizinkan setelah pesanan awal lunas (confirmed atau picked_up).
             if (! in_array($lockedRental->rental_status, [Rental::STATUS_CONFIRMED, Rental::STATUS_PICKED_UP], true)
@@ -87,7 +94,7 @@ class RentalExtensionService
 
             $extension = RentalExtension::create([
                 'rental_id' => $lockedRental->id,
-                'requested_by' => $customer->id,
+                'requested_by' => $actor->id,
                 'additional_days' => $additionalDays,
                 'previous_return_at' => $previousReturnAt,
                 'proposed_return_at' => $proposedReturnAt,
@@ -105,7 +112,7 @@ class RentalExtensionService
             ])->save();
 
             $lockedRental->recordHistory(
-                $customer,
+                $actor,
                 'extension_requested',
                 $lockedRental->rental_status,
                 $lockedRental->rental_status,
@@ -116,7 +123,7 @@ class RentalExtensionService
                     'previous_return_at' => $previousReturnAt->toIso8601String(),
                     'proposed_return_at' => $proposedReturnAt->toIso8601String(),
                     'additional_amount' => $additionalAmount,
-                ]
+                ] + ($confirmation?->metadata() ?? [])
             );
 
             return $extension;
@@ -281,7 +288,7 @@ class RentalExtensionService
      *
      * @throws ValidationException
      */
-    public function submitExtensionPayment(RentalExtension $extension, User $customer, UploadedFile $proofFile): RentalExtension
+    public function submitExtensionPayment(RentalExtension $extension, User $actor, UploadedFile $proofFile): RentalExtension
     {
         $nowWib = CarbonImmutable::now(RentalScheduleService::TIMEZONE);
         $fileExtension = $proofFile->getClientOriginalExtension() ?: 'jpg';
@@ -295,7 +302,7 @@ class RentalExtensionService
         $previousProofPath = null;
 
         try {
-            $updatedExtension = DB::transaction(function () use ($extension, $customer, $storedPath, $nowWib, &$previousProofPath): RentalExtension {
+            $updatedExtension = DB::transaction(function () use ($extension, $actor, $storedPath, $nowWib, &$previousProofPath): RentalExtension {
                 // Ikuti urutan kunci global: Car -> Rental -> RentalExtension.
                 $carId = (int) Rental::query()->whereKey($extension->rental_id)->value('car_id');
                 Car::query()->lockForUpdate()->findOrFail($carId);
@@ -304,7 +311,12 @@ class RentalExtensionService
                 $lockedRental = Rental::query()->lockForUpdate()->findOrFail($extension->rental_id);
                 $lockedExtension = RentalExtension::query()->lockForUpdate()->findOrFail($extension->id);
 
-                if ($lockedRental->user_id !== $customer->id) {
+                // Admin mengunggah bukti untuk walk-in saja. Cabang pelanggan
+                // tetap memeriksa kepemilikan pesanan dalam transaksi yang sama.
+                $canUpload = $actor->isAdmin()
+                    ? $lockedRental->booking_channel === Rental::CHANNEL_WALK_IN
+                    : $lockedRental->user_id === $actor->id;
+                if (! $canUpload || $lockedRental->car_id !== $carId) {
                     throw ValidationException::withMessages([
                         'payment_proof' => 'Anda tidak berhak mengunggah bukti pembayaran untuk pesanan milik orang lain.',
                     ]);
@@ -342,7 +354,7 @@ class RentalExtensionService
                 ])->save();
 
                 $lockedRental->recordHistory(
-                    $customer,
+                    $actor,
                     'extension_payment_submitted',
                     $lockedRental->rental_status,
                     $lockedRental->rental_status,

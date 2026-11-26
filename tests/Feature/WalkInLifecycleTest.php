@@ -5,12 +5,14 @@ namespace Tests\Feature;
 use App\Models\Car;
 use App\Models\Rental;
 use App\Models\RentalChangeRequest;
+use App\Models\RentalExtension;
 use App\Models\RentalSetting;
 use App\Models\Role;
 use App\Models\User;
 use Carbon\CarbonInterface;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class WalkInLifecycleTest extends TestCase
@@ -93,6 +95,99 @@ class WalkInLifecycleTest extends TestCase
         $this->actingAs($online)->patch(route('customer.change-requests.respond', $onlineChange), [
             'decision' => 'approve',
         ])->assertSessionHasNoErrors();
+    }
+
+    public function test_walk_in_replacement_extension_and_additional_payment_complete_without_customer_login(): void
+    {
+        [$admin, $staff, $customer, $car] = $this->prepare();
+        $pickup = now('Asia/Jakarta')->addDays(3);
+        $rental = $this->book($customer, $car, $pickup);
+        $originalTotal = $rental->total_amount;
+        $replacement = Car::readyForRental()->where('id', '!=', $car->id)->firstOrFail();
+
+        $change = $this->propose($rental, $pickup, $replacement);
+        $this->patch(route('admin.change-requests.walk-in-response', $change), $this->confirmation() + [
+            'decision' => 'approve',
+        ])->assertSessionHas('success');
+        $rental->refresh();
+        $this->assertSame($replacement->id, $rental->car_id);
+        $this->assertEquals($originalTotal, $rental->total_amount);
+
+        $this->uploadMainProof($rental);
+        $this->patch(route('admin.payments.approve', $rental->payments()->sole()), [
+            'verified_amount' => $rental->total_amount,
+            'received_at' => now('Asia/Jakarta')->format('Y-m-d\TH:i'),
+        ])->assertSessionHasNoErrors();
+        $this->assertSame(Rental::STATUS_PENDING, $rental->fresh()->rental_status);
+        $this->patch(route('admin.verifications.approve', $customer))->assertSessionHas('success');
+
+        $requestExtension = route('admin.bookings.walk-in-extensions.store', $rental);
+        $this->post($requestExtension, ['additional_days' => 1])->assertSessionHasErrors('confirmation_method');
+        $this->post($requestExtension, $this->confirmation() + ['additional_days' => 1])->assertSessionHas('success');
+        $this->post($requestExtension, $this->confirmation() + ['additional_days' => 1])->assertSessionHasErrors('additional_days');
+        $extension = $rental->extensions()->sole();
+        $history = $rental->histories()->where('action', 'extension_requested')->sole();
+        $this->assertSame($admin->id, $extension->requested_by);
+        $this->assertSame($admin->id, $history->actor_id);
+        $this->assertSame('phone', $history->metadata['confirmation_method']);
+
+        $this->patch(route('admin.extensions.approve', $extension))->assertSessionHas('success');
+        $uploadExtension = route('admin.extensions.walk-in-payment.store', $extension);
+        $this->actingAs($staff)->post($uploadExtension)->assertForbidden();
+        $this->actingAs($admin)->post($uploadExtension, [
+            'payment_proof' => UploadedFile::fake()->createWithContent('proof.pdf', '%PDF-1.4
+%%EOF
+'),
+        ])->assertSessionHas('success');
+        Storage::disk('local')->assertExists($extension->fresh()->payment_proof);
+        $this->get(route('documents.extension-payment.show', $extension))->assertOk()->assertHeader('Content-Type', 'application/pdf');
+        $this->actingAs($staff)->get(route('documents.extension-payment.show', $extension))->assertForbidden();
+
+        $originalReturn = $rental->return_at;
+        $this->assertTrue($originalReturn->equalTo($rental->fresh()->return_at));
+        $this->actingAs($admin)->patch(route('admin.extensions.payment.approve', $extension), [
+            'verified_amount' => $extension->additional_amount,
+            'received_at' => now('Asia/Jakarta')->format('Y-m-d\TH:i'),
+        ])->assertSessionHas('success');
+        $this->assertSame(RentalExtension::STATUS_COMPLETED, $extension->fresh()->status);
+        $rental->refresh();
+        $this->assertTrue($originalReturn->copy()->addDay()->equalTo($rental->return_at));
+
+        $this->travelTo($pickup);
+        $this->actingAs($staff)->post(route('staff.schedules.pickup', $rental), [
+            'identity_checked' => 1,
+            'actual_pickup_at' => $pickup->format('Y-m-d\TH:i'),
+            'odometer_km' => 5000,
+            'fuel_level' => 'full',
+            'condition_photo' => UploadedFile::fake()->image('pickup.jpg'),
+        ])->assertSessionHasNoErrors();
+
+        $this->travelTo($rental->return_at);
+        $this->post(route('staff.schedules.return', $rental), [
+            'actual_return_at' => now('Asia/Jakarta')->format('Y-m-d\TH:i'),
+            'odometer_km' => 5150,
+            'fuel_level' => 'half',
+            'condition_photo' => UploadedFile::fake()->image('return.jpg'),
+        ])->assertSessionHasNoErrors();
+
+        $this->actingAs($admin)->post(route('admin.bookings.additional-charges.assess', $rental), [
+            'fuel_fee_amount' => 60000,
+            'fuel_fee_reason' => 'BBM kurang saat dikembalikan.',
+            'damage_fee_amount' => 0,
+        ])->assertSessionHas('success');
+        $this->patch(route('admin.bookings.complete', $rental))->assertSessionHasErrors('completion');
+        $this->post(route('admin.bookings.additional-charges.proof', $rental), [
+            'additional_charge_proof' => UploadedFile::fake()->image('fuel.png'),
+        ])->assertSessionHas('success');
+        $this->patch(route('admin.bookings.additional-charges.approve', $rental), [
+            'verified_amount' => 60000,
+            'received_at' => now('Asia/Jakarta')->format('Y-m-d\TH:i'),
+            'payment_reference' => 'WALK-FUEL-01',
+        ])->assertSessionHas('success');
+        $this->patch(route('admin.bookings.complete', $rental))->assertSessionHas('success');
+        $this->assertSame(Rental::STATUS_COMPLETED, $rental->fresh()->rental_status);
+        $this->assertSame(3, $rental->cashFlows()->count());
+        $this->assertNull($customer->fresh()->password);
     }
 
     /** @return array{User, User, User, Car} */

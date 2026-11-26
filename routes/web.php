@@ -133,6 +133,8 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
     Route::post('/bookings/{rental}/change-requests', [AdminBookingChangeController::class, 'proposeChange'])->name('bookings.change-requests.propose');
     Route::patch('/change-requests/{changeRequest}/respond', [AdminBookingChangeController::class, 'respondToRequest'])->name('change-requests.respond');
     Route::patch('/change-requests/{changeRequest}/walk-in-response', [AdminBookingChangeController::class, 'recordWalkInResponse'])->name('change-requests.walk-in-response');
+    Route::post('/bookings/{rental}/walk-in-extensions', [AdminBookingChangeController::class, 'requestWalkInExtension'])->name('bookings.walk-in-extensions.store');
+    Route::post('/extensions/{extension}/walk-in-payment', [AdminBookingChangeController::class, 'storeWalkInExtensionProof'])->name('extensions.walk-in-payment.store');
     Route::patch('/extensions/{extension}/approve', [AdminBookingChangeController::class, 'approveExtension'])->name('extensions.approve');
     Route::patch('/extensions/{extension}/reject', [AdminBookingChangeController::class, 'rejectExtension'])->name('extensions.reject');
     Route::patch('/extensions/{extension}/payment/approve', [AdminBookingChangeController::class, 'approveExtensionPayment'])->name('extensions.payment.approve');

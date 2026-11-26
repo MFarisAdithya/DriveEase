@@ -87,6 +87,41 @@ class BookingChangeController extends Controller
             ->with('success', 'Jawaban penyewa walk-in berhasil dicatat.');
     }
 
+    public function requestWalkInExtension(Request $request, Rental $rental): RedirectResponse
+    {
+        abort_unless($rental->booking_channel === Rental::CHANNEL_WALK_IN, 403);
+        $validated = $request->validate([
+            'additional_days' => ['required', 'integer', 'min:1', 'max:30'],
+            'notes' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $this->extensionService->requestExtension(
+            $rental,
+            $request->user(),
+            (int) $validated['additional_days'],
+            $validated['notes'] ?? null,
+            WalkInConfirmation::fromInput($request->only('confirmation_method', 'confirmed_at')),
+        );
+
+        return redirect()->route('admin.bookings.show', $rental)
+            ->with('success', 'Permohonan perpanjangan penyewa walk-in tercatat.');
+    }
+
+    public function storeWalkInExtensionProof(Request $request, RentalExtension $extension): RedirectResponse
+    {
+        abort_unless($extension->rental?->booking_channel === Rental::CHANNEL_WALK_IN, 403);
+        $validated = $request->validate([
+            'payment_proof' => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'extensions:jpg,jpeg,png,pdf', 'max:5120'],
+        ]);
+
+        // Gunakan jalur simpan privat yang sama dengan portal pelanggan.
+        // Mengirim bukti tidak mengaktifkan jadwal sampai pembayaran diverifikasi.
+        $this->extensionService->submitExtensionPayment($extension, $request->user(), $validated['payment_proof']);
+
+        return redirect()->route('admin.bookings.show', $extension->rental_id)
+            ->with('success', 'Bukti perpanjangan walk-in tersimpan dan menunggu verifikasi.');
+    }
+
     /**
      * Setujui pengajuan perpanjangan sewa setelah pengecekan ketersediaan tahap 1 (A-08, SYS-09).
      */

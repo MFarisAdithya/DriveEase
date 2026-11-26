@@ -361,6 +361,25 @@
             </div>
         @endif
 
+        @if ($rental->booking_channel === \App\Models\Rental::CHANNEL_WALK_IN
+            && in_array($rental->rental_status, [\App\Models\Rental::STATUS_CONFIRMED, \App\Models\Rental::STATUS_PICKED_UP], true)
+            && ! $rental->extensions->contains(fn ($item) => in_array($item->status, ['pending_approval', 'awaiting_payment', 'payment_submitted'], true)))
+            <form method="POST" action="{{ route('admin.bookings.walk-in-extensions.store', $rental) }}" class="rounded-xl border border-line bg-surface-raised p-4 text-xs space-y-3">
+                @csrf
+                <h3 class="font-bold">Catat Permohonan Perpanjangan Walk-in</h3>
+                <div class="grid gap-2 sm:grid-cols-2">
+                    <label>Tambahan hari
+                        <input type="number" name="additional_days" min="1" max="30" required class="mt-1 block w-full rounded border border-field-line p-2">
+                    </label>
+                    <label>Catatan permohonan
+                        <input name="notes" maxlength="500" class="mt-1 block w-full rounded border border-field-line p-2">
+                    </label>
+                    @include('admin.bookings.confirmation-fields')
+                </div>
+                <div class="flex justify-end"><button class="rounded-lg bg-action px-4 py-2 font-bold">Simpan Permohonan</button></div>
+            </form>
+        @endif
+
         @if ($rental->extensions->isNotEmpty())
             <div class="space-y-4 border-t border-line pt-4">
                 <h3 class="text-sm font-bold text-ink">Pengajuan Perpanjangan Sewa (A-08)</h3>
@@ -403,6 +422,16 @@
                                     </button>
                                 </form>
                             </div>
+                        @elseif ($rental->booking_channel === \App\Models\Rental::CHANNEL_WALK_IN && $extension->status === \App\Models\RentalExtension::STATUS_AWAITING_PAYMENT)
+                            <form method="POST" action="{{ route('admin.extensions.walk-in-payment.store', $extension) }}" enctype="multipart/form-data" class="space-y-2 border-t border-line pt-3">
+                                @csrf
+                                <p>Rekening {{ $extension->payment_bank_name }} {{ $extension->payment_account_number }} ({{ $extension->payment_account_holder }})</p>
+                                <p>Batas unggah {{ $extension->payment_deadline_at?->timezone('Asia/Jakarta')->format('d M Y H:i') }} WIB.</p>
+                                <label>Bukti pembayaran perpanjangan (JPG/JPEG/PNG/PDF, maks 5 MB)
+                                    <input type="file" name="payment_proof" accept=".jpg,.jpeg,.png,.pdf" required class="mt-1 block w-full rounded border border-field-line p-2">
+                                </label>
+                                <div class="flex justify-end"><button class="rounded-lg bg-action px-4 py-2 font-bold">Unggah Bukti Walk-in</button></div>
+                            </form>
                         @elseif ($extension->status === \App\Models\RentalExtension::STATUS_PAYMENT_SUBMITTED)
                             <div class="pt-2 space-y-3 border-t border-line">
                                 <p class="text-muted">
