@@ -79,17 +79,16 @@ class BookingController extends Controller
     }
 
     /**
-     * Show the online booking creation form for verified customers only (C-03, C-05).
+     * Show the online booking creation form after identity documents are complete (C-03, C-05).
      */
     public function create(Request $request): View|RedirectResponse
     {
         $user = $request->user();
 
-        // Pelanggan yang belum lolos verifikasi identitas diarahkan ke halaman verifikasi
-        // agar tidak bisa membuat pemesanan sebelum KTP dan SIM disetujui admin (C-03).
+        // Pelanggan tanpa dokumen lengkap diarahkan ke halaman identitas (C-03).
         if (! $user->canMakeReservation()) {
             return redirect()->route('customer.verification.create')
-                ->with('error', 'Identitas KTP dan SIM Anda harus terverifikasi sebelum dapat membuat pemesanan.');
+                ->with('error', 'Lengkapi dokumen KTP dan SIM sebelum membuat pemesanan.');
         }
 
         $cars = Car::bookableForSchedule()->with('carType')->orderBy('name')->get();
@@ -143,7 +142,7 @@ class BookingController extends Controller
 
         if (! $user->canMakeReservation()) {
             return redirect()->route('customer.verification.create')
-                ->with('error', 'Identitas KTP dan SIM Anda harus terverifikasi sebelum dapat membuat pemesanan.');
+                ->with('error', 'Lengkapi dokumen KTP dan SIM sebelum membuat pemesanan.');
         }
 
         $validated = $request->validate([

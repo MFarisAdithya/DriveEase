@@ -84,7 +84,7 @@ class RentalSetting extends Model
             'address' => 'Jl. Prof. Dr. Sumantri Brojonegoro No. 1, Bandar Lampung',
             'contact' => '0812-3456-7890 · halo@driveease.test',
             'operating_hours' => '08.00–21.00 WIB',
-            'terms' => "1. Pelanggan wajib terverifikasi KTP (16 digit) dan SIM (14 digit) sebelum memesan.\n2. Pembayaran dilakukan penuh melalui transfer bank dengan batas unggah bukti 2 jam.\n3. Durasi sewa dihitung 24 jam per hari (WIB) dengan jeda persiapan 1 jam antarpenyewaan.\n4. Pembatalan dan keterlambatan pengembalian mengikuti kebijakan resmi DriveEase.",
+            'terms' => "1. Lengkapi KTP (16 digit) dan SIM (14 digit) sebelum memesan. Konfirmasi memerlukan verifikasi identitas dan pelunasan.\n2. Pembayaran dilakukan penuh melalui transfer bank dengan batas unggah bukti 2 jam.\n3. Durasi sewa dihitung 24 jam per hari (WIB) dengan jeda persiapan 1 jam antarpenyewaan.\n4. Pembatalan dan keterlambatan pengembalian mengikuti kebijakan resmi DriveEase.",
         ];
     }
 

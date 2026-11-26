@@ -53,8 +53,22 @@
             </div>
         </dl>
 
+        @if ($rental->rental_status === \App\Models\Rental::STATUS_PENDING && ! $rental->hasVerifiedIdentity())
+            <div class="rounded-xl border border-line bg-surface-raised p-4 text-xs">
+                <a href="{{ route('customer.verification.create') }}" class="font-bold underline">Status identitas</a>
+                @if ($rental->identity_status === \App\Models\Rental::IDENTITY_REJECTED)
+                    &middot; Perbaiki sebelum {{ $rental->identity_deadline_at?->timezone('Asia/Jakarta')->format('d M Y H:i') }} WIB.
+                @else
+                    &middot; Identitas harus disetujui sebelum pesanan dikonfirmasi.
+                @endif
+            </div>
+        @endif
+
+        @if ($rental->canUploadPaymentProof())
         <div class="rounded-xl border border-line bg-surface-raised p-5 space-y-1 text-xs">
             <h2 class="text-sm font-bold text-ink">Rekening Tujuan Pembayaran</h2>
+            <p>Sisa tagihan: <strong>Rp {{ number_format($rental->remainingBalance(), 0, ',', '.') }}</strong></p>
+            <p>Batas unggah: <strong>{{ $rental->payment_deadline_at?->timezone('Asia/Jakarta')->format('d M Y H:i') ?? '–' }} WIB</strong></p>
             @if ($rental->payment_account_number)
                 <p>Bank: <strong>{{ $rental->payment_bank_name }}</strong></p>
                 <p>Nomor Rekening: <strong class="font-mono">{{ $rental->payment_account_number }}</strong></p>
@@ -64,10 +78,12 @@
             @endif
         </div>
 
+        @endif
+
         @if ($rental->payment_status === \App\Models\Rental::PAYMENT_PAID)
             <div class="rounded-xl border border-success-line bg-success-surface p-5 text-xs space-y-2">
                 <div class="flex flex-wrap items-center justify-between gap-2">
-                    <h2 class="text-sm font-bold text-success">Bukti Transaksi Terkonfirmasi</h2>
+                    <h2 class="text-sm font-bold text-success">{{ in_array($rental->rental_status, ['pending', 'cancelled', 'expired'], true) ? 'Bukti Pembayaran Diterima' : 'Bukti Transaksi Terkonfirmasi' }}</h2>
                     <button type="button" onclick="window.print()" class="rounded-lg border border-success-line bg-surface px-3 py-1.5 font-semibold text-ink hover:bg-surface-hover print:hidden">
                         Cetak Bukti Transaksi
                     </button>
@@ -80,10 +96,6 @@
                     <div>
                         <dt class="text-muted">Tanggal Verifikasi Lunas</dt>
                         <dd class="font-semibold text-ink">{{ $rental->payment_verified_at?->timezone('Asia/Jakarta')->format('d M Y H:i') ?? $rental->created_at?->timezone('Asia/Jakarta')->format('d M Y H:i') }} WIB</dd>
-                    </div>
-                    <div>
-                        <dt class="text-muted">Rekening Pembayaran Tercatat</dt>
-                        <dd class="font-semibold text-ink">{{ $rental->payment_bank_name }} &middot; {{ $rental->payment_account_number }}</dd>
                     </div>
                     <div>
                         <dt class="text-muted">Total Sewa &amp; Tagihan Tambahan</dt>
@@ -110,8 +122,12 @@
             <div class="rounded-xl border border-danger-line bg-danger-surface p-4 text-xs text-danger">
                 <strong class="block font-bold">Bukti Pembayaran Ditolak</strong>
                 <p class="mt-1">Alasan: "{{ $rental->payment_rejection_reason }}"</p>
-                <p class="mt-1">Sisa kekurangan pembayaran: <strong>Rp {{ number_format($rental->remainingBalance(), 0, ',', '.') }}</strong>. Unggah perbaikan sebelum <strong>{{ $rental->payment_deadline_at?->timezone('Asia/Jakarta')->format('d M Y H:i') }} WIB</strong>.</p>
+                <p class="mt-1">Sisa kekurangan pembayaran: <strong>Rp {{ number_format($rental->remainingBalance(), 0, ',', '.') }}</strong>. @if ($rental->canUploadPaymentProof()) Unggah perbaikan sebelum <strong>{{ $rental->payment_deadline_at?->timezone('Asia/Jakarta')->format('d M Y H:i') }} WIB</strong>. @endif </p>
             </div>
+        @endif
+
+        @if ($rental->rental_status === \App\Models\Rental::STATUS_PENDING && $rental->review_followup_at)
+            <p role="status" class="rounded-lg border border-warning-line p-3 text-xs">Admin perlu menindaklanjuti jadwal dan akan menghubungi Anda.</p>
         @endif
 
         @if ($rental->canUploadPaymentProof())
@@ -141,7 +157,7 @@
                             <div class="space-y-1">
                                 <span class="font-bold text-ink">{{ $payment->statusLabel() }}</span>
                                 <span class="text-muted"> &middot; Dikirim {{ $payment->submitted_at?->timezone('Asia/Jakarta')->format('d M Y H:i') }} WIB</span>
-                                <p>Klaim nominal: <strong>Rp {{ number_format((float) $payment->claimed_amount, 0, ',', '.') }}</strong>
+                                <p>Tagihan saat unggah: <strong>Rp {{ number_format((float) $payment->claimed_amount, 0, ',', '.') }}</strong>
                                     @if ($payment->verified_amount !== null)
                                         &middot; Terverifikasi: <strong>Rp {{ number_format((float) $payment->verified_amount, 0, ',', '.') }}</strong>
                                     @endif

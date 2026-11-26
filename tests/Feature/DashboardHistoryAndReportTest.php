@@ -94,7 +94,7 @@ class DashboardHistoryAndReportTest extends TestCase
         $this->actingAs($customer)->get(route('customer.bookings.show', $paidRental))
             ->assertOk()
             ->assertSee('Bukti Transaksi Terkonfirmasi')
-            ->assertSee($paidRental->payment_account_number);
+            ->assertDontSee($paidRental->payment_account_number);
 
         // Pelanggan lain ditolak (403) saat mencoba membuka transaksi yang bukan miliknya.
         $this->actingAs($customer)->get(route('customer.bookings.show', $otherRental))

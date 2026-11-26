@@ -487,7 +487,7 @@ class CustomerVerificationTest extends TestCase
         $this->customer->refresh();
         $this->assertEquals('pending', $this->customer->verification_status);
         $this->assertNull($this->customer->rejection_reason);
-        $this->assertFalse($this->customer->canMakeReservation());
+        $this->assertTrue($this->customer->canMakeReservation());
     }
 
     public function test_verified_customer_cannot_resubmit_documents(): void

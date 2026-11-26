@@ -31,8 +31,7 @@ class RentalPaymentService
     public function submitProof(
         Rental $rental,
         User $actor,
-        UploadedFile $proofFile,
-        ?float $claimedAmount = null
+        UploadedFile $proofFile
     ): RentalPayment {
         $nowWib = CarbonImmutable::now(RentalScheduleService::TIMEZONE);
         $extension = $proofFile->getClientOriginalExtension() ?: 'jpg';
@@ -45,7 +44,7 @@ class RentalPaymentService
         }
 
         try {
-            return DB::transaction(function () use ($rental, $actor, $claimedAmount, $storedPath, $nowWib): RentalPayment {
+            return DB::transaction(function () use ($rental, $actor, $storedPath, $nowWib): RentalPayment {
                 // Ikuti hierarki kunci global: Car -> releaseExpiredHolds -> Rental.
                 Car::query()->lockForUpdate()->findOrFail($rental->car_id);
                 $this->scheduleService->releaseExpiredHolds($rental->car_id, $nowWib);
@@ -70,18 +69,19 @@ class RentalPaymentService
                     ]);
                 }
 
-                if ($lockedRental->payment_deadline_at !== null && $lockedRental->payment_deadline_at->copy()->timezone(RentalScheduleService::TIMEZONE)->lte($nowWib)) {
+                if (! $lockedRental->canUploadPaymentProof($nowWib)) {
                     throw ValidationException::withMessages([
                         'payment_proof' => 'Batas waktu unggah bukti pembayaran telah berakhir.',
                     ]);
                 }
 
-                $remainingBalance = $lockedRental->remainingBalance();
-                $amountToClaim = $claimedAmount !== null ? round($claimedAmount, 2) : $remainingBalance;
+                // Simpan snapshot sisa tagihan sistem pada kolom historis
+                // claimed_amount. Nominal kiriman browser tidak menjadi sumber data.
+                $amountToClaim = $lockedRental->remainingBalance();
 
                 if ($amountToClaim <= 0) {
                     throw ValidationException::withMessages([
-                        'claimed_amount' => 'Nominal pembayaran harus lebih besar dari 0.',
+                        'payment_proof' => 'Pesanan tidak memiliki sisa tagihan.',
                     ]);
                 }
 
@@ -153,6 +153,7 @@ class RentalPaymentService
         return DB::transaction(function () use ($payment, $admin, $normalizedAmount, $receivedAtWib, $nowWib): Rental {
             $carId = (int) Rental::query()->whereKey($payment->rental_id)->value('car_id');
             Car::query()->lockForUpdate()->findOrFail($carId);
+            $this->scheduleService->releaseExpiredHolds($carId, $nowWib);
             $lockedRental = Rental::query()->lockForUpdate()->findOrFail($payment->rental_id);
             $lockedPayment = RentalPayment::query()->lockForUpdate()->findOrFail($payment->id);
 
@@ -162,6 +163,13 @@ class RentalPaymentService
                 ]);
             }
 
+            if (in_array($lockedRental->rental_status, [Rental::STATUS_CANCELLED, Rental::STATUS_EXPIRED], true)) {
+                if ($normalizedAmount <= 0) {
+                    throw ValidationException::withMessages(['verified_amount' => 'Nominal diterima harus lebih besar dari nol.']);
+                }
+
+                return $this->reconcileClosed($lockedRental, $lockedPayment, $admin, $normalizedAmount, $receivedAtWib, $nowWib);
+            }
             if ($lockedRental->rental_status !== Rental::STATUS_PENDING) {
                 throw ValidationException::withMessages([
                     'payment' => 'Pesanan tidak lagi berada pada status menunggu konfirmasi.',
@@ -206,7 +214,12 @@ class RentalPaymentService
             $lockedRental->transitionPaymentStatus(Rental::PAYMENT_PAID);
 
             $excessAmount = max(0.0, round($normalizedAmount - $remaining, 2));
-            $notice = 'Pembayaran lunas terverifikasi. Pesanan Anda telah dikonfirmasi dan siap diambil sesuai jadwal.';
+            if ($lockedRental->identity_status !== null && $lockedRental->pickup_at?->lte($nowWib)) {
+                $lockedRental->review_followup_at ??= $nowWib;
+            }
+            $confirmed = $lockedRental->confirmWhenReady($nowWib);
+            $notice = $confirmed ? $lockedRental->status_notice
+                : 'Pembayaran lunas. Pesanan masih memerlukan verifikasi identitas atau tindak lanjut admin.';
 
             if ($excessAmount > 0) {
                 $lockedRental->overpayment_amount = round((float) $lockedRental->overpayment_amount + $excessAmount, 2);
@@ -218,18 +231,15 @@ class RentalPaymentService
                     .' yang ditetapkan untuk dikembalikan oleh admin.';
             }
 
-            $lockedRental->transitionRentalStatus(
-                Rental::STATUS_CONFIRMED,
-                $notice
-            );
+            $lockedRental->status_notice = $notice;
             $lockedRental->saveOrFail();
 
             $lockedRental->recordHistory(
                 $admin,
                 'payment_approved',
                 "{$previousRentalStatus}/{$previousPaymentStatus}",
-                Rental::STATUS_CONFIRMED.'/'.Rental::PAYMENT_PAID,
-                'Pembayaran diverifikasi lunas dan pesanan dikonfirmasi.',
+                $lockedRental->rental_status.'/'.Rental::PAYMENT_PAID,
+                $confirmed ? 'Pembayaran dan identitas memenuhi syarat konfirmasi.' : 'Pembayaran diverifikasi lunas.',
                 [
                     'payment_id' => $lockedPayment->id,
                     'verified_amount' => $normalizedAmount,
@@ -283,6 +293,7 @@ class RentalPaymentService
         return DB::transaction(function () use ($payment, $admin, $trimmedReason, $normalizedReceived, $receivedAtWib, $nowWib): Rental {
             $carId = (int) Rental::query()->whereKey($payment->rental_id)->value('car_id');
             Car::query()->lockForUpdate()->findOrFail($carId);
+            $this->scheduleService->releaseExpiredHolds($carId, $nowWib);
             $lockedRental = Rental::query()->lockForUpdate()->findOrFail($payment->rental_id);
             $lockedPayment = RentalPayment::query()->lockForUpdate()->findOrFail($payment->id);
 
@@ -292,6 +303,9 @@ class RentalPaymentService
                 ]);
             }
 
+            if (in_array($lockedRental->rental_status, [Rental::STATUS_CANCELLED, Rental::STATUS_EXPIRED], true)) {
+                return $this->reconcileClosed($lockedRental, $lockedPayment, $admin, $normalizedReceived, $receivedAtWib, $nowWib, $trimmedReason);
+            }
             if ($lockedRental->rental_status !== Rental::STATUS_PENDING) {
                 throw ValidationException::withMessages([
                     'payment' => 'Pesanan tidak lagi berada pada status menunggu konfirmasi.',
@@ -335,17 +349,29 @@ class RentalPaymentService
             // Kebijakan SKPL memberi tenggat perbaikan 1 jam sejak penolakan, tanpa melewati jadwal pengambilan.
             $oneHourFromRejection = $nowWib->addHour();
             $pickupWib = CarbonImmutable::instance($lockedRental->pickup_at)->timezone(RentalScheduleService::TIMEZONE);
-            $fixDeadline = $oneHourFromRejection->lessThan($pickupWib) ? $oneHourFromRejection : $pickupWib;
+            // Penolakan pertama membuka satu jendela perbaikan. Penolakan
+            // berikutnya mempertahankan tenggat yang sudah dicatat.
+            $fixDeadline = $lockedRental->payment_rejected_at !== null && $lockedRental->payment_deadline_at !== null
+                ? $lockedRental->payment_deadline_at->copy()->timezone(RentalScheduleService::TIMEZONE)
+                : $oneHourFromRejection->min($pickupWib);
+            $lateReview = $lockedRental->identity_status !== null && ($fixDeadline->lte($nowWib)
+                || ($fixDeadline->lt($oneHourFromRejection)
+                    && RentalScheduleService::reviewOverdue($lockedRental->payment_submitted_at, $nowWib)));
+            if ($lateReview) {
+                $lockedRental->payment_review_blocked = true;
+                $lockedRental->review_followup_at ??= $nowWib;
+            }
 
             $lockedRental->transitionPaymentStatus(Rental::PAYMENT_REJECTED);
-            $lockedRental->payment_rejected_at = $nowWib;
+            $lockedRental->payment_rejected_at ??= $nowWib;
             $lockedRental->payment_rejection_reason = $trimmedReason;
             $lockedRental->payment_deadline_at = $fixDeadline;
 
             $newRemaining = $lockedRental->remainingBalance();
             $lockedRental->status_notice = 'Bukti pembayaran ditolak: '.$trimmedReason
                 .' Sisa tagihan: Rp '.number_format($newRemaining, 0, ',', '.')
-                .'. Unggah perbaikan sebelum '.$fixDeadline->format('d M Y H:i').' WIB.';
+                .($lateReview ? '. Admin perlu menghubungi pelanggan untuk penyelesaian.'
+                    : '. Unggah perbaikan sebelum '.$fixDeadline->format('d M Y H:i').' WIB.');
             $lockedRental->saveOrFail();
 
             $lockedRental->recordHistory(
@@ -365,5 +391,51 @@ class RentalPaymentService
 
             return $lockedRental;
         });
+    }
+
+    private function reconcileClosed(
+        Rental $rental,
+        RentalPayment $payment,
+        User $admin,
+        float $amount,
+        ?CarbonInterface $receivedAt,
+        CarbonInterface $at,
+        ?string $reason = null,
+    ): Rental {
+        // Bukti masih punya status pending dan sudah dikunci oleh pemanggil.
+        // Menutup bukti dan mencatat kas dalam transaksi yang sama mencegah
+        // rekonsiliasi ganda sekaligus menjaga status pesanan tetap terminal.
+        $hasFunds = $amount > 0;
+        $payment->update([
+            'status' => $hasFunds ? RentalPayment::STATUS_APPROVED : RentalPayment::STATUS_REJECTED,
+            'verified_amount' => $amount,
+            'verified_by' => $admin->id,
+            'verified_at' => $at,
+            'received_at' => $hasFunds ? $receivedAt : null,
+            'rejection_reason' => $reason,
+        ]);
+        if ($hasFunds) {
+            RentalCashFlow::create([
+                'rental_id' => $rental->id,
+                'rental_payment_id' => $payment->id,
+                'recorded_by' => $admin->id,
+                'direction' => RentalCashFlow::DIRECTION_INFLOW,
+                'category' => RentalCashFlow::CATEGORY_MAIN_PAYMENT,
+                'amount' => $amount,
+                'occurred_at' => $receivedAt,
+                'notes' => 'Rekonsiliasi dana pada pesanan yang sudah ditutup.',
+            ]);
+        }
+        $rental->paid_amount = round((float) $rental->paid_amount + $amount, 2);
+        $rental->transitionPaymentStatus($rental->remainingBalance() <= 0 ? Rental::PAYMENT_PAID : Rental::PAYMENT_REJECTED);
+        app(RentalFinancialService::class)->refreshCancellationRefund($rental);
+        $rental->saveOrFail();
+        $rental->recordHistory($admin, 'payment_reconciled', null, $rental->payment_status, $reason, [
+            'payment_id' => $payment->id,
+            'received_amount' => $amount,
+            'received_at' => $receivedAt?->toIso8601String(),
+        ]);
+
+        return $rental;
     }
 }

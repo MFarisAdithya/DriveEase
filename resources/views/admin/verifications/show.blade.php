@@ -60,6 +60,30 @@
         </div>
     @endif
 
+    @if ($user->isPendingVerification() && \App\Services\RentalScheduleService::reviewOverdue($user->identity_submitted_at, now('Asia/Jakarta')))
+        <p role="alert" class="rounded-lg border border-warning-line p-3 text-xs text-warning">Pemeriksaan identitas melewati SLA satu jam operasional.</p>
+    @endif
+
+    @if ($user->email === null && ! $user->isVerified())
+        <form method="POST" action="{{ route('admin.verifications.correct-walk-in', $user) }}" enctype="multipart/form-data" class="rounded-xl border border-line bg-surface p-5 space-y-3 text-xs">
+            @csrf
+            @method('PATCH')
+            <h3 class="font-bold">Perbaiki Dokumen Walk-in</h3>
+            <p>Isi bagian yang perlu diganti. Dokumen lain tetap digunakan.</p>
+            @foreach (['ktp' => 16, 'sim' => 14] as $type => $digits)
+                <div class="grid gap-2 sm:grid-cols-2">
+                    <label>Nomor {{ strtoupper($type) }} ({{ $digits }} digit)
+                        <input class="block w-full rounded border border-field-line p-2" name="{{ $type }}_number" inputmode="numeric" maxlength="{{ $digits }}">
+                    </label>
+                    <label>Foto {{ strtoupper($type) }} (JPG/JPEG/PNG)
+                        <input class="block w-full rounded border border-field-line p-2" name="{{ $type }}_image" type="file" accept=".jpg,.jpeg,.png">
+                    </label>
+                </div>
+            @endforeach
+            <div class="flex justify-end"><button class="rounded-lg bg-action px-4 py-2 font-bold">Simpan Perbaikan</button></div>
+        </form>
+    @endif
+
     <!-- Customer Basic Information Grid -->
     <div class="bg-surface rounded-xl border border-line shadow-sm p-6">
         <h3 class="text-xs font-bold uppercase tracking-wider text-muted mb-4">Data Profil Pelanggan</h3>

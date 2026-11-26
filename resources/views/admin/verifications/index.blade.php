@@ -63,6 +63,9 @@
                         <td class="px-4 py-5">
                             <span class="mb-1 block text-xs text-muted xl:hidden">Status akun</span>
                             <span class="inline-flex rounded-md px-2 py-1 font-medium {{ $customer->isVerified() ? 'bg-success-surface text-success' : ($customer->isRejectedVerification() ? 'bg-danger-surface text-danger' : 'bg-warning-surface text-warning') }}">{{ $customer->isVerified() ? 'Disetujui' : ($customer->isRejectedVerification() ? 'Ditolak' : 'Menunggu peninjauan') }}</span>
+                            @if ($customer->isPendingVerification() && $customer->identity_submitted_at?->lte($reviewCutoff))
+                                <span class="block mt-1 font-semibold text-warning">SLA terlewati</span>
+                            @endif
                         </td>
                         <td class="px-4 py-5 text-muted"><span class="mb-1 block text-xs xl:hidden">Diperbarui</span>{{ $customer->updated_at?->translatedFormat('d M Y, H:i') ?? 'Belum tersedia' }}</td>
                         <td class="px-4 py-5"><a class="ui-button ui-secondary w-full" href="{{ route('admin.verifications.show', $customer) }}">Periksa dokumen<span class="sr-only"> {{ $customer->name }}</span></a></td>

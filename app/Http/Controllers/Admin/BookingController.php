@@ -82,7 +82,9 @@ class BookingController extends Controller
             $query->where('rental_status', Rental::STATUS_PENDING)
                 ->where('payment_status', Rental::PAYMENT_PENDING_APPROVAL)
                 ->whereNotNull('payment_submitted_at')
-                ->where('payment_submitted_at', '<', now('Asia/Jakarta')->subHour()->format('Y-m-d H:i:s'));
+                ->where('payment_submitted_at', '<=', RentalScheduleService::reviewCutoff(now('Asia/Jakarta'))->format('Y-m-d H:i:s'));
+        } elseif ($activeFilter === 'review_followup') {
+            $query->where('rental_status', Rental::STATUS_PENDING)->whereNotNull('review_followup_at');
         } elseif ($activeFilter === 'pending_changes') {
             $query->whereHas('changeRequests', function ($cq): void {
                 $cq->whereIn('status', ['pending_admin', 'pending_customer']);
@@ -130,7 +132,7 @@ class BookingController extends Controller
             ->where('rental_status', Rental::STATUS_PENDING)
             ->where('payment_status', Rental::PAYMENT_PENDING_APPROVAL)
             ->whereNotNull('payment_submitted_at')
-            ->where('payment_submitted_at', '<', now('Asia/Jakarta')->subHour()->format('Y-m-d H:i:s'))
+            ->where('payment_submitted_at', '<=', RentalScheduleService::reviewCutoff(now('Asia/Jakarta'))->format('Y-m-d H:i:s'))
             ->count();
 
         return view('admin.bookings.index', compact('bookings', 'overdueVerificationCount'));
@@ -183,6 +185,7 @@ class BookingController extends Controller
             'accept_terms' => ['accepted'],
             'notes' => ['nullable', 'string', 'max:1000'],
             'idempotency_key' => ['nullable', 'string', 'max:64'],
+            'confirmation_method' => ['nullable', 'in:in_person,phone,message'],
         ]);
 
         try {
@@ -194,6 +197,9 @@ class BookingController extends Controller
         }
 
         $customer = User::findOrFail((int) $validated['customer_id']);
+        if ($customer->email === null && empty($validated['confirmation_method'])) {
+            return back()->withInput()->withErrors(['confirmation_method' => 'Pilih metode konfirmasi persetujuan penyewa walk-in.']);
+        }
 
         // Pemesanan langsung oleh admin tetap menggunakan RentalBookingService sehingga aturan
         // verifikasi identitas, tarif 24 jam WIB, jeda 1 jam, dan status awal belum lunas tetap berlaku.
@@ -207,6 +213,7 @@ class BookingController extends Controller
             createdBy: $request->user(),
             notes: $validated['notes'] ?? null,
             idempotencyKey: $validated['idempotency_key'] ?? null,
+            confirmationMethod: $validated['confirmation_method'] ?? null,
         );
 
         return redirect()->route('admin.bookings.show', $rental)
@@ -260,7 +267,7 @@ class BookingController extends Controller
             $customer = DB::transaction(function () use ($validated, $paths): User {
                 $customerRole = Role::query()->where('name', 'customer')->firstOrFail();
 
-                return User::create([
+                $customer = new User([
                     'role_id' => $customerRole->id,
                     'name' => $validated['name'],
                     'phone' => $validated['phone'],
@@ -269,6 +276,10 @@ class BookingController extends Controller
                     'sim_number' => $validated['sim_number'],
                     'verification_status' => 'pending',
                 ] + $paths);
+                $customer->identity_submitted_at = now(RentalScheduleService::TIMEZONE);
+                $customer->saveOrFail();
+
+                return $customer;
             });
         } catch (Throwable) {
             // Bersihkan hanya berkas baru milik permintaan ini jika salah satu
@@ -350,6 +361,37 @@ class BookingController extends Controller
 
         return redirect()->route('admin.bookings.show', $rental)
             ->with('success', 'Pesanan dibatalkan dan hak pengembalian dana telah ditetapkan persis sesuai kebijakan.');
+    }
+
+    public function recordReviewContact(Request $request, Rental $rental): RedirectResponse
+    {
+        $validated = $request->validate([
+            'confirmation_method' => ['required', 'in:in_person,phone,message'],
+            'contacted_at' => ['required', 'date'],
+            'contact_notes' => ['required', 'string', 'max:500'],
+        ]);
+        $contactedAt = $this->scheduleService->parsePickupAt($validated['contacted_at']);
+        if ($contactedAt->isFuture()) {
+            return back()->withErrors(['contacted_at' => 'Waktu kontak belum terjadi.']);
+        }
+
+        DB::transaction(function () use ($rental, $request, $validated, $contactedAt): void {
+            $locked = Rental::query()->lockForUpdate()->findOrFail($rental->id);
+            abort_unless($locked->review_followup_at !== null, 409);
+            $contactKey = $contactedAt->toIso8601String().'|'.$validated['confirmation_method'];
+            // Kunci pesanan mencegah dua pengiriman yang sama mencatat ulang
+            // kontak manual pada waktu dan metode yang sama oleh petugas yang sama.
+            if (! $locked->histories()->where('action', 'admin_review_contact')
+                ->where('actor_id', $request->user()->id)->where('metadata->contact_key', $contactKey)->exists()) {
+                $locked->recordHistory($request->user(), 'admin_review_contact', null, null, $validated['contact_notes'], [
+                    'contact_key' => $contactKey,
+                    'contacted_at' => $contactedAt->toIso8601String(),
+                    'confirmation_method' => $validated['confirmation_method'],
+                ]);
+            }
+        });
+
+        return back()->with('success', 'Kontak pelanggan tercatat.');
     }
 
     /**

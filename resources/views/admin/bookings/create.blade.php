@@ -88,6 +88,13 @@
                 </label>
             </div>
 
+            <label for="confirmation_method" class="block text-xs font-semibold">Metode Persetujuan Penyewa</label>
+            <select id="confirmation_method" name="confirmation_method" class="w-full rounded-lg border border-field-line p-2 text-sm">
+                <option value="">Pilih untuk penyewa tanpa akun login</option>
+                @foreach (['in_person' => 'Tatap muka', 'phone' => 'Telepon', 'message' => 'Pesan'] as $value => $label)
+                    <option value="{{ $value }}" @selected(old('confirmation_method') === $value)>{{ $label }}</option>
+                @endforeach
+            </select>
             <button type="submit" class="rounded-lg bg-action hover:bg-action-hover px-5 py-2.5 text-xs font-bold text-ink shadow-xs">
                 Buat Pemesanan Langsung
             </button>

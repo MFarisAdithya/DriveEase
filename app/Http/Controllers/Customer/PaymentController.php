@@ -20,9 +20,8 @@ class PaymentController extends Controller
         // Tolak pelanggan lain yang mencoba mengirim bukti ke pesanan yang bukan miliknya.
         abort_unless($rental->user_id === $request->user()->id, 403, 'Anda tidak berhak mengunggah pembayaran untuk pesanan ini.');
 
-        $validated = $request->validate([
+        $request->validate([
             'payment_proof' => ['required', 'image', 'mimes:jpg,jpeg,png', 'extensions:jpg,jpeg,png', 'max:2048'],
-            'claimed_amount' => ['nullable', 'numeric', 'min:1'],
         ]);
 
         try {
@@ -30,7 +29,6 @@ class PaymentController extends Controller
                 rental: $rental,
                 actor: $request->user(),
                 proofFile: $request->file('payment_proof'),
-                claimedAmount: isset($validated['claimed_amount']) ? (float) $validated['claimed_amount'] : null,
             );
         } catch (ValidationException $exception) {
             throw $exception;

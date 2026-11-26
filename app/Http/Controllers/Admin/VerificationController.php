@@ -4,11 +4,17 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\IdentityDocuments;
+use App\Services\RentalIdentityService;
+use App\Services\RentalScheduleService;
 use App\Services\VerificationQueue;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use RuntimeException;
 
 class VerificationController extends Controller
 {
@@ -38,7 +44,9 @@ class VerificationController extends Controller
 
         $customers = $activeQuery->latest('updated_at')->orderByDesc('id')->paginate(15)->withQueryString();
 
-        return view('admin.verifications.index', compact('customers', 'counts', 'status', 'search'));
+        $reviewCutoff = RentalScheduleService::reviewCutoff(now(RentalScheduleService::TIMEZONE));
+
+        return view('admin.verifications.index', compact('customers', 'counts', 'status', 'search', 'reviewCutoff'));
     }
 
     /**
@@ -78,19 +86,7 @@ class VerificationController extends Controller
     {
         abort_unless($user->isCustomer(), 404, 'Pelanggan tidak ditemukan.');
 
-        $approved = DB::transaction(function () use ($user): bool {
-            $locked = User::query()->lockForUpdate()->findOrFail($user->id);
-            if (! $locked->hasSubmittedDocuments()) {
-                return false;
-            }
-            $locked->verification_status = 'verified';
-            $locked->verified_at = now();
-            $locked->verified_by = auth()->id();
-            $locked->rejection_reason = null;
-            $locked->saveOrFail();
-
-            return true;
-        });
+        $approved = app(RentalIdentityService::class)->approve($user, $request->user());
         if (! $approved) {
             return back()->with('error', 'Dokumen pelanggan belum lengkap atau berkas tidak ditemukan.');
         }
@@ -114,13 +110,43 @@ class VerificationController extends Controller
             'rejection_reason.max' => 'Alasan penolakan maksimal 500 karakter.',
         ]);
 
-        $user->verification_status = 'rejected';
-        $user->rejection_reason = $validated['rejection_reason'];
-        $user->verified_at = null;
-        $user->verified_by = null;
-        $user->save();
+        app(RentalIdentityService::class)->reject($user, $request->user(), $validated['rejection_reason']);
 
         return redirect()->route('admin.verifications.show', $user)
             ->with('success', "Verifikasi pelanggan {$user->name} berhasil ditolak.");
+    }
+
+    public function correctWalkIn(Request $request, User $user, IdentityDocuments $documents): RedirectResponse
+    {
+        // Profil tanpa email dibuat dari jalur walk-in. Akun portal biasa
+        // tetap mengurus penggantian dokumen melalui halaman pelanggan sendiri.
+        abort_unless($user->isCustomer() && $user->email === null, 404);
+        $validator = Validator::make($request->all(), [
+            'ktp_number' => ['nullable', 'digits:16'],
+            'sim_number' => ['nullable', 'digits:14'],
+            'ktp_image' => ['nullable', 'image', 'mimes:jpg,jpeg,png', 'extensions:jpg,jpeg,png', 'max:2048'],
+            'sim_image' => ['nullable', 'image', 'mimes:jpg,jpeg,png', 'extensions:jpg,jpeg,png', 'max:2048'],
+        ]);
+        if ($validator->fails()) {
+            return back()->withErrors($validator);
+        }
+
+        $validated = $validator->validated();
+        if (! $request->filled(['ktp_number']) && ! $request->filled(['sim_number'])
+            && ! $request->hasFile('ktp_image') && ! $request->hasFile('sim_image')) {
+            return back()->withErrors(['identity' => 'Isi nomor atau pilih foto yang ingin diperbaiki.']);
+        }
+
+        try {
+            $documents->submit($user, $validated + [
+                'ktp_number' => null, 'sim_number' => null,
+            ], $request->user(), $request->allFiles());
+        } catch (ValidationException $exception) {
+            return back()->withErrors($exception->errors());
+        } catch (RuntimeException) {
+            return back()->withErrors(['identity' => 'Perbaikan dokumen tidak dapat disimpan.']);
+        }
+
+        return back()->with('success', 'Perbaikan identitas tersimpan, menunggu pemeriksaan.');
     }
 }

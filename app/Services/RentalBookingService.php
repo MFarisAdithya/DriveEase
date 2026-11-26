@@ -34,21 +34,9 @@ class RentalBookingService
         string $channel = Rental::CHANNEL_ONLINE,
         ?User $createdBy = null,
         ?string $notes = null,
-        ?string $idempotencyKey = null
+        ?string $idempotencyKey = null,
+        ?string $confirmationMethod = null
     ): Rental {
-        if (! $customer->isCustomer()) {
-            throw ValidationException::withMessages([
-                'customer_id' => 'Pemesanan hanya dapat dibuat untuk akun pelanggan.',
-            ]);
-        }
-
-        // Hanya pelanggan dengan KTP dan SIM terverifikasi yang berhak memesan kendaraan (C-03, A-15).
-        if (! $customer->canMakeReservation()) {
-            throw ValidationException::withMessages([
-                'customer_id' => 'Identitas pelanggan belum terverifikasi. Selesaikan verifikasi KTP dan SIM sebelum memesan.',
-            ]);
-        }
-
         if (! $termsAccepted) {
             throw ValidationException::withMessages([
                 'accept_terms' => 'Anda wajib menyetujui ketentuan rental sebelum membuat pesanan.',
@@ -99,8 +87,18 @@ class RentalBookingService
                 $createdBy,
                 $notes,
                 $normalizedKey,
+                $confirmationMethod,
                 $nowWib
             ): Rental {
+                // Kunci pelanggan sebelum kendaraan dan pesanan. Pemeriksaan identitas
+                // terbaru dan snapshot pesanan tidak dapat tersalip keputusan admin.
+                $customer = User::query()->lockForUpdate()->findOrFail($customer->id);
+                if (! $customer->isCustomer() || ! $customer->canMakeReservation()) {
+                    throw ValidationException::withMessages([
+                        'customer_id' => 'Lengkapi dokumen KTP dan SIM yang dapat diperiksa sebelum memesan.',
+                    ]);
+                }
+
                 $car = Car::query()->lockForUpdate()->findOrFail($carId);
 
                 // Pengecekan idempotency_key dilakukan setelah lockForUpdate() agar permintaan ganda
@@ -179,6 +177,10 @@ class RentalBookingService
                     'idempotency_key' => $normalizedKey,
                 ]);
 
+                $rental->identity_status = $customer->isVerified() ? Rental::IDENTITY_VERIFIED : Rental::IDENTITY_PENDING;
+                if (! $customer->isVerified() && $customer->identity_rejected_at !== null) {
+                    $rental->identity_deadline_at = $customer->identity_rejected_at->copy()->addHours(6)->min($pickupWib);
+                }
                 $rental->rental_status = Rental::STATUS_PENDING;
                 $rental->payment_status = Rental::PAYMENT_UNPAID;
                 $rental->saveOrFail();
@@ -191,6 +193,8 @@ class RentalBookingService
                     'Pemesanan dibuat melalui kanal '.$rental->channelLabel().'.',
                     [
                         'channel' => $rental->booking_channel,
+                        'terms_accepted_at' => $nowWib->toIso8601String(),
+                        'confirmation_method' => $normalizedChannel === Rental::CHANNEL_WALK_IN ? $confirmationMethod : null,
                         'daily_price' => (float) $rental->daily_price,
                         'total_amount' => (float) $rental->total_amount,
                         'payment_deadline_at' => $paymentDeadline->toIso8601String(),

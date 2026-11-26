@@ -24,12 +24,36 @@
         </div>
     @endif
 
+    @if ($rental->rental_status === \App\Models\Rental::STATUS_PENDING && $rental->review_followup_at)
+        <div role="alert" class="rounded-xl border border-warning-line bg-warning-surface p-4 text-xs text-warning">
+            Hubungi pelanggan segera untuk menyelesaikan pemeriksaan, menawarkan jadwal baru dengan persetujuan, atau membatalkan dengan refund penuh. Jangan gunakan status tidak hadir.
+            <form method="POST" action="{{ route('admin.bookings.review-contact', $rental) }}" class="mt-3 grid gap-2 sm:grid-cols-2">
+                @csrf
+                <label>Waktu Kontak (WIB)
+                    <input type="datetime-local" name="contacted_at" required class="block w-full rounded border border-field-line p-2">
+                </label>
+                <label>Metode Konfirmasi
+                    <select name="confirmation_method" required class="block w-full rounded border border-field-line p-2">
+                        <option value="in_person">Tatap muka</option>
+                        <option value="phone">Telepon</option>
+                        <option value="message">Pesan</option>
+                    </select>
+                </label>
+                <label class="sm:col-span-2">Hasil Kontak atau Persetujuan
+                    <textarea name="contact_notes" required maxlength="500" class="block w-full rounded border border-field-line p-2"></textarea>
+                </label>
+                <div class="flex justify-end sm:col-span-2"><button class="rounded bg-action px-4 py-2 font-bold">Catat Kontak</button></div>
+            </form>
+        </div>
+    @endif
+
     <div class="bg-surface rounded-xl border border-line shadow-sm p-6 sm:p-8 space-y-6">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-line pb-4">
             <div>
                 <h2 class="text-xl font-bold text-ink">{{ $rental->car?->name }} ({{ $rental->car?->plate_number }})</h2>
                 <p class="text-xs text-muted mt-0.5">
                     Pelanggan: <strong>{{ $rental->user?->name }}</strong> ({{ $rental->user?->email ?? 'Tanpa akun login' }})
+                    &middot; <a class="underline" href="{{ route('admin.verifications.show', $rental->user_id) }}">Identitas {{ $rental->hasVerifiedIdentity() ? 'terverifikasi' : 'belum terverifikasi' }}</a>
                     &middot; Kanal: <strong>{{ $rental->channelLabel() }}</strong>
                     @if ($rental->creator)
                         &middot; Dibuat oleh: {{ $rental->creator->name }}
@@ -75,13 +99,13 @@
             </div>
         </dl>
 
-        @if ($rental->canUploadPaymentProof())
+        @if ($rental->booking_channel === \App\Models\Rental::CHANNEL_WALK_IN && $rental->canUploadPaymentProof())
             <form method="POST" action="{{ route('admin.bookings.payments.store', $rental) }}" enctype="multipart/form-data" class="rounded-xl border border-line bg-surface-raised p-5 space-y-3">
                 @csrf
                 <h3 class="text-sm font-bold text-ink">Unggah Bukti Transfer (Bantuan Walk-In)</h3>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <input name="payment_proof" type="file" accept=".jpg,.jpeg,.png" required class="rounded-lg border border-field-line bg-surface p-2 text-xs">
-                    <input name="claimed_amount" type="number" min="1" value="{{ (int) $rental->remainingBalance() }}" required class="rounded-lg border border-field-line bg-surface p-2 text-xs">
+                    <span>Sisa tagihan sistem Rp {{ number_format($rental->remainingBalance(), 0, ',', '.') }}</span>
                 </div>
                 <button type="submit" class="rounded-lg bg-surface-hover px-4 py-2 text-xs font-bold text-ink">Simpan Bukti Transfer</button>
             </form>
@@ -96,7 +120,7 @@
                             <div>
                                 <span class="font-bold text-ink">{{ $payment->statusLabel() }}</span>
                                 <span class="text-muted"> &middot; Dikirim {{ $payment->submitted_at?->timezone('Asia/Jakarta')->format('d M Y H:i') }} WIB</span>
-                                <p class="mt-1">Nominal diklaim: <strong>Rp {{ number_format((float) $payment->claimed_amount, 0, ',', '.') }}</strong></p>
+                                <p class="mt-1">Tagihan tercatat: <strong>Rp {{ number_format((float) $payment->claimed_amount, 0, ',', '.') }}</strong></p>
                                 @if ($payment->verified_by)
                                     <p class="text-muted">
                                         Diverifikasi oleh {{ $payment->verifier?->name }} pada {{ $payment->verified_at?->timezone('Asia/Jakarta')->format('d M Y H:i') }} WIB (Rp {{ number_format((float) $payment->verified_amount, 0, ',', '.') }})
@@ -119,11 +143,11 @@
                                 <form method="POST" action="{{ route('admin.payments.approve', $payment) }}" class="space-y-2 rounded-lg border border-success-line bg-success-surface/50 p-4">
                                     @csrf
                                     @method('PATCH')
-                                    <label for="verified_amount_{{ $payment->id }}" class="block font-bold text-success">Setujui Pembayaran Lunas (Rp)</label>
+                                    <label for="verified_amount_{{ $payment->id }}" class="block font-bold text-success">{{ in_array($rental->rental_status, ['cancelled', 'expired'], true) ? 'Rekonsiliasi Dana Diterima (Rp)' : 'Setujui Pembayaran Lunas (Rp)' }}</label>
                                     <input id="verified_amount_{{ $payment->id }}" name="verified_amount" type="number" min="1" value="{{ (int) $rental->remainingBalance() }}" required class="w-full rounded-lg border border-field-line bg-surface p-2 text-xs">
                                     <label for="received_at_{{ $payment->id }}" class="block font-semibold text-ink">Tanggal Dana Diterima (WIB)</label>
-                                    <input id="received_at_{{ $payment->id }}" name="received_at" type="datetime-local" value="{{ now('Asia/Jakarta')->format('Y-m-d\TH:i') }}" required class="w-full rounded-lg border border-field-line bg-surface p-2 text-xs">
-                                    <button type="submit" class="rounded-lg bg-success-action px-4 py-2 font-bold text-white">Verifikasi Lunas &amp; Konfirmasi</button>
+                                    <input id="received_at_{{ $payment->id }}" name="received_at" type="datetime-local" required class="w-full rounded-lg border border-field-line bg-surface p-2 text-xs">
+                                    <button type="submit" class="rounded-lg bg-success-action px-4 py-2 font-bold text-white">Catat Dana Masuk</button>
                                 </form>
 
                                 <form method="POST" action="{{ route('admin.payments.reject', $payment) }}" class="space-y-2 rounded-lg border border-danger-line bg-danger-surface/50 p-4">
@@ -161,7 +185,7 @@
                     <p>Direalisasikan pada {{ $rental->refund_transferred_at->timezone('Asia/Jakarta')->format('d M Y H:i') }} WIB &middot; Referensi: <strong class="font-mono">{{ $rental->refund_reference }}</strong></p>
                 @endif
 
-                @if ($rental->refund_status === \App\Models\Rental::REFUND_PENDING)
+                @if ($rental->refund_status === \App\Models\Rental::REFUND_PENDING && $rental->payment_status !== \App\Models\Rental::PAYMENT_PENDING_APPROVAL)
                     <form method="POST" action="{{ route('admin.bookings.refund', $rental) }}" class="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-3 border-t border-line items-end">
                         @csrf
                         @method('PATCH')

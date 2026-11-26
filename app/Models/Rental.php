@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\RentalScheduleService;
 use Carbon\CarbonInterface;
 use DomainException;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -53,6 +54,18 @@ class Rental extends Model
     public const CANCEL_RENTAL_FAULT = 'rental_fault';
 
     public const CANCEL_NO_SHOW = 'no_show';
+
+    public const CANCEL_IDENTITY = 'identity_failed';
+
+    public const CANCEL_PAYMENT_EXPIRED = 'payment_expired';
+
+    public const IDENTITY_PENDING = 'pending';
+
+    public const IDENTITY_VERIFIED = 'verified';
+
+    public const IDENTITY_REJECTED = 'rejected';
+
+    public const IDENTITY_FOLLOWUP = 'followup';
 
     public const ADDITIONAL_CHARGE_NONE = 'none';
 
@@ -200,6 +213,9 @@ class Rental extends Model
             'actual_pickup_at' => 'datetime',
             'actual_return_at' => 'datetime',
             'payment_deadline_at' => 'datetime',
+            'identity_deadline_at' => 'datetime',
+            'review_followup_at' => 'datetime',
+            'payment_review_blocked' => 'boolean',
             'payment_verified_at' => 'datetime',
             'payment_submitted_at' => 'datetime',
             'payment_rejected_at' => 'datetime',
@@ -319,16 +335,51 @@ class Rental extends Model
     #[Scope]
     protected function holdingSchedule(Builder $query, ?CarbonInterface $at = null): void
     {
-        // Format waktu WIB dipakai agar perbandingan kolom timestamp PostgreSQL konsisten.
-        // Pesanan pending yang belum lunas (unpaid atau rejected) tanpa antrean verifikasi
-        // dan sudah melewati tenggat tidak lagi menahan jadwal kendaraan.
         $cutoff = ($at ? $at->copy()->timezone('Asia/Jakarta') : now('Asia/Jakarta'))->format('Y-m-d H:i:s');
 
+        // whereNot membalik kelompok kondisi yang melepaskan jadwal. IS NOT NULL
+        // mencegah perbandingan timestamp null menghasilkan UNKNOWN di PostgreSQL.
         $query->whereIn('rental_status', self::HOLDING_STATUSES)
-            ->whereRaw(
-                'NOT (rental_status = ? AND payment_status IN (?, ?) AND payment_deadline_at IS NOT NULL AND payment_deadline_at <= ?)',
-                [self::STATUS_PENDING, self::PAYMENT_UNPAID, self::PAYMENT_REJECTED, $cutoff]
-            );
+            ->whereNot(function (Builder $pending) use ($cutoff): void {
+                $pending->where('rental_status', self::STATUS_PENDING)
+                    ->where(function (Builder $released) use ($cutoff): void {
+                        $released->where(fn (Builder $payment) => $payment->where('payment_review_blocked', false)
+                            ->whereIn('payment_status', [self::PAYMENT_UNPAID, self::PAYMENT_REJECTED])
+                            ->whereNotNull('payment_deadline_at')->where('payment_deadline_at', '<=', $cutoff))
+                            ->orWhere(fn (Builder $identity) => $identity->whereNotNull('identity_status')
+                                ->where('identity_status', self::IDENTITY_REJECTED)
+                                ->whereNotNull('identity_deadline_at')->where('identity_deadline_at', '<=', $cutoff))
+                            ->orWhere(fn (Builder $ended) => $ended->whereNotNull('identity_status')
+                                ->whereNotNull('return_at')->where('return_at', '<=', $cutoff));
+                    })->orWhere(fn (Builder $confirmed) => $confirmed->where('rental_status', self::STATUS_CONFIRMED)
+                    ->whereNotNull('review_followup_at')->whereNotNull('return_at')->where('return_at', '<=', $cutoff));
+            });
+    }
+
+    /**
+     * Panggil setelah mengunci baris Rental. Pembayaran dan verifikasi identitas
+     * dapat menyimpan hasilnya sendiri, tetapi hanya hasil lengkap mengubah status sewa.
+     */
+    public function confirmWhenReady(CarbonInterface $at): bool
+    {
+        if ($this->rental_status !== self::STATUS_PENDING || $this->payment_status !== self::PAYMENT_PAID
+            || $this->remainingBalance() > 0 || ! $this->hasVerifiedIdentity()
+            || ($this->identity_status !== null && $this->return_at?->lte($at))) {
+            return false;
+        }
+
+        $this->transitionRentalStatus(self::STATUS_CONFIRMED, 'Identitas terverifikasi dan pembayaran lunas. Pesanan terkonfirmasi.');
+
+        return true;
+    }
+
+    public function hasVerifiedIdentity(): bool
+    {
+        // Pesanan lama belum menyimpan status identitas sendiri; relasi user
+        // tetap menjadi sumber verifikasi untuk baris lama.
+        return $this->identity_status !== null
+            ? $this->identity_status === self::IDENTITY_VERIFIED
+            : ($this->user?->isVerified() ?? false);
     }
 
     /**
@@ -396,7 +447,8 @@ class Rental extends Model
      */
     public function isPaymentExpired(?CarbonInterface $at = null): bool
     {
-        if ($this->rental_status !== self::STATUS_PENDING || ! in_array($this->payment_status, [self::PAYMENT_UNPAID, self::PAYMENT_REJECTED], true)) {
+        if ($this->rental_status !== self::STATUS_PENDING || $this->payment_review_blocked
+            || ! in_array($this->payment_status, [self::PAYMENT_UNPAID, self::PAYMENT_REJECTED], true)) {
             return false;
         }
 
@@ -407,6 +459,12 @@ class Rental extends Model
         $reference = $at ? $at->copy()->timezone('Asia/Jakarta') : now('Asia/Jakarta');
 
         return $this->payment_deadline_at->copy()->timezone('Asia/Jakarta')->lte($reference);
+    }
+
+    public function isIdentityExpired(CarbonInterface $at): bool
+    {
+        return $this->rental_status === self::STATUS_PENDING && $this->identity_status === self::IDENTITY_REJECTED
+            && $this->identity_deadline_at?->lte($at);
     }
 
     /**
@@ -430,7 +488,10 @@ class Rental extends Model
             return false;
         }
 
-        return ! $this->isPaymentExpired($at);
+        $reference = $at ?? now('Asia/Jakarta');
+
+        return ! $this->payment_review_blocked && ! $this->isPaymentExpired($reference)
+            && ! $this->isIdentityExpired($reference);
     }
 
     /**
@@ -448,7 +509,7 @@ class Rental extends Model
 
         $reference = $at ? $at->copy()->timezone('Asia/Jakarta') : now('Asia/Jakarta');
 
-        return $this->payment_submitted_at->copy()->timezone('Asia/Jakarta')->addHour()->lessThan($reference);
+        return RentalScheduleService::reviewOverdue($this->payment_submitted_at, $reference);
     }
 
     /**
@@ -482,8 +543,13 @@ class Rental extends Model
      */
     public function isHoldingSchedule(?CarbonInterface $at = null): bool
     {
+        $reference = $at ?? now('Asia/Jakarta');
+
         return in_array($this->rental_status, self::HOLDING_STATUSES, true)
-            && ! $this->isPaymentExpired($at);
+            && ! $this->isPaymentExpired($reference) && ! $this->isIdentityExpired($reference)
+            && ! ($this->return_at?->lte($reference)
+                && (($this->rental_status === self::STATUS_PENDING && $this->identity_status !== null)
+                    || ($this->rental_status === self::STATUS_CONFIRMED && $this->review_followup_at !== null)));
     }
 
     /**

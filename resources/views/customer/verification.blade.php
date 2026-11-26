@@ -104,7 +104,7 @@
             <div>
                 <h4 class="text-base font-bold text-info">Lengkapi Identitas untuk Menyewa Mobil</h4>
                 <p class="text-sm text-info mt-1">
-                    Sesuai kebijakan keamanan rental DriveEase, pelanggan wajib memiliki KTP (16 digit angka) dan SIM (14 digit angka) yang valid dan terverifikasi sebelum dapat melakukan reservasi.
+                    Sesuai kebijakan keamanan rental DriveEase, pelanggan wajib memiliki KTP (16 digit angka) dan SIM (14 digit angka) yang lengkap sebelum memesan. Persetujuan identitas dan pelunasan diperlukan untuk konfirmasi pesanan.
                 </p>
             </div>
         </div>

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Car;
 use App\Models\Rental;
+use App\Models\RentalSetting;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
@@ -186,85 +187,110 @@ class RentalScheduleService
         return $query;
     }
 
+    public static function reviewOverdue(?CarbonInterface $submittedAt, CarbonInterface $at): bool
+    {
+        return $submittedAt !== null && $submittedAt->lte(self::reviewCutoff($at));
+    }
+
     /**
-     * Release expired unpaid holds without deleting transaction history (SYS-05, SYS-06).
+     * Hitung mundur satu jam kerja. Cutoff yang sama dapat dipakai pada filter
+     * SQL dan peringatan detail tanpa membaca setiap baris untuk menghitung SLA.
+     */
+    public static function reviewCutoff(CarbonInterface $at): CarbonImmutable
+    {
+        $now = CarbonImmutable::instance($at)->timezone(self::TIMEZONE);
+        // Jam operasional disimpan sebagai teks. Baca rentang jam yang biasa
+        // dipakai setting, dengan default usaha bila teks tidak memuat rentang.
+        $hours = RentalSetting::publicInfo()->operating_hours;
+        $open = 480;
+        $close = 1260;
+        if (preg_match('/\b([01]?\d|2[0-3])[:.]([0-5]\d)\s*[-–—]\s*([01]?\d|2[0-3])[:.]([0-5]\d)\b/u', $hours, $match)) {
+            $open = (int) $match[1] * 60 + (int) $match[2];
+            $close = (int) $match[3] * 60 + (int) $match[4];
+        }
+        if ($close <= $open) {
+            $close += 1440;
+        }
+
+        $day = $now->startOfDay();
+        $remaining = 3600;
+        while (true) {
+            $start = $day->addMinutes($open);
+            $end = $day->addMinutes($close)->min($now);
+            if ($end->gt($start)) {
+                $seconds = (int) $start->diffInSeconds($end);
+                if ($remaining <= $seconds) {
+                    return $end->subSeconds($remaining);
+                }
+                $remaining -= $seconds;
+            }
+            $day = $day->subDay();
+        }
+    }
+
+    /**
+     * Lepas penahanan yang sudah gagal dan catat tindak lanjut pemeriksaan.
      */
     public function releaseExpiredHolds(?int $carId = null, ?CarbonInterface $at = null): int
     {
         $reference = $at ? CarbonImmutable::instance($at)->timezone(self::TIMEZONE) : CarbonImmutable::now(self::TIMEZONE);
         $cutoff = $reference->format('Y-m-d H:i:s');
 
-        // DB::transaction() mengikuti hierarki penguncian global (cars ASC -> rentals ASC)
-        // untuk mencegah deadlock, sekaligus menjaga kedaluwarsa bersifat idempoten.
         return DB::transaction(function () use ($carId, $cutoff, $reference): int {
-            if ($carId !== null) {
-                Car::query()->where('id', $carId)->lockForUpdate()->get();
-            } else {
-                $targetCarIds = Rental::query()
-                    ->where('rental_status', Rental::STATUS_PENDING)
-                    ->whereIn('payment_status', [Rental::PAYMENT_UNPAID, Rental::PAYMENT_REJECTED])
-                    ->whereNotNull('payment_deadline_at')
-                    ->where('payment_deadline_at', '<=', $cutoff)
-                    ->orderBy('car_id')
-                    ->pluck('car_id')
-                    ->unique()
-                    ->values()
-                    ->all();
+            $candidates = Rental::query()->where('rental_status', Rental::STATUS_PENDING)
+                ->where(function (Builder $due) use ($cutoff): void {
+                    $due->where(fn (Builder $payment) => $payment->where('payment_review_blocked', false)
+                        ->whereIn('payment_status', [Rental::PAYMENT_UNPAID, Rental::PAYMENT_REJECTED])
+                        ->where('payment_deadline_at', '<=', $cutoff))
+                        ->orWhere(fn (Builder $identity) => $identity->where('identity_status', Rental::IDENTITY_REJECTED)
+                            ->where('identity_deadline_at', '<=', $cutoff))
+                        ->orWhere(fn (Builder $followup) => $followup->whereNotNull('identity_status')
+                            ->whereNull('review_followup_at')->where('pickup_at', '<=', $cutoff));
+                });
 
-                if ($targetCarIds === []) {
-                    return 0;
+            // Kunci kendaraan dulu dan baca ulang kandidat setelah penguncian.
+            // Approval/unggah bersamaan akan terlihat sebelum status diubah.
+            $carIds = $carId !== null ? [$carId] : (clone $candidates)->distinct()->orderBy('car_id')->pluck('car_id')->all();
+            Car::query()->whereIn('id', $carIds)->orderBy('id')->lockForUpdate()->get();
+            $rentals = $candidates->whereIn('car_id', $carIds)->orderBy('id')->lockForUpdate()->get();
+            $expiredCount = 0;
+
+            foreach ($rentals as $rental) {
+                $paymentExpired = $rental->isPaymentExpired($reference);
+                $identityExpired = $rental->isIdentityExpired($reference);
+                if (! $paymentExpired && ! $identityExpired) {
+                    $rental->review_followup_at = $reference;
+                    $rental->saveOrFail();
+                    $rental->recordHistory(null, 'admin_review_followup', null, null,
+                        'Jadwal ambil tiba saat pemeriksaan belum selesai. Hubungi pelanggan.');
+
+                    continue;
                 }
 
-                Car::query()->whereIn('id', $targetCarIds)->orderBy('id')->lockForUpdate()->get();
-            }
+                // Jika kedua kewajiban gagal, pakai waktu paling awal. Operator
+                // <= memberi prioritas identitas saat kedua waktu sama.
+                $identityFirst = $identityExpired && (! $paymentExpired
+                    || $rental->identity_deadline_at->lte($rental->payment_deadline_at));
+                $type = $identityFirst ? Rental::CANCEL_IDENTITY : Rental::CANCEL_PAYMENT_EXPIRED;
+                $status = $identityFirst ? Rental::STATUS_CANCELLED : Rental::STATUS_EXPIRED;
+                $reason = $identityFirst ? 'Tenggat perbaikan dokumen identitas terlewati.'
+                    : 'Melewati batas waktu pembayaran tanpa bukti transfer yang valid.';
 
-            $expiredRentals = Rental::query()
-                ->when($carId !== null, fn (Builder $q) => $q->where('car_id', $carId))
-                ->where('rental_status', Rental::STATUS_PENDING)
-                ->whereIn('payment_status', [Rental::PAYMENT_UNPAID, Rental::PAYMENT_REJECTED])
-                ->whereNotNull('payment_deadline_at')
-                ->where('payment_deadline_at', '<=', $cutoff)
-                ->orderBy('id')
-                ->lockForUpdate()
-                ->get();
-
-            $updatedCount = 0;
-
-            foreach ($expiredRentals as $rental) {
-                $previousStatus = $rental->rental_status;
-                $paidAmount = max(0.0, round((float) $rental->paid_amount, 2));
-
-                // Apabila pesanan sempat menerima dana parsial sebelum tenggat perbaikan habis,
-                // sistem menetapkan hak refund 100% atas dana masuk agar dapat direkonsiliasi admin.
-                $notice = 'Batas waktu unggah bukti pembayaran terlewati sehingga jadwal kendaraan dilepas otomatis.';
-                if ($paidAmount > 0) {
-                    $rental->refund_percentage = 100;
-                    $rental->refund_amount = $paidAmount;
-                    $rental->refund_status = Rental::REFUND_PENDING;
-                    $notice = 'Pesanan kedaluwarsa. Dana terverifikasi masuk sebesar Rp '.number_format($paidAmount, 0, ',', '.')
-                        .' ditetapkan sebagai refund 100% menunggu realisasi admin.';
-                }
-
-                $rental->transitionRentalStatus(Rental::STATUS_EXPIRED, $notice);
+                $rental->transitionRentalStatus($status, $reason.' Jadwal kendaraan dilepas.');
                 $rental->cancelled_at = $reference;
-                $rental->cancellation_reason = 'Melewati batas waktu pembayaran tanpa bukti transfer yang valid.';
-                $rental->save();
-                $rental->recordHistory(
-                    null,
-                    'booking_expired',
-                    $previousStatus,
-                    Rental::STATUS_EXPIRED,
-                    $rental->cancellation_reason,
-                    $paidAmount > 0 ? [
-                        'refund_percentage' => 100,
-                        'refund_amount' => $paidAmount,
-                        'refund_status' => Rental::REFUND_PENDING,
-                    ] : []
-                );
-                $updatedCount++;
+                $rental->cancellation_type = $type;
+                $rental->cancellation_reason = $reason;
+                app(RentalFinancialService::class)->refreshCancellationRefund($rental);
+                $rental->saveOrFail();
+                $rental->recordHistory(null, $identityFirst ? 'booking_identity_cancelled' : 'booking_expired',
+                    Rental::STATUS_PENDING, $status, $reason, [
+                        'cancellation_type' => $type,
+                        'refund_amount' => (float) $rental->refund_amount,
+                    ]);
+                $expiredCount++;
             }
 
-            return $updatedCount;
+            return $expiredCount;
         });
     }
 }

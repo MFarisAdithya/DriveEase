@@ -183,6 +183,7 @@ class PaymentVerificationTest extends TestCase
 
     public function test_overdue_verification_warns_admin_without_auto_cancel_and_expired_rejected_releases_hold(): void
     {
+        $this->travelTo(now('Asia/Jakarta')->setTime(12, 0));
         $admin = $this->createUserWithRole('admin');
         $customer = $this->createVerifiedCustomer();
         $cars = Car::readyForRental()->take(2)->get();

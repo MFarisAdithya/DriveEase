@@ -63,7 +63,8 @@ class RentalChangeService
             $car = Car::query()->lockForUpdate()->findOrFail($rental->car_id);
             $lockedRental = Rental::query()->lockForUpdate()->findOrFail($rental->id);
 
-            if (! in_array($lockedRental->rental_status, [Rental::STATUS_PENDING, Rental::STATUS_CONFIRMED], true)) {
+            if (! in_array($lockedRental->rental_status, [Rental::STATUS_PENDING, Rental::STATUS_CONFIRMED], true)
+                || $lockedRental->isPaymentExpired($nowWib) || $lockedRental->isIdentityExpired($nowWib)) {
                 throw ValidationException::withMessages([
                     'rental_id' => 'Perubahan jadwal hanya dapat diajukan sebelum kendaraan diambil.',
                 ]);
@@ -74,8 +75,6 @@ class RentalChangeService
                     'rental_id' => 'Masih ada usulan perubahan yang menunggu persetujuan pada pesanan ini.',
                 ]);
             }
-
-            $this->scheduleService->releaseExpiredHolds($car->id, $nowWib);
 
             $pricing = $this->scheduleService->calculatePricing($car, $pickupAt, $totalDays);
 
@@ -186,7 +185,8 @@ class RentalChangeService
 
             $lockedRental = Rental::query()->lockForUpdate()->findOrFail($rental->id);
 
-            if (! in_array($lockedRental->rental_status, [Rental::STATUS_PENDING, Rental::STATUS_CONFIRMED], true)) {
+            if (! in_array($lockedRental->rental_status, [Rental::STATUS_PENDING, Rental::STATUS_CONFIRMED], true)
+                || $lockedRental->isPaymentExpired($nowWib) || $lockedRental->isIdentityExpired($nowWib)) {
                 throw ValidationException::withMessages([
                     'rental_id' => 'Usulan perubahan atau penggantian unit hanya berlaku pada pesanan berstatus menunggu atau terkonfirmasi.',
                 ]);
@@ -237,7 +237,6 @@ class RentalChangeService
                 ]);
             }
 
-            $this->scheduleService->releaseExpiredHolds($targetCar->id, $nowWib);
             $pricing = $this->scheduleService->calculatePricing($targetCar, $pickupAt, $totalDays);
 
             // Jika admin membebaskan selisih biaya karena kendala operasional pihak rental (A-06),
@@ -382,7 +381,8 @@ class RentalChangeService
                 return $lockedRequest->refresh();
             }
 
-            if (! in_array($lockedRental->rental_status, [Rental::STATUS_PENDING, Rental::STATUS_CONFIRMED], true)) {
+            if (! in_array($lockedRental->rental_status, [Rental::STATUS_PENDING, Rental::STATUS_CONFIRMED], true)
+                || $lockedRental->isPaymentExpired($nowWib) || $lockedRental->isIdentityExpired($nowWib)) {
                 throw ValidationException::withMessages([
                     'decision' => 'Pesanan ini tidak lagi berada pada status yang memungkinkan perubahan jadwal atau unit.',
                 ]);
@@ -406,7 +406,9 @@ class RentalChangeService
             $proposedReturnAt = CarbonImmutable::instance($lockedRequest->proposed_return_at ?? $lockedRental->return_at)
                 ->timezone(RentalScheduleService::TIMEZONE);
 
-            $this->scheduleService->releaseExpiredHolds($targetCar->id, $nowWib);
+            if ($proposedPickupAt->lte($nowWib)) {
+                throw ValidationException::withMessages(['decision' => 'Jadwal ambil baru sudah terlewati. Buat usulan baru.']);
+            }
 
             // Pemeriksaan ulang ketersediaan + jeda 1 jam dilakukan tepat saat persetujuan
             // agar perubahan yang sempat mengantre tidak bentrok dengan pesanan lain yang masuk belakangan.
@@ -438,6 +440,20 @@ class RentalChangeService
                 }
             }
 
+            // Persetujuan jadwal baru mengganti masa penahanan yang tertunda.
+            // Hanya bukti yang diblokir karena kendala admin mendapat tenggat baru;
+            // unggah ulang biasa tidak pernah memulai ulang tenggat.
+            if ($lockedRental->review_followup_at !== null && $proposedPickupAt->ne($lockedRental->pickup_at)) {
+                $lockedRental->review_followup_at = null;
+                if ($lockedRental->payment_review_blocked) {
+                    $newDeadline = $nowWib->addHour()->min($proposedPickupAt);
+                    $lockedRental->payment_review_blocked = false;
+                }
+            }
+            if ($lockedRental->identity_deadline_at?->gt($proposedPickupAt)) {
+                $lockedRental->identity_deadline_at = $proposedPickupAt;
+            }
+
             $lockedRental->forceFill([
                 'car_id' => $targetCar->id,
                 'pickup_at' => $proposedPickupAt,
@@ -449,7 +465,9 @@ class RentalChangeService
                 'total_amount' => (float) $lockedRequest->proposed_total_amount,
                 'payment_deadline_at' => $newDeadline,
                 'status_notice' => 'Perubahan pesanan telah disetujui dan jadwal atau unit terbaru kini aktif.',
-            ])->save();
+            ]);
+            $lockedRental->confirmWhenReady($nowWib);
+            $lockedRental->saveOrFail();
 
             $lockedRequest->forceFill([
                 'status' => RentalChangeRequest::STATUS_APPROVED,

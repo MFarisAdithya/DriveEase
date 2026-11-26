@@ -24,9 +24,10 @@ class PaymentController extends Controller
      */
     public function storeWalkInProof(Request $request, Rental $rental): RedirectResponse
     {
-        $validated = $request->validate([
+        abort_unless($rental->booking_channel === Rental::CHANNEL_WALK_IN, 403);
+
+        $request->validate([
             'payment_proof' => ['required', 'image', 'mimes:jpg,jpeg,png', 'extensions:jpg,jpeg,png', 'max:2048'],
-            'claimed_amount' => ['nullable', 'numeric', 'min:1'],
         ]);
 
         try {
@@ -34,7 +35,6 @@ class PaymentController extends Controller
                 rental: $rental,
                 actor: $request->user(),
                 proofFile: $request->file('payment_proof'),
-                claimedAmount: isset($validated['claimed_amount']) ? (float) $validated['claimed_amount'] : null,
             );
         } catch (ValidationException $exception) {
             throw $exception;
@@ -68,7 +68,7 @@ class PaymentController extends Controller
         );
 
         return redirect()->route('admin.bookings.show', $rental)
-            ->with('success', "Pembayaran pesanan {$rental->rental_code} disetujui dan status pesanan dikonfirmasi.");
+            ->with('success', "Pembayaran pesanan {$rental->rental_code} sudah diperiksa. Lihat status konfirmasi dan refund pada detail pesanan.");
     }
 
     /**

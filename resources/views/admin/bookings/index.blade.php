@@ -56,7 +56,8 @@
                     <select id="admin_quick_filter" name="filter" class="rounded-lg border border-field-line bg-surface-raised px-3 py-2 text-xs">
                         <option value="">Filter Khusus</option>
                         <option value="active_rentals" @selected(request('filter') === 'active_rentals')>Sewa Aktif</option>
-                        <option value="overdue_verification" @selected(request('filter') === 'overdue_verification')>Verifikasi &gt; 1 Jam</option>
+                        <option value="overdue_verification" @selected(request('filter') === 'overdue_verification')>Verifikasi Bayar Melewati SLA</option>
+                        <option value="review_followup" @selected(request('filter') === 'review_followup')>Tindak Lanjut Pemeriksaan</option>
                         <option value="pending_changes" @selected(request('filter') === 'pending_changes')>Usulan Perubahan</option>
                         <option value="pending_extensions" @selected(request('filter') === 'pending_extensions')>Pengajuan Perpanjangan</option>
                         <option value="affected_bookings" @selected(request('filter') === 'affected_bookings')>Pesanan Terdampak</option>

@@ -309,6 +309,7 @@ class BookingFlowTest extends TestCase
         $car = Car::readyForRental()->firstOrFail();
         $this->post(route('admin.bookings.store'), [
             'customer_id' => $walkIn->id,
+            'confirmation_method' => 'in_person',
             'car_id' => $car->id,
             'pickup_at' => $pickup->format('Y-m-d\TH:i'),
             'total_days' => 1,

@@ -112,6 +112,7 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
     Route::get('/verifications', [AdminVerificationController::class, 'index'])->name('verifications.index');
     Route::get('/verifications/{user}', [AdminVerificationController::class, 'show'])->name('verifications.show');
     Route::patch('/verifications/{user}/approve', [AdminVerificationController::class, 'approve'])->name('verifications.approve');
+    Route::patch('/verifications/{user}/walk-in-documents', [AdminVerificationController::class, 'correctWalkIn'])->name('verifications.correct-walk-in');
     Route::patch('/verifications/{user}/reject', [AdminVerificationController::class, 'reject'])->name('verifications.reject');
 
     // Admin Online & Walk-In Booking Management (A-06, A-15)
@@ -122,6 +123,7 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
     Route::get('/bookings/{rental}', [AdminBookingController::class, 'show'])->name('bookings.show');
     Route::patch('/bookings/{rental}/cancel', [AdminBookingController::class, 'cancel'])->name('bookings.cancel');
     Route::patch('/bookings/{rental}/cancel-with-refund', [AdminBookingController::class, 'cancelWithRefund'])->name('bookings.cancel-with-refund');
+    Route::post('/bookings/{rental}/review-contact', [AdminBookingController::class, 'recordReviewContact'])->name('bookings.review-contact');
     Route::patch('/bookings/{rental}/refund', [AdminBookingController::class, 'realizeRefund'])->name('bookings.refund');
     Route::post('/bookings/{rental}/payments', [AdminPaymentController::class, 'storeWalkInProof'])->name('bookings.payments.store');
     Route::patch('/payments/{payment}/approve', [AdminPaymentController::class, 'approve'])->name('payments.approve');

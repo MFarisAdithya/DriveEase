@@ -69,6 +69,8 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'verified_at' => 'datetime',
+            'identity_submitted_at' => 'datetime',
+            'identity_rejected_at' => 'datetime',
             'deactivated_at' => 'datetime',
             'password' => 'hashed',
             'nik_ktp' => 'encrypted',
@@ -161,7 +163,10 @@ class User extends Authenticatable
      */
     public function canMakeReservation(): bool
     {
-        return $this->isVerified();
+        // Persetujuan lama tetap sah. Untuk identitas yang belum disetujui,
+        // hasSubmittedDocuments() memeriksa nomor dan keberadaan dua foto privat.
+        return ! $this->isDeactivated() && ($this->isVerified()
+            || ($this->isPendingVerification() && $this->hasSubmittedDocuments()));
     }
 
     /**

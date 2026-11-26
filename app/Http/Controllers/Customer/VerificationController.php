@@ -7,6 +7,7 @@ use App\Services\IdentityDocuments;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use RuntimeException;
 use Throwable;
@@ -98,6 +99,8 @@ class VerificationController extends Controller
 
         try {
             $documents->submit($user, $validator->validated());
+        } catch (ValidationException $exception) {
+            return back()->withErrors($exception->errors());
         } catch (Throwable $exception) {
             report($exception);
 

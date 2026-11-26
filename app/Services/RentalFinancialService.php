@@ -31,7 +31,7 @@ class RentalFinancialService
             : CarbonImmutable::now(RentalScheduleService::TIMEZONE);
         $pickupWib = CarbonImmutable::instance($rental->pickup_at)->timezone(RentalScheduleService::TIMEZONE);
 
-        if ($cancellationType === Rental::CANCEL_RENTAL_FAULT) {
+        if (in_array($cancellationType, [Rental::CANCEL_RENTAL_FAULT, Rental::CANCEL_IDENTITY, Rental::CANCEL_PAYMENT_EXPIRED], true)) {
             $percentage = 100;
             $label = 'Pembatalan karena kendala pihak rental (refund 100%)';
         } elseif ($cancellationType === Rental::CANCEL_NO_SHOW) {
@@ -72,6 +72,23 @@ class RentalFinancialService
             'paid_amount' => $paidAmount,
             'reason_label' => $label,
         ];
+    }
+
+    /**
+     * Hitung ulang kewajiban setelah pembatalan atau rekonsiliasi. Refund yang
+     * sudah ditransfer tetap tercatat, sehingga uang yang sama tidak ditagihkan ulang.
+     */
+    public function refreshCancellationRefund(Rental $rental): void
+    {
+        $type = $rental->cancellation_type ?? ($rental->rental_status === Rental::STATUS_EXPIRED
+            ? Rental::CANCEL_PAYMENT_EXPIRED : Rental::CANCEL_CUSTOMER);
+        $reference = $type === Rental::CANCEL_CUSTOMER ? $rental->cancellation_requested_at : null;
+        $policy = $this->calculateRefundPolicy($rental, $type, $reference ?? $rental->cancelled_at);
+        $realized = (float) $rental->refund_realized_amount;
+        $rental->refund_percentage = $policy['percentage'];
+        $rental->refund_amount = round($realized + $policy['amount'], 2);
+        $rental->refund_status = $policy['amount'] > 0 ? Rental::REFUND_PENDING
+            : ($realized > 0 ? Rental::REFUND_PROCESSED : Rental::REFUND_NONE);
     }
 
     /**
@@ -249,12 +266,19 @@ class RentalFinancialService
                 ]);
             }
 
+            if ($lockedRental->review_followup_at !== null && $cancellationType === Rental::CANCEL_CUSTOMER
+                && ($lockedRental->cancellation_requested_at === null
+                    || $lockedRental->cancellation_requested_at->gte($lockedRental->review_followup_at))) {
+                throw ValidationException::withMessages(['cancellation_type' => 'Gunakan kendala pihak rental jika pembatalan disebabkan pemeriksaan yang terlambat.']);
+            }
+
             if ($cancellationType === Rental::CANCEL_NO_SHOW) {
                 $pickupWib = CarbonImmutable::instance($lockedRental->pickup_at)->timezone(RentalScheduleService::TIMEZONE);
 
                 // SKPL mensyaratkan pelanggan sudah melewati +1 jam dari jadwal ambil pada pesanan terkonfirmasi,
                 // belum melakukan pengambilan, dan admin sudah mencoba menghubungi pelanggan lebih dahulu.
-                if ($lockedRental->rental_status !== Rental::STATUS_CONFIRMED || $lockedRental->actual_pickup_at !== null) {
+                if ($lockedRental->rental_status !== Rental::STATUS_CONFIRMED || $lockedRental->actual_pickup_at !== null
+                    || $lockedRental->review_followup_at !== null || ! $lockedRental->hasVerifiedIdentity()) {
                     throw ValidationException::withMessages([
                         'cancellation_type' => 'Status tidak hadir (no-show) hanya berlaku pada pesanan terkonfirmasi yang belum diambil.',
                     ]);
@@ -360,6 +384,11 @@ class RentalFinancialService
                 throw ValidationException::withMessages([
                     'refund' => 'Realisasi pengembalian dana tidak tersedia pada status pesanan saat ini.',
                 ]);
+            }
+
+            if (in_array($lockedRental->rental_status, [Rental::STATUS_CANCELLED, Rental::STATUS_EXPIRED], true)
+                && $lockedRental->payment_status === Rental::PAYMENT_PENDING_APPROVAL) {
+                throw ValidationException::withMessages(['refund' => 'Rekonsiliasi bukti pembayaran yang belum diperiksa sebelum transfer refund.']);
             }
 
             if ($lockedRental->refund_status !== Rental::REFUND_PENDING) {

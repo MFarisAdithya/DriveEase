@@ -49,7 +49,7 @@ class RentalOperationService
             $reasons[] = 'Pembayaran utama pesanan harus lunas dan terverifikasi admin.';
         }
 
-        if (! ($rental->user?->isVerified() ?? false)) {
+        if (! $rental->hasVerifiedIdentity() || ! ($rental->user?->isVerified() ?? false)) {
             $reasons[] = 'Identitas KTP/SIM penyewa harus terverifikasi sebelum serah-terima.';
         }
 

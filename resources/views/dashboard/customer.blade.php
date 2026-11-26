@@ -108,7 +108,7 @@
                 <div>
                     <h3 class="text-sm font-bold text-info">Lengkapi Dokumen Identitas Anda</h3>
                     <p class="text-xs text-info mt-0.5">
-                        Unggah KTP dan SIM Anda agar akun terverifikasi dan dapat segera melakukan pemesanan kendaraan impian.
+                        Lengkapi KTP dan SIM untuk memesan. Pesanan dikonfirmasi setelah identitas disetujui dan pembayaran lunas.
                     </p>
                 </div>
             </div>
