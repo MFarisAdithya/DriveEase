@@ -21,11 +21,6 @@
         </ul>
     @endif
 
-    <div class="rounded-xl border border-info-line bg-info-surface p-4 text-xs sm:text-sm text-info">
-        <strong class="block font-bold">Status &amp; Tindakan Berikutnya</strong>
-        <p class="mt-0.5">{{ $rental->nextActionNotice() }}</p>
-    </div>
-
     <div class="bg-surface rounded-xl border border-line shadow-sm p-6 sm:p-8 space-y-6">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-line pb-4">
             <div>
@@ -37,6 +32,14 @@
                 <span class="px-3 py-1 rounded-full bg-warning-surface text-warning">{{ $rental->paymentStatusLabel() }}</span>
             </div>
         </div>
+
+        <p class="rounded-lg border border-info-line bg-info-surface p-3 text-xs sm:text-sm text-info">
+            @if ($rental->rental_status === \App\Models\Rental::STATUS_PENDING && $rental->review_followup_at)
+                Admin perlu menindaklanjuti jadwal dan akan menghubungi Anda.
+            @else
+                {{ $rental->nextActionNotice() }}
+            @endif
+        </p>
 
         <dl class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
             <div class="rounded-lg border border-line bg-surface-raised p-4">
@@ -64,20 +67,55 @@
             </div>
         @endif
 
-        @if ($rental->canUploadPaymentProof())
-        <div class="rounded-xl border border-line bg-surface-raised p-5 space-y-1 text-xs">
-            <h2 class="text-sm font-bold text-ink">Rekening Tujuan Pembayaran</h2>
-            <p>Sisa tagihan: <strong>Rp {{ number_format($rental->remainingBalance(), 0, ',', '.') }}</strong></p>
-            <p>Batas unggah: <strong>{{ $rental->payment_deadline_at?->timezone('Asia/Jakarta')->format('d M Y H:i') ?? '–' }} WIB</strong></p>
-            @if ($rental->payment_account_number)
-                <p>Bank: <strong>{{ $rental->payment_bank_name }}</strong></p>
-                <p>Nomor Rekening: <strong class="font-mono">{{ $rental->payment_account_number }}</strong></p>
-                <p>Atas Nama: <strong>{{ $rental->payment_account_holder }}</strong></p>
-            @else
-                <p class="text-muted">Informasi rekening tujuan pembayaran belum dikonfigurasi admin saat pesanan dibuat.</p>
-            @endif
-        </div>
+        @php
+            // Model menentukan apakah tagihan masih dapat dibayar. Pakai
+            // hasil yang sama untuk rekening, tenggat, dan tombol unggah.
+            $canPay = $rental->canUploadPaymentProof();
+        @endphp
 
+        @if ($rental->payment_rejection_reason)
+            <div class="rounded-lg border border-danger-line bg-danger-surface p-4 text-xs text-danger">
+                <strong class="block">Bukti Pembayaran Ditolak</strong>
+                <p>{{ $rental->payment_rejection_reason }}</p>
+            </div>
+        @endif
+
+        @if ($canPay)
+            <form method="POST" action="{{ route('customer.bookings.payments.store', $rental) }}" enctype="multipart/form-data" class="rounded-xl border border-line bg-surface-raised p-5 space-y-4">
+                @csrf
+                <h2 class="text-sm font-bold text-ink">Pembayaran Sewa</h2>
+                <dl class="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2">
+                    <div>
+                        <dt class="font-medium text-muted">Sisa tagihan</dt>
+                        <dd class="text-base font-bold text-ink">Rp {{ number_format($rental->remainingBalance(), 0, ',', '.') }}</dd>
+                    </div>
+                    <div>
+                        <dt class="font-medium text-muted">Batas unggah</dt>
+                        <dd class="font-bold text-ink">
+                            {{ $rental->payment_deadline_at ? $rental->payment_deadline_at->timezone('Asia/Jakarta')->format('d M Y H:i').' WIB' : '–' }}
+                        </dd>
+                    </div>
+                </dl>
+                @if ($rental->payment_account_number)
+                    <div class="border-t border-line pt-3 text-xs">
+                        <p class="font-semibold text-ink">Rekening Tujuan Pembayaran</p>
+                        <p>{{ $rental->payment_bank_name }} · <strong class="font-mono">{{ $rental->payment_account_number }}</strong> · a.n. {{ $rental->payment_account_holder }}</p>
+                    </div>
+                @else
+                    <p class="text-xs text-muted">Rekening belum tercatat. Hubungi admin sebelum melakukan transfer.</p>
+                @endif
+                <div>
+                    <label for="payment_proof" class="block text-xs font-semibold text-ink mb-1">Foto bukti transfer (JPG/JPEG/PNG, maks 2 MB)</label>
+                    <input id="payment_proof" name="payment_proof" type="file" accept=".jpg,.jpeg,.png" required class="w-full rounded-lg border border-field-line bg-surface p-2 text-xs">
+                </div>
+                <div class="flex justify-end">
+                    <button type="submit" class="ui-button">
+                        {{ $rental->payment_rejection_reason ? 'Kirim Perbaikan Bukti' : 'Kirim Bukti Pembayaran' }}
+                    </button>
+                </div>
+            </form>
+        @elseif ($rental->rental_status === \App\Models\Rental::STATUS_PENDING && $rental->payment_status !== \App\Models\Rental::PAYMENT_PAID)
+            <p class="text-xs text-muted">Sisa tagihan: <strong class="text-ink">Rp {{ number_format($rental->remainingBalance(), 0, ',', '.') }}</strong></p>
         @endif
 
         @if ($rental->payment_status === \App\Models\Rental::PAYMENT_PAID)
@@ -95,7 +133,7 @@
                     </div>
                     <div>
                         <dt class="text-muted">Tanggal Verifikasi Lunas</dt>
-                        <dd class="font-semibold text-ink">{{ $rental->payment_verified_at?->timezone('Asia/Jakarta')->format('d M Y H:i') ?? $rental->created_at?->timezone('Asia/Jakarta')->format('d M Y H:i') }} WIB</dd>
+                        <dd class="font-semibold text-ink">{{ $rental->payment_verified_at ? $rental->payment_verified_at->timezone('Asia/Jakarta')->format('d M Y H:i').' WIB' : '–' }}</dd>
                     </div>
                     <div>
                         <dt class="text-muted">Total Sewa &amp; Tagihan Tambahan</dt>
@@ -118,39 +156,9 @@
             </div>
         @endif
 
-        @if ($rental->payment_rejection_reason)
-            <div class="rounded-xl border border-danger-line bg-danger-surface p-4 text-xs text-danger">
-                <strong class="block font-bold">Bukti Pembayaran Ditolak</strong>
-                <p class="mt-1">Alasan: "{{ $rental->payment_rejection_reason }}"</p>
-                <p class="mt-1">Sisa kekurangan pembayaran: <strong>Rp {{ number_format($rental->remainingBalance(), 0, ',', '.') }}</strong>. @if ($rental->canUploadPaymentProof()) Unggah perbaikan sebelum <strong>{{ $rental->payment_deadline_at?->timezone('Asia/Jakarta')->format('d M Y H:i') }} WIB</strong>. @endif </p>
-            </div>
-        @endif
-
-        @if ($rental->rental_status === \App\Models\Rental::STATUS_PENDING && $rental->review_followup_at)
-            <p role="status" class="rounded-lg border border-warning-line p-3 text-xs">Admin perlu menindaklanjuti jadwal dan akan menghubungi Anda.</p>
-        @endif
-
-        @if ($rental->canUploadPaymentProof())
-            <form method="POST" action="{{ route('customer.bookings.payments.store', $rental) }}" enctype="multipart/form-data" class="rounded-xl border border-line bg-surface-raised p-5 space-y-4">
-                @csrf
-                <h2 class="text-sm font-bold text-ink">
-                    {{ $rental->payment_status === \App\Models\Rental::PAYMENT_REJECTED ? 'Perbaiki Bukti / Lengkapi Kekurangan Pembayaran' : 'Unggah Bukti Transfer Pembayaran' }}
-                </h2>
-                <div>
-                    <label for="payment_proof" class="block text-xs font-semibold text-ink mb-1">Foto Bukti Transfer (JPG/JPEG/PNG, maks 2 MB)</label>
-                    <input id="payment_proof" name="payment_proof" type="file" accept=".jpg,.jpeg,.png" required class="w-full rounded-lg border border-field-line bg-surface p-2 text-xs">
-                </div>
-                <div class="flex justify-end">
-                    <button type="submit" class="rounded-lg bg-action hover:bg-action-hover px-5 py-2.5 text-xs font-bold text-ink shadow-xs">
-                        Kirim Bukti Pembayaran
-                    </button>
-                </div>
-            </form>
-        @endif
-
         @if ($rental->payments->isNotEmpty())
-            <div class="space-y-3">
-                <h2 class="text-sm font-bold text-ink">Riwayat Pengiriman Bukti Pembayaran</h2>
+            <details class="rounded-xl border border-line bg-surface-raised">
+                <summary class="cursor-pointer px-4 py-3 text-sm font-bold text-ink">Riwayat Pengiriman Bukti Pembayaran</summary>
                 <ul class="divide-y divide-line rounded-xl border border-line bg-surface-raised text-xs">
                     @foreach ($rental->payments as $payment)
                         <li class="p-4 flex flex-wrap items-center justify-between gap-3">
@@ -172,7 +180,7 @@
                         </li>
                     @endforeach
                 </ul>
-            </div>
+            </details>
         @endif
 
         @if ($rental->notes)

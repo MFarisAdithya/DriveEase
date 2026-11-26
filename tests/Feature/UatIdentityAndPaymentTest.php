@@ -186,10 +186,16 @@ class UatIdentityAndPaymentTest extends TestCase
         $customer->forceFill(['identity_submitted_at' => now('Asia/Jakarta')])->saveOrFail();
         $rental = $this->book($customer, $car, now('Asia/Jakarta')->addDay()->setTime(9, 0));
         $this->actingAs($customer)->get(route('customer.bookings.show', $rental))
-            ->assertOk()->assertSee($rental->payment_account_number)->assertSee('Batas unggah');
+            ->assertOk()->assertSee($rental->payment_account_number)
+            ->assertSee('Sisa tagihan')->assertSee('Batas unggah')
+            ->assertDontSee('name="claimed_amount"', false);
         $this->post(route('customer.bookings.payments.store', $rental), [
             'payment_proof' => UploadedFile::fake()->image('timely.jpg'),
         ])->assertSessionHasNoErrors();
+
+        // Rekening disembunyikan segera setelah bukti masuk antrean pemeriksaan.
+        $this->get(route('customer.bookings.show', $rental))->assertOk()
+            ->assertDontSee($rental->payment_account_number)->assertDontSee('name="payment_proof"', false);
 
         $this->travelTo(now('Asia/Jakarta')->addDay()->setTime(8, 44));
         $this->assertFalse(RentalScheduleService::reviewOverdue($customer->identity_submitted_at, now('Asia/Jakarta')));
