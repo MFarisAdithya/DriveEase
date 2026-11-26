@@ -54,7 +54,7 @@
         </dl>
 
         <div class="rounded-xl border border-line bg-surface-raised p-5 space-y-1 text-xs">
-            <h2 class="text-sm font-bold text-ink">Rekening Tujuan Pembayaran (Tercatat pada Tagihan)</h2>
+            <h2 class="text-sm font-bold text-ink">Rekening Tujuan Pembayaran</h2>
             @if ($rental->payment_account_number)
                 <p>Bank: <strong>{{ $rental->payment_bank_name }}</strong></p>
                 <p>Nomor Rekening: <strong class="font-mono">{{ $rental->payment_account_number }}</strong></p>
