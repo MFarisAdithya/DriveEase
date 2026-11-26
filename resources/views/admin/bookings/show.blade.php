@@ -64,7 +64,7 @@
                 <dd class="mt-1 text-sm font-bold text-ink">{{ $rental->payment_deadline_at?->timezone('Asia/Jakarta')->format('d M Y H:i') ?? '-' }} WIB</dd>
             </div>
             <div class="rounded-lg border border-line bg-surface-raised p-4 sm:col-span-2">
-                <dt class="text-muted font-semibold uppercase">Snapshot Rekening Pembayaran</dt>
+                <dt class="text-muted font-semibold uppercase">Rekening Pembayaran</dt>
                 <dd class="mt-1 text-sm font-bold text-ink">
                     @if ($rental->payment_account_number)
                         {{ $rental->payment_bank_name }} &middot; {{ $rental->payment_account_number }} ({{ $rental->payment_account_holder }})
