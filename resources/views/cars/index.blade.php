@@ -81,10 +81,7 @@
                         <figure class="vehicle-photo">
                             <div class="flex h-full items-center justify-center p-5 text-sm text-muted">Foto kendaraan belum tersedia</div>
                             @if ($photo['url'])
-                                <img src="{{ $photo['url'] }}" alt="{{ $car->name }}" loading="lazy" onerror="this.hidden = true; this.parentElement.querySelector('figcaption')?.remove()">
-                                @if ($photo['is_model'])
-                                    <figcaption class="absolute bottom-3 right-3 rounded bg-white px-2 py-1 text-xs text-ink">Foto model</figcaption>
-                                @endif
+                                <img src="{{ $photo['url'] }}" alt="{{ $car->name }}" loading="lazy" onerror="this.hidden = true">
                             @endif
                         </figure>
                         <div class="flex flex-1 flex-col p-5">

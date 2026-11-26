@@ -126,6 +126,7 @@ class AvailabilityApiAndCatalogTest extends TestCase
             ->assertSee('Tersedia untuk periode yang dipilih')
             ->assertSee('data-availability-form', false)
             ->assertDontSee('Periksa Jadwal')
+            ->assertDontSee('<figcaption', false)
             ->assertSee(number_format($car->price_per_day * 2, 0, ',', '.'));
 
         $previewEndpoint = route('api.v1.availability', ['car_id' => $car->id] + $filters);
