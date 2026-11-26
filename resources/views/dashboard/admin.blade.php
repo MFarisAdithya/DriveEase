@@ -16,7 +16,7 @@
                 <strong class="block text-sm">Peringatan Operasional: {{ $stats['overdue_trips'] ?? 0 }} Pengembalian Terlambat &middot; {{ ($impactedNextBookings ?? collect())->count() }} Pesanan Berikutnya Terdampak</strong>
                 <p class="mt-0.5">Segera tangani pesanan terdampak dengan kendaraan pengganti tanpa biaya tambahan, penjadwalan ulang, atau refund penuh.</p>
             </div>
-            <a href="{{ route('admin.bookings.index', ['filter' => 'affected_bookings']) }}" class="rounded-lg bg-danger-action px-4 py-2 font-bold text-white shrink-0">
+            <a href="{{ route('admin.bookings.index', ['filter' => 'affected_bookings']) }}" class="ml-auto shrink-0 rounded-lg bg-danger-action px-4 py-2 font-bold text-white">
                 Lihat Pesanan Terdampak
             </a>
         </div>
@@ -24,7 +24,7 @@
 
     <section aria-labelledby="work-queues" class="space-y-2">
         <h2 id="work-queues" class="text-base font-bold text-ink">Antrean kerja</h2>
-        <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div class="grid grid-cols-2 gap-2 sm:gap-3 xl:grid-cols-4">
             <a href="{{ route('admin.verifications.index', ['status' => 'ready']) }}" class="rounded-xl border border-line bg-surface p-3 hover:border-warning-line">
                 <span class="block text-sm font-semibold text-ink">Verifikasi identitas</span>
                 <strong class="mt-1 block text-lg text-warning">{{ $stats['pending_verifications'] }} siap ditinjau</strong>

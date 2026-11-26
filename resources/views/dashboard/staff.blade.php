@@ -12,12 +12,12 @@
                 Ringkasan jadwal pengambilan, pengembalian, keterlambatan, dan kesiapan armada operasional hari ini.
             </p>
         </div>
-        <div class="flex flex-wrap gap-3">
-            <a href="{{ route('staff.schedules.index') }}" class="rounded-lg bg-action hover:bg-action-hover px-4 py-2 text-xs font-bold text-ink">
-                Jadwal Operasional
-            </a>
+        <div class="flex flex-wrap justify-end gap-2">
             <a href="{{ route('staff.readiness.index') }}" class="rounded-lg border border-line bg-surface-raised hover:bg-surface-hover px-4 py-2 text-xs font-bold text-ink">
                 Kesiapan Armada
+            </a>
+            <a href="{{ route('staff.schedules.index') }}" class="rounded-lg bg-action hover:bg-action-hover px-4 py-2 text-xs font-bold text-ink">
+                Jadwal Operasional
             </a>
         </div>
     </div>
@@ -123,15 +123,15 @@
             <a href="{{ route('staff.readiness.index') }}" class="text-xs font-semibold text-link hover:underline">Kelola Kesiapan &rarr;</a>
         </div>
 
-        <div class="overflow-x-auto">
+        <div role="region" aria-label="Daftar kesiapan kendaraan" tabindex="0" class="overflow-x-auto">
             <table class="w-full text-left border-collapse">
                 <thead>
                     <tr class="bg-surface-raised text-[11px] font-semibold text-muted uppercase tracking-wider border-b border-line">
-                        <th class="py-3 px-5">Nama Kendaraan</th>
-                        <th class="py-3 px-5">Kategori</th>
-                        <th class="py-3 px-5">Plat Nomor</th>
-                        <th class="py-3 px-5">Status Operasional</th>
-                        <th class="py-3 px-5">Kesiapan Fisik</th>
+                        <th scope="col" class="py-3 px-5">Nama Kendaraan</th>
+                        <th scope="col" class="py-3 px-5">Kategori</th>
+                        <th scope="col" class="py-3 px-5">Plat Nomor</th>
+                        <th scope="col" class="py-3 px-5">Status Operasional</th>
+                        <th scope="col" class="py-3 px-5">Kesiapan Fisik</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-line text-sm">

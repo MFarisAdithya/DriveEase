@@ -241,13 +241,13 @@
                     @endif
                 </div>
 
-                <form action="{{ route('admin.verifications.approve', $user) }}" method="POST" class="mt-6">
+                <form action="{{ route('admin.verifications.approve', $user) }}" method="POST" class="mt-6 flex justify-end">
                     @csrf
                     @method('PATCH')
                     <button type="submit" 
                             {{ !$user->hasSubmittedDocuments() ? 'disabled' : '' }}
                             onclick="return confirm('Apakah Anda yakin ingin menyetujui verifikasi identitas pelanggan ini?')"
-                            class="w-full px-4 py-2.5 bg-success-action hover:bg-success-action disabled:bg-surface-raised disabled:cursor-not-allowed text-ink text-xs font-bold rounded-lg shadow-sm transition-colors flex items-center justify-center gap-2">
+                            class="min-h-10 px-4 py-2.5 bg-success-action hover:bg-success-action disabled:bg-surface-raised disabled:cursor-not-allowed text-ink text-xs font-bold rounded-lg shadow-sm transition-colors flex items-center justify-center gap-2">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                         </svg>
@@ -288,10 +288,10 @@
                         </div>
                     </div>
 
-                    <div class="mt-4">
+                    <div class="mt-4 flex justify-end">
                         <button type="submit" 
                                 onclick="return confirm('Apakah Anda yakin ingin menolak verifikasi pelanggan ini?')"
-                                class="w-full px-4 py-2.5 bg-danger-action hover:bg-danger-action text-ink text-xs font-bold rounded-lg shadow-sm transition-colors flex items-center justify-center gap-2">
+                                class="min-h-10 px-4 py-2.5 bg-danger-action hover:bg-danger-action text-ink text-xs font-bold rounded-lg shadow-sm transition-colors flex items-center justify-center gap-2">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                             </svg>

@@ -74,7 +74,7 @@
 
             <form method="POST" action="{{ route('staff.schedules.pickup', $rental) }}" enctype="multipart/form-data" class="rounded-xl border border-line bg-surface-raised p-5 space-y-4 text-xs">
                 @csrf
-                <h2 class="text-sm font-bold text-ink">Inspeksi Awal &amp; Konfirmasi Pengambilan Kendaraan (S-03)</h2>
+                <h2 class="text-sm font-bold text-ink">Inspeksi Awal &amp; Konfirmasi Pengambilan Kendaraan</h2>
                 <label class="inline-flex items-center gap-2 text-ink font-semibold">
                     <input type="checkbox" name="identity_checked" value="1" required class="rounded border-field-line">
                     <span>Saya telah memeriksa KTP &amp; SIM asli penyewa sesuai akun terverifikasi.</span>
@@ -105,15 +105,17 @@
                     <label for="pickup_photo" class="block font-semibold text-ink mb-1">Foto Kondisi Fisik Awal (Wajib)</label>
                     <input id="pickup_photo" name="condition_photo" type="file" required accept=".jpg,.jpeg,.png" class="w-full rounded-lg border border-field-line bg-surface p-2">
                 </div>
-                <button type="submit" class="rounded-lg bg-action hover:bg-action-hover px-5 py-2.5 font-bold text-ink">
-                    Konfirmasi Serah-Terima Kendaraan
-                </button>
+                <div class="flex justify-end">
+    <button type="submit" class="min-h-10 rounded-lg bg-action px-5 py-2.5 text-sm font-bold text-ink hover:bg-action-hover">
+                        Konfirmasi Serah-Terima Kendaraan
+                    </button>
+                </div>
             </form>
         @elseif ($rental->rental_status === \App\Models\Rental::STATUS_PICKED_UP)
             @php $pickupData = $rental->pickupInspection; @endphp
             <form method="POST" action="{{ route('staff.schedules.return', $rental) }}" enctype="multipart/form-data" class="rounded-xl border border-line bg-surface-raised p-5 space-y-4 text-xs">
                 @csrf
-                <h2 class="text-sm font-bold text-ink">Inspeksi Akhir &amp; Konfirmasi Pengembalian Kendaraan (S-04)</h2>
+                <h2 class="text-sm font-bold text-ink">Inspeksi Akhir &amp; Konfirmasi Pengembalian Kendaraan</h2>
                 @if ($pickupData)
                     <p class="text-muted">Pembanding inspeksi awal: <strong class="text-ink">{{ number_format($pickupData->odometer_km, 0, ',', '.') }} km</strong> &middot; BBM: <strong class="text-ink">{{ $pickupData->fuelLevelLabel() }}</strong></p>
                 @endif
@@ -151,9 +153,11 @@
                     <label for="return_photo" class="block font-semibold text-ink mb-1">Foto Kondisi Akhir Kendaraan (Wajib)</label>
                     <input id="return_photo" name="condition_photo" type="file" required accept=".jpg,.jpeg,.png" class="w-full rounded-lg border border-field-line bg-surface p-2">
                 </div>
-                <button type="submit" class="rounded-lg bg-action hover:bg-action-hover px-5 py-2.5 font-bold text-ink">
-                    Simpan Pengembalian &amp; Inspeksi Akhir
-                </button>
+                <div class="flex justify-end">
+    <button type="submit" class="min-h-10 rounded-lg bg-action px-5 py-2.5 text-sm font-bold text-ink hover:bg-action-hover">
+                        Simpan Pengembalian &amp; Inspeksi Akhir
+                    </button>
+                </div>
             </form>
         @endif
 

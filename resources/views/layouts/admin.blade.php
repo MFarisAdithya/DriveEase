@@ -87,7 +87,7 @@
             <!-- Top Navbar -->
             <header class="sticky top-0 z-30 h-16 bg-surface/90 backdrop-blur-md text-ink border-b border-line flex items-center gap-3 px-4 md:justify-between md:px-8 shrink-0">
             <details class="relative md:hidden">
-                <summary class="cursor-pointer py-3 font-semibold">Menu</summary>
+                <summary class="cursor-pointer whitespace-nowrap rounded py-3 text-sm font-semibold">Menu</summary>
                 <nav aria-label="Navigasi admin" class="absolute left-0 top-full z-40 grid max-h-[calc(100dvh-5rem)] w-64 gap-3 overflow-y-auto rounded-lg border border-line bg-surface-raised p-3 shadow-lg">
                     @include('admin.navigation-links', ['showIcon' => false])
                     <a href="{{ route('account.edit') }}" class="mb-2 flex items-center justify-center rounded-lg border border-field-line px-3 py-2 text-xs font-medium text-subtle hover:bg-surface-hover hover:text-ink transition-colors">Akun Saya</a>
