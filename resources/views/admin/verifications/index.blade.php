@@ -58,7 +58,7 @@
             <tbody class="divide-y divide-line">
                 @forelse ($customers as $customer)
                     <tr class="hover:bg-surface-raised/60">
-                        <td class="px-4 py-5"><p class="font-semibold">{{ $customer->name }}</p><p class="mt-1 text-muted">{{ $customer->email }}</p></td>
+                        <td class="px-4 py-5"><p class="font-semibold">{{ $customer->name }}</p><p class="mt-1 text-muted">{{ $customer->email ?? 'Tanpa akun login' }}</p></td>
                         <td class="px-4 py-5"><span class="mb-1 block text-xs text-muted xl:hidden">Berkas</span>{{ $customer->hasSubmittedDocuments() ? 'Berkas lengkap' : 'Berkas belum lengkap' }}</td>
                         <td class="px-4 py-5">
                             <span class="mb-1 block text-xs text-muted xl:hidden">Status akun</span>

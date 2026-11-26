@@ -9,8 +9,10 @@ use App\Models\Role;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class BookingFlowTest extends TestCase
@@ -214,18 +216,6 @@ class BookingFlowTest extends TestCase
         $this->actingAs($verifiedOnline)->get(route('admin.bookings.create'))->assertForbidden();
         $this->actingAs($admin)->get(route('customer.bookings.create'))->assertForbidden();
 
-        // Pendaftaran walk-in oleh admin membuat akun customer berstatus pending.
-        $walkInEmail = 'walkin_new_'.uniqid().'@driveease.test';
-        $this->actingAs($admin)->post(route('admin.bookings.register-customer'), [
-            'name' => 'Pelanggan WalkIn Baru',
-            'email' => $walkInEmail,
-            'phone' => '081234567899',
-            'password' => 'password123',
-            'password_confirmation' => 'password123',
-        ])->assertRedirect();
-        $newWalkInCustomer = User::where('email', $walkInEmail)->firstOrFail();
-        $this->assertSame('pending', $newWalkInCustomer->verification_status);
-
         $pickupAt = CarbonImmutable::now('Asia/Jakarta')->addDays(4)->setTime(13, 0);
 
         // Pemesanan langsung menolak pelanggan belum terverifikasi dan mobil perawatan.
@@ -267,6 +257,68 @@ class BookingFlowTest extends TestCase
             'total_days' => 1,
             'accept_terms' => '1',
         ])->assertSessionHasErrors('pickup_at');
+    }
+
+    public function test_admin_records_and_verifies_walk_in_identity_without_login_credentials(): void
+    {
+        $admin = $this->createUserWithRole('admin');
+        $staff = $this->createUserWithRole('staff');
+        $registration = route('admin.bookings.register-customer');
+
+        $this->post($registration)->assertRedirect(route('login'));
+        $this->actingAs($staff)->post($registration)->assertForbidden();
+
+        // Validasi harus menolak permintaan yang belum memiliki dokumen atau
+        // mencoba menyisipkan kredensial ke endpoint identitas walk-in.
+        $this->actingAs($admin)->post($registration, ['email' => $admin->email, 'password' => 'input-dilarang'])
+            ->assertSessionHasErrors(['email', 'password', 'ktp_image', 'sim_image']);
+
+        $this->get(route('admin.bookings.create'))->assertOk()
+            ->assertSee('enctype="multipart/form-data"', false)
+            ->assertDontSee('name="password"', false);
+
+        $identity = [
+            'name' => 'Penyewa Tanpa Login',
+            'phone' => '081234567899',
+            'ktp_number' => '3578012304950001',
+            'sim_number' => '12345678901234',
+            'ktp_image' => UploadedFile::fake()->image('ktp.jpeg'),
+            'sim_image' => UploadedFile::fake()->image('sim.png'),
+            'verification_status' => 'verified',
+        ];
+        $response = $this->post($registration, $identity);
+        $walkIn = User::query()->where('name', $identity['name'])->sole();
+
+        $response->assertRedirect(route('admin.verifications.show', $walkIn));
+        $this->assertNull($walkIn->email);
+        $this->assertNull($walkIn->password);
+        $this->assertTrue($walkIn->isPendingVerification());
+        $this->assertSame($identity['ktp_number'], $walkIn->ktp_number);
+        $this->assertNotSame($identity['ktp_number'], $walkIn->getRawOriginal('ktp_number'));
+        $this->assertNotSame($identity['sim_number'], $walkIn->getRawOriginal('sim_number'));
+        Storage::disk('local')->assertExists([$walkIn->ktp_image, $walkIn->sim_image]);
+        Storage::disk('public')->assertMissing([$walkIn->ktp_image, $walkIn->sim_image]);
+
+        $this->patch(route('admin.verifications.approve', $walkIn))->assertSessionHas('success');
+        $this->assertTrue($walkIn->fresh()->isVerified());
+        $this->assertSame($admin->id, $walkIn->fresh()->verified_by);
+
+        // Pelanggan tanpa login memakai relasi user_id yang sama dengan penyewa
+        // lama. Verifikasi tetap diperlukan di fondasi ini sebelum pemesanan.
+        $pickup = CarbonImmutable::now('Asia/Jakarta')->addDays(9)->setTime(13, 0);
+        $car = Car::readyForRental()->firstOrFail();
+        $this->post(route('admin.bookings.store'), [
+            'customer_id' => $walkIn->id,
+            'car_id' => $car->id,
+            'pickup_at' => $pickup->format('Y-m-d\TH:i'),
+            'total_days' => 1,
+            'accept_terms' => '1',
+        ])->assertSessionHas('success');
+
+        $rental = $walkIn->rentals()->sole();
+        $this->assertSame(Rental::CHANNEL_WALK_IN, $rental->booking_channel);
+        $this->assertSame($admin->id, $rental->created_by);
+        $this->get(route('admin.bookings.show', $rental))->assertOk()->assertSee($walkIn->name);
     }
 
     private function createUserWithRole(string $roleName): User

@@ -8,6 +8,7 @@ use App\Models\Rental;
 use App\Models\RentalSetting;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\IdentityDocuments;
 use App\Services\RentalBookingService;
 use App\Services\RentalFinancialService;
 use App\Services\RentalOperationService;
@@ -15,9 +16,11 @@ use App\Services\RentalScheduleService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
+use RuntimeException;
 use Throwable;
 
 class BookingController extends Controller
@@ -211,41 +214,74 @@ class BookingController extends Controller
     }
 
     /**
-     * Register a walk-in customer account in pending verification state before booking (A-15).
+     * Catat identitas penyewa walk-in tanpa membuat kredensial login (UAT-10, A-15).
      */
-    public function registerWalkInCustomer(Request $request): RedirectResponse
+    public function registerWalkInCustomer(Request $request, IdentityDocuments $documents): RedirectResponse
     {
-        if (is_string($request->input('email'))) {
-            $request->merge(['email' => Str::lower(trim($request->input('email')))]);
-        }
-
-        $validated = $request->validate([
+        $validator = Validator::make($request->all(), [
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'phone' => ['required', 'string', 'max:25'],
             'address' => ['nullable', 'string', 'max:500'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'email' => ['prohibited'],
+            'password' => ['prohibited'],
+            'ktp_number' => ['required', 'digits:16'],
+            'sim_number' => ['required', 'digits:14'],
+            'ktp_image' => ['required', 'image', 'mimes:jpg,jpeg,png', 'extensions:jpg,jpeg,png', 'max:2048'],
+            'sim_image' => ['required', 'image', 'mimes:jpg,jpeg,png', 'extensions:jpg,jpeg,png', 'max:2048'],
         ]);
 
-        $customerRole = Role::firstOrCreate(
-            ['name' => 'customer'],
-            ['display_name' => 'Pelanggan']
-        );
+        // only() membatasi input lama yang dikembalikan ke formulir. Nomor KTP
+        // dan SIM tidak ikut dimasukkan ke flash session ketika penyimpanan gagal.
+        $contact = $request->only('name', 'phone', 'address');
+        if ($validator->fails()) {
+            return back()->withErrors($validator)->withInput($contact);
+        }
 
-        // Akun pelanggan baru hasil pendaftaran langsung tetap berstatus 'pending'
-        // dan wajib menyelesaikan verifikasi identitas sebelum dapat dibuatkan pesanan.
-        $customer = User::create([
-            'role_id' => $customerRole->id,
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-            'phone' => $validated['phone'],
-            'address' => $validated['address'] ?? null,
-            'password' => Hash::make($validated['password']),
-            'verification_status' => 'pending',
-        ]);
+        $validated = $validator->validated();
+        $paths = [];
+        try {
+            // store() membuat nama berkas dan mengembalikan path relatif pada disk privat.
+            // Simpan kedua path sebelum membuat baris pelanggan agar antrean verifikasi
+            // tidak menerima catatan yang kehilangan salah satu berkasnya.
+            foreach (['ktp_image', 'sim_image'] as $field) {
+                $path = $validated[$field]->store('identities', 'local');
+                if ($path === false) {
+                    throw new RuntimeException('Gagal menyimpan dokumen walk-in.');
+                }
+                $paths[$field] = $path;
+                if (! $documents->exists($path)) {
+                    throw new RuntimeException('Dokumen walk-in tidak ditemukan setelah unggah.');
+                }
+            }
+
+            // Callback transaksi mengembalikan model User setelah Eloquent menyimpan
+            // profil. Model yang sama dipakai antrean verifikasi dan rentals.user_id.
+            // Nomor identitas melalui mutator/cast terenkripsi sebelum masuk PostgreSQL.
+            $customer = DB::transaction(function () use ($validated, $paths): User {
+                $customerRole = Role::query()->where('name', 'customer')->firstOrFail();
+
+                return User::create([
+                    'role_id' => $customerRole->id,
+                    'name' => $validated['name'],
+                    'phone' => $validated['phone'],
+                    'address' => $validated['address'] ?? null,
+                    'ktp_number' => $validated['ktp_number'],
+                    'sim_number' => $validated['sim_number'],
+                    'verification_status' => 'pending',
+                ] + $paths);
+            });
+        } catch (Throwable) {
+            // Bersihkan hanya berkas baru milik permintaan ini jika salah satu
+            // unggahan atau simpan profil gagal. Dokumen pelanggan lain tetap utuh.
+            foreach ($paths as $path) {
+                $documents->delete($path);
+            }
+
+            return back()->withInput($contact)->with('error', 'Identitas walk-in belum dapat disimpan. Silakan coba kembali.');
+        }
 
         return redirect()->route('admin.verifications.show', $customer)
-            ->with('success', "Akun pelanggan {$customer->name} berhasil dibuat. Lengkapi unggahan KTP/SIM dan setujui verifikasi sebelum membuat pemesanan langsung.");
+            ->with('success', "Identitas walk-in {$customer->name} tersimpan dan siap diperiksa.");
     }
 
     /**

@@ -34,12 +34,12 @@
             </div>
 
             <div>
-                <label for="customer_id" class="block text-xs font-semibold text-ink mb-1">Pelanggan Terdaftar</label>
+                <label for="customer_id" class="block text-xs font-semibold text-ink mb-1">Pelanggan</label>
                 <select id="customer_id" name="customer_id" required class="w-full rounded-lg border border-field-line bg-surface-raised p-2.5 text-sm">
                     <option value="">-- Pilih Pelanggan --</option>
                     @foreach ($customers as $customer)
                         <option value="{{ $customer->id }}" @selected((int) old('customer_id', $selectedCustomerId) === $customer->id)>
-                            {{ $customer->name }} ({{ $customer->email }}) &mdash; {{ $customer->isVerified() ? 'Terverifikasi' : 'Belum Terverifikasi' }}
+                            {{ $customer->name }} ({{ $customer->email ?? 'Tanpa akun login' }}) &mdash; {{ $customer->isVerified() ? 'Terverifikasi' : 'Belum Terverifikasi' }}
                         </option>
                     @endforeach
                 </select>
@@ -93,20 +93,16 @@
             </button>
         </form>
 
-        <form method="POST" action="{{ route('admin.bookings.register-customer') }}" class="lg:col-span-5 bg-surface rounded-xl border border-line p-6 shadow-sm space-y-4 self-start">
+        <form method="POST" action="{{ route('admin.bookings.register-customer') }}" enctype="multipart/form-data" class="lg:col-span-5 bg-surface rounded-xl border border-line p-6 shadow-sm space-y-4 self-start">
             @csrf
             <div class="border-b border-line pb-3">
-                <h2 class="text-base font-bold text-ink">Bantu Daftarkan Pelanggan Baru</h2>
-                <p class="text-xs text-muted mt-0.5">Pelanggan baru yang datang langsung didaftarkan berstatus menunggu verifikasi sebelum KTP/SIM disetujui.</p>
+                <h2 class="text-base font-bold text-ink">Catat Identitas Walk-in</h2>
+                <p class="text-xs text-muted mt-0.5">Simpan identitas dan foto KTP/SIM untuk diperiksa admin. Pelanggan tidak perlu membuat akun login.</p>
             </div>
 
             <div>
                 <label for="reg_name" class="block text-xs font-semibold text-ink mb-1">Nama Lengkap</label>
                 <input id="reg_name" name="name" value="{{ old('name') }}" required class="w-full rounded-lg border border-field-line bg-surface-raised p-2.5 text-sm">
-            </div>
-            <div>
-                <label for="reg_email" class="block text-xs font-semibold text-ink mb-1">Email</label>
-                <input id="reg_email" name="email" type="email" value="{{ old('email') }}" required class="w-full rounded-lg border border-field-line bg-surface-raised p-2.5 text-sm">
             </div>
             <div>
                 <label for="reg_phone" class="block text-xs font-semibold text-ink mb-1">Nomor Telepon / WhatsApp</label>
@@ -116,17 +112,21 @@
                 <label for="reg_address" class="block text-xs font-semibold text-ink mb-1">Alamat (Opsional)</label>
                 <input id="reg_address" name="address" value="{{ old('address') }}" class="w-full rounded-lg border border-field-line bg-surface-raised p-2.5 text-sm">
             </div>
-            <div>
-                <label for="reg_password" class="block text-xs font-semibold text-ink mb-1">Kata Sandi Awal</label>
-                <input id="reg_password" name="password" type="password" minlength="8" required class="w-full rounded-lg border border-field-line bg-surface-raised p-2.5 text-sm">
-            </div>
-            <div>
-                <label for="reg_password_confirmation" class="block text-xs font-semibold text-ink mb-1">Konfirmasi Kata Sandi</label>
-                <input id="reg_password_confirmation" name="password_confirmation" type="password" required class="w-full rounded-lg border border-field-line bg-surface-raised p-2.5 text-sm">
-            </div>
+            {{-- Setiap label menunjuk ke input dengan id yang sama. Atribut accept
+                memandu pemilihan berkas; validasi format juga berjalan di server. --}}
+            @foreach (['ktp' => 16, 'sim' => 14] as $type => $digits)
+                <div>
+                    <label for="reg_{{ $type }}_number" class="block text-xs font-semibold text-ink mb-1">Nomor {{ strtoupper($type) }} ({{ $digits }} digit)</label>
+                    <input id="reg_{{ $type }}_number" name="{{ $type }}_number" type="text" inputmode="numeric" pattern="{{ '[0-9]{'.$digits.'}' }}" maxlength="{{ $digits }}" required class="w-full rounded-lg border border-field-line bg-surface-raised p-2.5 text-sm">
+                </div>
+                <div>
+                    <label for="reg_{{ $type }}_image" class="block text-xs font-semibold text-ink mb-1">Foto {{ strtoupper($type) }} (JPG/JPEG/PNG, maks 2 MB)</label>
+                    <input id="reg_{{ $type }}_image" name="{{ $type }}_image" type="file" accept=".jpg,.jpeg,.png" required class="w-full rounded-lg border border-field-line bg-surface-raised p-2.5 text-sm">
+                </div>
+            @endforeach
 
             <button type="submit" class="w-full rounded-lg border border-field-line bg-surface-raised hover:bg-surface-hover px-4 py-2.5 text-xs font-bold text-ink">
-                Daftarkan &amp; Lanjut ke Verifikasi
+                Simpan &amp; Lanjut ke Verifikasi
             </button>
         </form>
     </div>

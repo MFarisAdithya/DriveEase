@@ -70,7 +70,7 @@
             </div>
             <div>
                 <span class="text-muted block font-medium">Email</span>
-                <span class="text-sm font-semibold text-ink mt-0.5 block">{{ $user->email }}</span>
+                <span class="text-sm font-semibold text-ink mt-0.5 block">{{ $user->email ?? 'Tanpa akun login' }}</span>
             </div>
             <div>
                 <span class="text-muted block font-medium">Nomor Telepon</span>

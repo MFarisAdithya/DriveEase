@@ -29,7 +29,7 @@
             <div>
                 <h2 class="text-xl font-bold text-ink">{{ $rental->car?->name }} ({{ $rental->car?->plate_number }})</h2>
                 <p class="text-xs text-muted mt-0.5">
-                    Pelanggan: <strong>{{ $rental->user?->name }}</strong> ({{ $rental->user?->email }})
+                    Pelanggan: <strong>{{ $rental->user?->name }}</strong> ({{ $rental->user?->email ?? 'Tanpa akun login' }})
                     &middot; Kanal: <strong>{{ $rental->channelLabel() }}</strong>
                     @if ($rental->creator)
                         &middot; Dibuat oleh: {{ $rental->creator->name }}
