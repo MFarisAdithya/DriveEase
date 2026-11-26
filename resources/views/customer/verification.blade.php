@@ -145,7 +145,7 @@
                 {{ $user->isRejectedVerification() ? 'Formulir Perbaikan & Pengiriman Ulang' : ($user->hasSubmittedDocuments() ? 'Perbarui Dokumen Identitas' : 'Unggah Dokumen Identitas') }}
             </h3>
             <p class="text-xs text-muted mb-6">
-                Pastikan foto dokumen tampak jelas, tidak buram, dan teks dapat terbaca dengan baik. Format didukung: JPG, JPEG, PNG, WEBP (Maksimal 2 MB per file).
+                Pastikan foto dokumen tampak jelas, tidak buram, dan teks dapat terbaca dengan baik. Format didukung: JPG, JPEG, PNG (Maksimal 2 MB per file).
             </p>
 
             <form action="{{ route('customer.verification.store') }}" method="POST" enctype="multipart/form-data" class="space-y-6">
@@ -188,9 +188,9 @@
                         <input type="file" 
                                name="ktp_image" 
                                id="ktp_image" 
-                               accept=".jpg,.jpeg,.png,.webp"
+                               accept=".jpg,.jpeg,.png"
                                class="w-full text-xs text-muted file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-surface-hover file:text-link hover:file:bg-surface-hover border border-line rounded-lg p-1.5 cursor-pointer">
-                        <p class="text-[11px] text-muted mt-1">Maksimal 2 MB. Format JPG, PNG, atau WEBP.</p>
+                        <p class="text-[11px] text-muted mt-1">Maksimal 2 MB. Format JPG, JPEG, atau PNG.</p>
                         @error('ktp_image')
                             <p class="text-xs text-danger mt-1 font-medium">{{ $message }}</p>
                         @enderror
@@ -255,9 +255,9 @@
                         <input type="file" 
                                name="sim_image" 
                                id="sim_image" 
-                               accept=".jpg,.jpeg,.png,.webp"
+                               accept=".jpg,.jpeg,.png"
                                class="w-full text-xs text-muted file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-surface-hover file:text-link hover:file:bg-surface-hover border border-line rounded-lg p-1.5 cursor-pointer">
-                        <p class="text-[11px] text-muted mt-1">Maksimal 2 MB. Format JPG, PNG, atau WEBP.</p>
+                        <p class="text-[11px] text-muted mt-1">Maksimal 2 MB. Format JPG, JPEG, atau PNG.</p>
                         @error('sim_image')
                             <p class="text-xs text-danger mt-1 font-medium">{{ $message }}</p>
                         @enderror

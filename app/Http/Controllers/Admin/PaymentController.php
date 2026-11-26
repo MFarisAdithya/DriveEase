@@ -25,7 +25,7 @@ class PaymentController extends Controller
     public function storeWalkInProof(Request $request, Rental $rental): RedirectResponse
     {
         $validated = $request->validate([
-            'payment_proof' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+            'payment_proof' => ['required', 'image', 'mimes:jpg,jpeg,png', 'extensions:jpg,jpeg,png', 'max:2048'],
             'claimed_amount' => ['nullable', 'numeric', 'min:1'],
         ]);
 

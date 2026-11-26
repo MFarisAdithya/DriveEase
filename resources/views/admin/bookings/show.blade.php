@@ -80,7 +80,7 @@
                 @csrf
                 <h3 class="text-sm font-bold text-ink">Unggah Bukti Transfer (Bantuan Walk-In)</h3>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <input name="payment_proof" type="file" accept=".jpg,.jpeg,.png,.webp" required class="rounded-lg border border-field-line bg-surface p-2 text-xs">
+                    <input name="payment_proof" type="file" accept=".jpg,.jpeg,.png" required class="rounded-lg border border-field-line bg-surface p-2 text-xs">
                     <input name="claimed_amount" type="number" min="1" value="{{ (int) $rental->remainingBalance() }}" required class="rounded-lg border border-field-line bg-surface p-2 text-xs">
                 </div>
                 <button type="submit" class="rounded-lg bg-surface-hover px-4 py-2 text-xs font-bold text-ink">Simpan Bukti Transfer</button>
@@ -541,7 +541,7 @@
                         </div>
                         <div>
                             <label for="damage_evidence" class="block font-semibold text-ink mb-1">Foto Bukti Kerusakan Tambahan (Opsional jika foto inspeksi akhir sudah ada)</label>
-                            <input id="damage_evidence" name="damage_evidence" type="file" accept=".jpg,.jpeg,.png,.webp" class="w-full rounded-lg border border-field-line bg-surface p-2">
+                            <input id="damage_evidence" name="damage_evidence" type="file" accept=".jpg,.jpeg,.png" class="w-full rounded-lg border border-field-line bg-surface p-2">
                         </div>
                         <button type="submit" class="rounded-lg bg-action hover:bg-action-hover px-4 py-2 font-bold text-ink">
                             Simpan Pemeriksaan Biaya Tambahan
@@ -554,7 +554,7 @@
                         @csrf
                         <div class="flex-1">
                             <label for="admin_add_charge_proof" class="block font-semibold text-ink mb-1">Unggah Bukti Bayar Tagihan Tambahan (Walk-In / Dibantu Admin)</label>
-                            <input id="admin_add_charge_proof" name="additional_charge_proof" type="file" required accept=".jpg,.jpeg,.png,.webp" class="w-full rounded-lg border border-field-line bg-surface p-2">
+                            <input id="admin_add_charge_proof" name="additional_charge_proof" type="file" required accept=".jpg,.jpeg,.png" class="w-full rounded-lg border border-field-line bg-surface p-2">
                         </div>
                         <button type="submit" class="rounded-lg border border-line bg-surface px-4 py-2 font-bold text-ink shrink-0">Kirim Bukti Tambahan</button>
                     </form>

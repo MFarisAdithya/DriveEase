@@ -101,7 +101,7 @@ class BookingChangeController extends Controller
         abort_unless($extension->rental?->user_id === $request->user()->id, 403, 'Anda tidak berhak mengunggah bukti pembayaran untuk pesanan ini.');
 
         $validated = $request->validate([
-            'payment_proof' => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
+            'payment_proof' => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'extensions:jpg,jpeg,png,pdf', 'max:5120'],
         ]);
 
         $this->extensionService->submitExtensionPayment(

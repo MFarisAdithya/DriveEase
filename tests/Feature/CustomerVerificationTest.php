@@ -238,9 +238,26 @@ class CustomerVerificationTest extends TestCase
         $response2->assertSessionHasErrors(['sim_image']);
     }
 
+    public function test_new_identity_upload_rejects_webp_even_when_named_jpg(): void
+    {
+        // Berkas uji berisi gambar WebP, tetapi nama unggahan meniru foto JPG.
+        // Validasi harus membaca isi berkas dan menolak penyamaran tipe ini.
+        $webp = UploadedFile::fake()->image('ktp.webp');
+        $renamed = new UploadedFile($webp->getPathname(), 'ktp.jpg', 'image/jpeg', UPLOAD_ERR_OK, true);
+
+        $this->actingAs($this->customer)->post(route('customer.verification.store'), [
+            'ktp_number' => '3578012304950001',
+            'sim_number' => '12345678901234',
+            'ktp_image' => $renamed,
+            'sim_image' => UploadedFile::fake()->image('sim.png'),
+        ])->assertSessionHasErrors(['ktp_image' => 'Format foto KTP harus berupa JPG, JPEG, atau PNG.']);
+
+        $this->assertNull($this->customer->fresh()->ktp_image);
+    }
+
     public function test_admin_can_view_customer_private_document(): void
     {
-        $ktpPath = 'identities/fake_ktp.jpg';
+        $ktpPath = 'identities/fake_ktp.webp';
         Storage::disk('local')->put($ktpPath, 'fake-image-content');
 
         $this->customer->update([

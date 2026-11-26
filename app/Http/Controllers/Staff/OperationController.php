@@ -112,7 +112,7 @@ class OperationController extends Controller
             'odometer_km' => ['required', 'integer', 'min:0', 'max:9999999'],
             'fuel_level' => ['required', Rule::in(array_keys(Inspection::FUEL_LEVEL_LABELS))],
             'condition_notes' => ['nullable', 'string', 'max:1000'],
-            'condition_photo' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
+            'condition_photo' => ['required', 'image', 'mimes:jpg,jpeg,png', 'extensions:jpg,jpeg,png', 'max:4096'],
         ]);
 
         $this->operationService->confirmPickup(
@@ -139,7 +139,7 @@ class OperationController extends Controller
             'condition_notes' => ['nullable', 'string', 'max:1000'],
             'has_damage' => ['nullable', 'boolean'],
             'damage_description' => ['nullable', 'required_if:has_damage,1', 'string', 'min:5', 'max:2000'],
-            'condition_photo' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
+            'condition_photo' => ['required', 'image', 'mimes:jpg,jpeg,png', 'extensions:jpg,jpeg,png', 'max:4096'],
         ]);
 
         $this->operationService->confirmReturn(

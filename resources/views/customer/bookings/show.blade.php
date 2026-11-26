@@ -121,8 +121,8 @@
                     {{ $rental->payment_status === \App\Models\Rental::PAYMENT_REJECTED ? 'Perbaiki Bukti / Lengkapi Kekurangan Pembayaran' : 'Unggah Bukti Transfer Pembayaran' }}
                 </h2>
                 <div>
-                    <label for="payment_proof" class="block text-xs font-semibold text-ink mb-1">Foto Bukti Transfer (JPG/PNG/WEBP, maks 2 MB)</label>
-                    <input id="payment_proof" name="payment_proof" type="file" accept=".jpg,.jpeg,.png,.webp" required class="w-full rounded-lg border border-field-line bg-surface p-2 text-xs">
+                    <label for="payment_proof" class="block text-xs font-semibold text-ink mb-1">Foto Bukti Transfer (JPG/JPEG/PNG, maks 2 MB)</label>
+                    <input id="payment_proof" name="payment_proof" type="file" accept=".jpg,.jpeg,.png" required class="w-full rounded-lg border border-field-line bg-surface p-2 text-xs">
                 </div>
                 <div class="flex justify-end">
                     <button type="submit" class="rounded-lg bg-action hover:bg-action-hover px-5 py-2.5 text-xs font-bold text-ink shadow-xs">
@@ -437,7 +437,7 @@
                         @csrf
                         <p class="text-muted">Transfer sisa tagihan tambahan Rp <strong class="text-ink">{{ number_format($rental->remainingAdditionalChargeBalance(), 0, ',', '.') }}</strong> ke rekening <strong class="text-ink">{{ $rental->additional_charge_bank_name ?? $rental->payment_bank_name }} {{ $rental->additional_charge_account_number ?? $rental->payment_account_number }}</strong> (a.n. {{ $rental->additional_charge_account_holder ?? $rental->payment_account_holder }}).</p>
                         <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                            <input name="additional_charge_proof" type="file" required accept=".jpg,.jpeg,.png,.webp" class="flex-1 rounded-lg border border-field-line bg-surface p-2">
+                            <input name="additional_charge_proof" type="file" required accept=".jpg,.jpeg,.png" class="flex-1 rounded-lg border border-field-line bg-surface p-2">
                             <button type="submit" class="rounded-lg bg-action hover:bg-action-hover px-4 py-2 font-bold text-ink shrink-0">
                                 Kirim Bukti Pembayaran Tambahan
                             </button>

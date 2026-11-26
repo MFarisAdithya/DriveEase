@@ -22,7 +22,7 @@ class AdditionalChargeController extends Controller
         abort_unless($rental->user_id === $request->user()->id, 403, 'Anda tidak berhak mengirim bukti tagihan tambahan untuk pesanan ini.');
 
         $validated = $request->validate([
-            'additional_charge_proof' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
+            'additional_charge_proof' => ['required', 'image', 'mimes:jpg,jpeg,png', 'extensions:jpg,jpeg,png', 'max:4096'],
         ]);
 
         $this->settlementService->submitAdditionalChargePayment(

@@ -26,7 +26,7 @@ class SettlementController extends Controller
             'fuel_fee_reason' => ['nullable', 'string', 'max:1000'],
             'damage_fee_amount' => ['required', 'numeric', 'min:0'],
             'damage_fee_reason' => ['nullable', 'string', 'max:1000'],
-            'damage_evidence' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
+            'damage_evidence' => ['nullable', 'image', 'mimes:jpg,jpeg,png', 'extensions:jpg,jpeg,png', 'max:4096'],
         ]);
 
         $this->settlementService->assessAdditionalCharges(
@@ -50,7 +50,7 @@ class SettlementController extends Controller
     public function storeChargeProof(Request $request, Rental $rental): RedirectResponse
     {
         $validated = $request->validate([
-            'additional_charge_proof' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
+            'additional_charge_proof' => ['required', 'image', 'mimes:jpg,jpeg,png', 'extensions:jpg,jpeg,png', 'max:4096'],
         ]);
 
         $this->settlementService->submitAdditionalChargePayment(

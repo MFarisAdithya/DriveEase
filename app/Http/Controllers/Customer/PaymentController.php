@@ -21,7 +21,7 @@ class PaymentController extends Controller
         abort_unless($rental->user_id === $request->user()->id, 403, 'Anda tidak berhak mengunggah pembayaran untuk pesanan ini.');
 
         $validated = $request->validate([
-            'payment_proof' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+            'payment_proof' => ['required', 'image', 'mimes:jpg,jpeg,png', 'extensions:jpg,jpeg,png', 'max:2048'],
             'claimed_amount' => ['nullable', 'numeric', 'min:1'],
         ]);
 

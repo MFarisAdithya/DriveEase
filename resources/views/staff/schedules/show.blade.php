@@ -103,7 +103,7 @@
                 </div>
                 <div>
                     <label for="pickup_photo" class="block font-semibold text-ink mb-1">Foto Kondisi Fisik Awal (Wajib)</label>
-                    <input id="pickup_photo" name="condition_photo" type="file" required accept=".jpg,.jpeg,.png,.webp" class="w-full rounded-lg border border-field-line bg-surface p-2">
+                    <input id="pickup_photo" name="condition_photo" type="file" required accept=".jpg,.jpeg,.png" class="w-full rounded-lg border border-field-line bg-surface p-2">
                 </div>
                 <button type="submit" class="rounded-lg bg-action hover:bg-action-hover px-5 py-2.5 font-bold text-ink">
                     Konfirmasi Serah-Terima Kendaraan
@@ -149,7 +149,7 @@
                 </div>
                 <div>
                     <label for="return_photo" class="block font-semibold text-ink mb-1">Foto Kondisi Akhir Kendaraan (Wajib)</label>
-                    <input id="return_photo" name="condition_photo" type="file" required accept=".jpg,.jpeg,.png,.webp" class="w-full rounded-lg border border-field-line bg-surface p-2">
+                    <input id="return_photo" name="condition_photo" type="file" required accept=".jpg,.jpeg,.png" class="w-full rounded-lg border border-field-line bg-surface p-2">
                 </div>
                 <button type="submit" class="rounded-lg bg-action hover:bg-action-hover px-5 py-2.5 font-bold text-ink">
                     Simpan Pengembalian &amp; Inspeksi Akhir

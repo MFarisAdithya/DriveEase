@@ -40,11 +40,14 @@ class VerificationController extends Controller
         $hasKtpFile = $documents->exists($user->ktp_image) || $documents->exists(session('temp_ktp_image')) || $request->hasFile('ktp_image');
         $hasSimFile = $documents->exists($user->sim_image) || $documents->exists(session('temp_sim_image')) || $request->hasFile('sim_image');
 
+        // image memastikan berkas berisi gambar. mimes membaca tipe dari isi berkas,
+        // sedangkan extensions membatasi akhiran nama unggahan. Aturan ini hanya
+        // dijalankan untuk berkas baru sehingga dokumen lama tetap dapat dibaca.
         $rules = [
             'ktp_number' => ['required', 'digits:16'],
             'sim_number' => ['required', 'digits:14'],
-            'ktp_image' => [$hasKtpFile ? 'nullable' : 'required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
-            'sim_image' => [$hasSimFile ? 'nullable' : 'required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+            'ktp_image' => [$hasKtpFile ? 'nullable' : 'required', 'image', 'mimes:jpg,jpeg,png', 'extensions:jpg,jpeg,png', 'max:2048'],
+            'sim_image' => [$hasSimFile ? 'nullable' : 'required', 'image', 'mimes:jpg,jpeg,png', 'extensions:jpg,jpeg,png', 'max:2048'],
         ];
 
         $messages = [
@@ -56,11 +59,13 @@ class VerificationController extends Controller
             'sim_number.max' => 'Nomor SIM harus tepat 14 digit angka.',
             'ktp_image.required' => 'Foto KTP asli wajib diunggah.',
             'ktp_image.image' => 'Berkas foto KTP harus berupa gambar.',
-            'ktp_image.mimes' => 'Format foto KTP harus berupa JPG, JPEG, PNG, atau WEBP.',
+            'ktp_image.mimes' => 'Format foto KTP harus berupa JPG, JPEG, atau PNG.',
+            'ktp_image.extensions' => 'Format foto KTP harus berupa JPG, JPEG, atau PNG.',
             'ktp_image.max' => 'Ukuran file foto KTP maksimal 2 MB.',
             'sim_image.required' => 'Foto SIM asli wajib diunggah.',
             'sim_image.image' => 'Berkas foto SIM harus berupa gambar.',
-            'sim_image.mimes' => 'Format foto SIM harus berupa JPG, JPEG, PNG, atau WEBP.',
+            'sim_image.mimes' => 'Format foto SIM harus berupa JPG, JPEG, atau PNG.',
+            'sim_image.extensions' => 'Format foto SIM harus berupa JPG, JPEG, atau PNG.',
             'sim_image.max' => 'Ukuran file foto SIM maksimal 2 MB.',
         ];
 
