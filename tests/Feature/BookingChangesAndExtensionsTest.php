@@ -216,9 +216,9 @@ class BookingChangesAndExtensionsTest extends TestCase
         $this->assertTrue($rental->return_at->timezone('Asia/Jakarta')->equalTo($originalReturnAt));
         $this->assertSame(2, $rental->total_days);
 
-        // Pelanggan mengunggah bukti bayar perpanjangan secara privat.
+        // Bukti perpanjangan tetap menerima PDF dan disimpan secara privat.
         $this->actingAs($customer)->post(route('customer.extensions.payment.store', $extension), [
-            'payment_proof' => UploadedFile::fake()->image('ext-proof.jpg'),
+            'payment_proof' => UploadedFile::fake()->createWithContent('ext-proof.pdf', "%PDF-1.4\n%%EOF\n"),
         ])->assertRedirect(route('customer.bookings.show', $rental));
 
         $extension->refresh();
@@ -228,7 +228,7 @@ class BookingChangesAndExtensionsTest extends TestCase
         // Hak akses dokumen privat bukti perpanjangan: pemilik & admin 200 no-store, staf & pelanggan lain 403.
         $proofUrl = route('documents.extension-payment.show', $extension);
         $ownerResponse = $this->actingAs($customer)->get($proofUrl);
-        $ownerResponse->assertOk();
+        $ownerResponse->assertOk()->assertHeader('Content-Type', 'application/pdf');
         $this->assertStringContainsString('no-store', (string) $ownerResponse->headers->get('Cache-Control'));
 
         $this->actingAs($admin)->get($proofUrl)->assertOk();
