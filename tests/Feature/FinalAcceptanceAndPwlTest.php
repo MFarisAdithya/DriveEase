@@ -332,11 +332,9 @@ class FinalAcceptanceAndPwlTest extends TestCase
         $this->actingAs($customer)->get(route('customer.dashboard'))
             ->assertOk()
             ->assertSee('Selamat Datang')
-            ->assertSee('Armada Siap Disewa Hari Ini');
-
-        $this->actingAs($customer)->get(route('customer.bookings.index'))
-            ->assertOk()
-            ->assertSee('for="customer_history_search"', false);
+            ->assertSee('id="pesanan"', false)
+            ->assertSee('for="customer_history_search"', false)
+            ->assertDontSee('Pesanan saya');
 
         $this->actingAs($admin)->get(route('admin.reports.index'))
             ->assertOk()

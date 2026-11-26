@@ -77,17 +77,21 @@ class DashboardHistoryAndReportTest extends TestCase
             ->assertSee($actionRental->rental_code)
             ->assertDontSee($otherRental->rental_code);
 
-        // C-11: Filter riwayat pribadi berdasarkan kode, status, dan periode WIB.
-        $this->actingAs($customer)->get(route('customer.bookings.index', [
+        // C-11: bookmark lama mengarah ke daftar pada Beranda, dengan filter
+        // yang sama. Pemberitahuan di atas daftar tetap mencakup semua pesanan.
+        $filters = [
             'search' => $paidRental->rental_code,
             'rental_status' => Rental::STATUS_CONFIRMED,
             'date_from' => $pickupPaid->toDateString(),
             'date_to' => $pickupPaid->toDateString(),
-        ]))
+        ];
+        $this->get(route('customer.bookings.index', $filters))
+            ->assertRedirect(route('customer.dashboard', $filters).'#pesanan');
+
+        $this->get(route('customer.dashboard', $filters))
             ->assertOk()
-            ->assertSee($paidRental->rental_code)
             ->assertSee('Bukti Transaksi Tersedia')
-            ->assertDontSee($actionRental->rental_code)
+            ->assertViewHas('bookings', fn ($bookings): bool => $bookings->pluck('id')->all() === [$paidRental->id])
             ->assertDontSee($otherRental->rental_code);
 
         // Bukti transaksi terkonfirmasi tampil pada detail pesanan lunas milik pelanggan.

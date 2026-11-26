@@ -45,14 +45,11 @@
                                 Kesiapan armada
                             </a>
                         @elseif(auth()->user()->isCustomer())
-                            <a href="{{ route('customer.dashboard') }}" class="px-3 py-1.5 rounded-lg {{ request()->routeIs('customer.dashboard') ? 'bg-surface-hover text-ink' : 'text-subtle hover:text-ink' }} transition-colors">
-                                Dasbor saya
+                            <a href="{{ route('customer.dashboard') }}" @if(request()->routeIs('customer.dashboard')) aria-current="page" @endif class="px-3 py-1.5 rounded-lg {{ request()->routeIs('customer.dashboard', 'customer.bookings.*') ? 'bg-surface-hover text-ink' : 'text-subtle hover:text-ink' }} transition-colors">
+                                Beranda
                             </a>
                             <a href="{{ route('customer.verification.create') }}" class="px-3 py-1.5 rounded-lg {{ request()->routeIs('customer.verification.*') ? 'bg-surface-hover text-ink' : 'text-subtle hover:text-ink' }} transition-colors">
                                 Identitas saya
-                            </a>
-                            <a href="{{ route('customer.bookings.index') }}" class="px-3 py-1.5 rounded-lg {{ request()->routeIs('customer.bookings.*') ? 'bg-surface-hover text-ink' : 'text-subtle hover:text-ink' }} transition-colors">
-                                Pesanan saya
                             </a>
                         @endif
                     @endauth
@@ -71,9 +68,8 @@
                             <a class="rounded-lg p-3 hover:bg-surface-raised" href="{{ route('staff.schedules.index') }}">Jadwal operasional</a>
                             <a class="rounded-lg p-3 hover:bg-surface-raised" href="{{ route('staff.readiness.index') }}">Kesiapan armada</a>
                         @elseif (auth()->user()->isCustomer())
-                            <a class="rounded-lg p-3 hover:bg-surface-raised" href="{{ route('customer.dashboard') }}">Dasbor saya</a>
+                            <a class="rounded-lg p-3 hover:bg-surface-raised" href="{{ route('customer.dashboard') }}">Beranda</a>
                             <a class="rounded-lg p-3 hover:bg-surface-raised" href="{{ route('customer.verification.create') }}">Identitas saya</a>
-                            <a class="rounded-lg p-3 hover:bg-surface-raised" href="{{ route('customer.bookings.index') }}">Pesanan saya</a>
                         @endif
                         <a class="rounded-lg p-3 hover:bg-surface-raised" href="{{ route('account.edit') }}">Akun Saya</a>
                     </nav>

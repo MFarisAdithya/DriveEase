@@ -5,8 +5,8 @@
 @section('content')
 <div class="max-w-4xl mx-auto space-y-6">
     <div class="flex flex-wrap items-center justify-between gap-3">
-        <a href="{{ route('customer.bookings.index') }}" class="inline-flex items-center gap-1.5 text-xs font-semibold text-muted hover:text-ink">
-            &larr; Kembali ke Daftar Pesanan
+        <a href="{{ route('customer.dashboard', request()->only('search', 'rental_status', 'date_from', 'date_to', 'page')) }}#pesanan" class="inline-flex items-center gap-1.5 text-xs font-semibold text-muted hover:text-ink">
+            &larr; Kembali ke Beranda
         </a>
         <span class="font-mono text-xs font-bold px-3 py-1 rounded-full bg-surface border border-line text-ink">
             Kode: {{ $rental->rental_code }}

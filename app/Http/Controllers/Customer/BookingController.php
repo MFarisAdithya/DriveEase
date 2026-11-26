@@ -23,59 +23,13 @@ class BookingController extends Controller
         private readonly RentalBookingService $bookingService,
     ) {}
 
-    /**
-     * List bookings belonging strictly to the signed-in customer (SYS-01, C-07).
-     */
-    public function index(Request $request): View
+    public function index(Request $request): RedirectResponse
     {
-        $user = $request->user();
+        // Tautan lama tetap bisa dibuka. Parameter yang sama akan diperiksa
+        // dan dipakai oleh filter di bagian Pesanan pada Beranda.
+        $filters = $request->only('search', 'rental_status', 'date_from', 'date_to', 'page');
 
-        // Lepaskan pesanan kedaluwarsa milik pelanggan sebelum merender daftar pesanan aktif.
-        $this->scheduleService->releaseExpiredHolds();
-
-        $validated = $request->validate([
-            'search' => ['nullable', 'string', 'max:100'],
-            'rental_status' => ['nullable', 'in:pending,confirmed,picked_up,returned,completed,cancelled,expired'],
-            'date_from' => ['nullable', 'date'],
-            'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
-        ], [
-            'date_to.after_or_equal' => 'Tanggal akhir riwayat tidak boleh lebih awal dari tanggal mulai.',
-        ]);
-
-        // Scope user->rentals() menjamin pelanggan hanya dapat menelusuri riwayat transaksinya sendiri (C-11, SYS-01).
-        $query = $user->rentals()->with(['car.carType', 'extensions']);
-
-        if (isset($validated['rental_status']) && $validated['rental_status'] !== '') {
-            $query->where('rental_status', $validated['rental_status']);
-        }
-
-        if (isset($validated['date_from']) && $validated['date_from'] !== '') {
-            $fromWib = CarbonImmutable::parse((string) $validated['date_from'], RentalScheduleService::TIMEZONE)->startOfDay();
-            $query->where('pickup_at', '>=', $fromWib->format('Y-m-d H:i:s'));
-        }
-
-        if (isset($validated['date_to']) && $validated['date_to'] !== '') {
-            $toWib = CarbonImmutable::parse((string) $validated['date_to'], RentalScheduleService::TIMEZONE)->endOfDay();
-            $query->where('pickup_at', '<=', $toWib->format('Y-m-d H:i:s'));
-        }
-
-        if (isset($validated['search']) && trim((string) $validated['search']) !== '') {
-            $search = trim((string) $validated['search']);
-            $query->where(function ($q) use ($search): void {
-                $q->where('rental_code', 'ilike', "%{$search}%")
-                    ->orWhereHas('car', function ($cq) use ($search): void {
-                        $cq->where('name', 'ilike', "%{$search}%")
-                            ->orWhere('plate_number', 'ilike', "%{$search}%");
-                    });
-            });
-        }
-
-        $bookings = $query
-            ->latest()
-            ->paginate(10)
-            ->withQueryString();
-
-        return view('customer.bookings.index', compact('bookings'));
+        return redirect()->to(route('customer.dashboard', $filters).'#pesanan');
     }
 
     /**

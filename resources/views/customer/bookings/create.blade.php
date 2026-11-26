@@ -5,8 +5,8 @@
 @section('content')
 <div class="max-w-3xl mx-auto space-y-6">
     <div>
-        <a href="{{ route('customer.bookings.index') }}" class="inline-flex items-center gap-1.5 text-xs font-semibold text-muted hover:text-ink">
-            &larr; Kembali ke Daftar Pesanan
+        <a href="{{ route('customer.dashboard') }}#pesanan" class="inline-flex items-center gap-1.5 text-xs font-semibold text-muted hover:text-ink">
+            &larr; Kembali ke Beranda
         </a>
         <h1 class="mt-2 text-2xl font-bold text-ink">Pemesanan Kendaraan Online</h1>
         <p class="mt-1 text-xs text-muted">Seluruh jadwal menggunakan Waktu Indonesia Barat (WIB) dengan durasi 24 jam per hari sewa.</p>

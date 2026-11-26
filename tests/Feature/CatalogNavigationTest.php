@@ -29,7 +29,7 @@ class CatalogNavigationTest extends TestCase
         $user = User::where('email', 'customer@driveease.test')->firstOrFail();
         $this->actingAs($user)->get(route('cars.index'))->assertOk()
             ->assertSee('data-account-menu', false)->assertSee('Navigasi akun')
-            ->assertSee(route('customer.verification.create'))->assertSee('Dasbor saya');
+            ->assertSee(route('customer.verification.create'))->assertSee('Beranda')->assertDontSee('Pesanan saya');
     }
 
     public function test_default_validation_messages_are_indonesian(): void
