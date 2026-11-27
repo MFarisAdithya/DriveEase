@@ -172,15 +172,15 @@
                         </div>
                     </div>
 
-                    <!-- Right Column: Floating White SUV + White Scooter Visual -->
+                    <!-- Right Column: Mobil pilihan -->
                     <div class="md:col-span-6 lg:col-span-7 relative flex items-center justify-center md:justify-end">
                         <!-- Subtle Soft Radial Spotlight Behind Vehicles -->
                         <div class="pointer-events-none absolute inset-x-10 top-6 bottom-6 rounded-full opacity-70 blur-3xl"
                              style="background: radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(182,223,237,0.35) 60%, transparent 100%);"
                              aria-hidden="true"></div>
 
-                        <img src="{{ asset('images/hero-vehicles.png') }}"
-                             alt="Pilihan Mobil SUV dan Motor Matic DriveEase"
+                        <img src="{{ asset('images/hero-car.png') }}"
+                             alt="Pilihan Mobil DriveEase"
                              class="relative z-10 w-full max-w-[760px] md:scale-105 lg:scale-100 h-auto object-contain select-none pointer-events-none animate-driveease-float drop-shadow-[0_22px_32px_rgba(11,40,64,0.12)]">
                     </div>
 
